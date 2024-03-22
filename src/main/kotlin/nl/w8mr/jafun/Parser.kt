@@ -6,6 +6,7 @@ import nl.w8mr.jafun.Token.*
 import nl.w8mr.parsek.*
 import nl.w8mr.parsek.failOr
 import nl.w8mr.parsek.Parser
+import nl.w8mr.parsek.text.Parsers.followedBy
 import java.lang.IllegalArgumentException
 
 data class Symbol(val name: String, val type: TypeSig)
@@ -30,7 +31,6 @@ object Parser {
 
 
     private fun isMethodIdentifier(result: Parser.Result<List<Identifier>>, associativity: Associativity, precedence: Int): Parser.Result<ASTNode.MethodIdentifier> {
-        //println("Debug: $result")
         return when (result) {
             is Parser.Success<List<Identifier>> -> {
                 val s = IdentifierCache.findAll(result.value.map(Identifier::value).joinToString(".").replace('/','∕'))
@@ -57,7 +57,6 @@ object Parser {
     }
 
     private fun isVariableIdentifier(result: Parser.Result<List<Identifier>>): Parser.Result<ASTNode.Variable> {
-        //println("Debug: $result")
         return when (result) {
             is Parser.Success<List<Identifier>> -> {
                 val name = result.value.last().value
@@ -106,10 +105,9 @@ object Parser {
     private val integerLiteral_term = literal(IntegerLiteral::class) map { ASTNode.IntegerLiteral(it.value) }
 
     private val complexIdentifier = identifierTerm sepBy dotTerm
-    //private val methodIdentifier: Parser<ASTNode.MethodIdentifier> = complexIdentifier.mapResult(::isMethodIdentifier)
     private val variableIdentifier : Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
-    private val arguments = (lParenTerm prefixLiteral (ref(::expression) sepBy literal(Comma::class)) postfixLiteral rParenTerm).map(ASTNode::ExpressionList)
-    private val expression : Parser<ASTNode.Expression> = rCurlTerm failOr oneOf(stringLiteral_term, integerLiteral_term, variableIdentifier, arguments, ref(::function), ref(::operations))
+    private val arguments = (lParenTerm prefixLiteral (ref(::expression) sepByAllowEmpty literal(Comma::class)) postfixLiteral rParenTerm).map(ASTNode::ExpressionList)
+    private val expression : Parser<ASTNode.Expression> = oneOf(stringLiteral_term, integerLiteral_term, variableIdentifier, arguments, ref(::function), ref(::operations))
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm).map(::newVariable)
 
     private fun methodIdentifier(associativity: Associativity = Associativity.PREFIX, precedence: Int = 10): Parser<ASTNode.MethodIdentifier> = complexIdentifier.mapResult { isMethodIdentifier(it, associativity, precedence) }
@@ -122,12 +120,14 @@ object Parser {
         infixl(30, methodIdentifier(Associativity.INFIXL, 30).binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } })
         infixl(20, methodIdentifier(Associativity.INFIXL, 20).binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } })
         prefix(10, methodIdentifier().unary { ident -> { expr -> invocation(ident, expr) } })
+       // solo(10, methodIdentifier(Associativity.SOLO).noary { ident -> { invocation(ident, ASTNode.ExpressionList(emptyList())) } })
+
         prefix(0, initVal.unary { ident -> { expr -> assignment(ident, expr) } } )
     }
-    private val curlBlock = seq(lCurlTerm, ref(::block)) { _, b, -> b }
+    private val curlBlock = seq(lCurlTerm, ref(::block), rCurlTerm) { _, b, _ -> b }
     private val function : Parser<ASTNode.Expression> = seq(funTerm, identifierTerm, seq(lParenTerm, rParenTerm), curlBlock) { _, i, _, b -> newFunction(i,b) }
-    private val statement : Parser<ASTNode.Statement> = seq(expression, oneOf(newlineTerm, eof(), rCurlTerm)) { expr, _ -> ASTNode.Statement(expr) }
-    private val block = zeroOrMore(statement)
+    private val statement : Parser<ASTNode.Statement> = seq(expression, oneOf(newlineTerm, eof(), lookAhead(rCurlTerm))) { expr, _ -> ASTNode.Statement(expr) }
+    private val block = seq(zeroOrMore(statement),zeroOrMore(newlineTerm)) { s, _ -> s }
     private val parser = block
 
     fun parse(tokens: List<Token>): List<ASTNode.Statement> {

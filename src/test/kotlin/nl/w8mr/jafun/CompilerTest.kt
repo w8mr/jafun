@@ -186,5 +186,5 @@ class CompilerTest {
         """)
         assertEquals("", result)
     }
-
+//            fun test() { fun blah() { println 2 } }
 }

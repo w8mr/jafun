@@ -10,6 +10,7 @@ import kotlin.Array
 
 fun compile(code: String, className: String = "HelloWorld", methodName: String = "main", methodSig: String = "([Ljava/lang/String;)V"): ByteArray {
     val lexed = lexer.parse(code).filter { it !is Token.WS }
+    println("LEXED: $lexed")
     val parsed = Parser.parse(lexed)
     println("PARSED: $parsed")
     println()

@@ -17,3 +17,7 @@ fun euro(n: Int) = n * 100
 @FunctionPrecedence(40)
 @FunctionAssociativity(Associativity.POSTFIX)
 fun cent(n: Int) = n
+
+@FunctionPrecedence(10)
+@FunctionAssociativity(Associativity.SOLO)
+fun test() = 5

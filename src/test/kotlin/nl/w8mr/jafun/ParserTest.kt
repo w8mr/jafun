@@ -94,4 +94,14 @@ class ParserTest {
         println(Parser.parse(lexed))
     }
 
+    @Test
+    fun functionAndInvocation() {
+        val input = """
+            test
+        """.trimIndent()
+        val lexed = lexer.parse(input).filter { it !is Token.WS }
+        println(lexed)
+        println(Parser.parse(lexed))
+    }
+
 }
