@@ -186,5 +186,14 @@ class CompilerTest {
         """)
         assertEquals("", result)
     }
-//            fun test() { fun blah() { println 2 } }
+
+    @Test
+    fun funDeclarationAndInvocation() {
+        val result = test("""
+            fun test() { println 2 }
+            test
+            test
+        """)
+        assertEquals("2\n2\n", result)
+    }
 }

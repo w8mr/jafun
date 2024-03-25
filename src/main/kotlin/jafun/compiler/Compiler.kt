@@ -8,8 +8,23 @@ annotation class FunctionAssociativity(val associativity: Associativity)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionPrecedence(val precedence: Int)
 
-object IdentifierCache {
-    val identifierMap = mutableMapOf<String, List<TypeSig>>()
+interface SymbolMap {
+    fun find(path: String) : TypeSig?
+    fun add(path: String, typeSig: TypeSig)
+
+}
+
+class LocalSymbolMap(val parent: SymbolMap): SymbolMap {
+    private val identifierMap = mutableMapOf<String, TypeSig?>()
+    override fun find(path: String): TypeSig? =
+        identifierMap[path] ?: parent.find(path)
+
+    override fun add(path: String, typeSig: TypeSig) {
+        identifierMap[path] = typeSig
+    }
+}
+object IdentifierCache: SymbolMap {
+    val identifierMap = mutableMapOf<String, TypeSig?>()
     init {
         val systemOutPrintln = staticFieldMethod(
             "java.lang.System",
@@ -26,21 +41,13 @@ object IdentifierCache {
         staticField: String,
         staticFieldType: String,
         methodName: String
-    ): List<TypeSig> {
+    ): TypeSig {
         val parent = jfClass(containingClass)
         val field = JFField(parent, staticFieldType.replace('.','/'), jfClass(staticFieldType), staticField)
-        return listOf(
-            parent,
-            field,
-            JFMethod(listOf(jfClass("java.lang.String")), field, methodName, VoidType, false)
-        )
-
+        return JFMethod(listOf(jfClass("java.lang.String")), field, methodName, VoidType, false)
     }
 
-    fun find(path: String) : TypeSig =
-        findAll(path)[0]
-
-    fun findAll(path: String) : List<TypeSig> {
+    override fun find(path: String) : TypeSig? {
         return identifierMap.computeIfAbsent(path) {
             val split = path.split(".")
             when {
@@ -49,13 +56,13 @@ object IdentifierCache {
                     val typeSigs = listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt").map {
                         val jClass = Class.forName(it)
                         findInClass(jClass, name)
-                    }.firstOrNull() { it.isNotEmpty() } ?: emptyList()
-                    typeSigs
+                    }.firstOrNull() { it != null }
+                     typeSigs
                 }
                 else -> {
                     try {
                         val jClass = Class.forName(path)
-                        listOf(JFClass(jClass.name.replace('.', '/')))
+                        JFClass(jClass.name.replace('.', '/'))
                     } catch (e: Exception) {
                         TODO()
 
@@ -66,10 +73,13 @@ object IdentifierCache {
         }
     }
 
-    private fun findInClass(jClass: Class<*>, name: String): List<TypeSig> {
+    override fun add(path: String, typeSig: TypeSig) {
+        identifierMap[path] = typeSig
+    }
+
+    private fun findInClass(jClass: Class<*>, name: String): TypeSig? {
         val jMethod = jClass.declaredMethods.find { it.name == name }
         return jMethod?.let {
-            val pckg = JFClass(jClass.name)
             val params = jMethod.parameters.map { jvmType(it.type.name) }
             val returnName = jMethod.returnType.name
             val rtn = jvmType(returnName)
@@ -83,8 +93,8 @@ object IdentifierCache {
                 params, JFClass("${jClass.name.replace('.', '/')}"), name, rtn,
                 true, associativity, precedence
             )
-            listOf(pckg, method)
-        } ?: listOf()
+            method
+        }
     }
 
     private val jvmTypes: Map<String, TypeSig> = mapOf(
@@ -132,6 +142,12 @@ data class JFMethod(
 
 }
 
+data class JFVariableSymbol(val name: String, val type: TypeSig): TypeSig {
+    override val signature: String
+        get() = type.signature
+}
+
+
 open class Generic(override val signature: String) : TypeSig {
     override fun equals(other: Any?) =
         other is TypeSig && this.signature == other.signature
@@ -139,6 +155,8 @@ open class Generic(override val signature: String) : TypeSig {
     override fun hashCode() =
         signature.hashCode()
 }
+
+val ThisType = JFField(JFClass(""), "this", Generic("this"), "this")
 
 object ClassType: Generic("L")
 object UnknownType: Generic("?")

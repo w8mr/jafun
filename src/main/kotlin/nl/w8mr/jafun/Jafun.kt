@@ -28,12 +28,18 @@ fun test(code: String, className: String = "HelloWorld", methodName: String = "m
     val oldOut = System.out
     val output = ByteArrayOutputStream()
     System.setOut(PrintStream(output))
-    runMethod(bytes, className, methodName)
-    System.setOut(oldOut)
+    try {
+        runMethod(bytes, className, methodName)
+        System.setOut(oldOut)
+    } catch (t: Throwable) {
+        System.setOut(oldOut)
+        println(t.message)
+        t.printStackTrace()
+    }
     val result = String(output.toByteArray())
     println("OUTPUT: $result")
-//    print("DISASSEMBLE: ")
-//    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
+    print("DISASSEMBLE: ")
+    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
     return result
 
 }
