@@ -160,7 +160,7 @@ sealed interface ASTNode {
             return UnknownType
         }
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            symbol.parametersDef.forEach { builder.parameter(it.identifier.name) }
+            symbol.parametersDef.forEach { builder.parameter(it.name) }
             compileMethod(builder.parent, block, symbol.name, "(${symbol.parameters.map{it.signature}.joinToString(separator = "")})V")
         }
 

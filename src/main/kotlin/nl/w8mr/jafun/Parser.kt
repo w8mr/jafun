@@ -77,17 +77,17 @@ object Parser {
         return ASTNode.Variable(variableSymbol)
     }
 
-    private fun newParameterDef(identifier: Token.Identifier, type: List<Token.Identifier>): ASTNode.ParameterDef {
+    private fun newParameterDef(identifier: Token.Identifier, type: List<Token.Identifier>): JFVariableSymbol{
         val variableSymbol = JFVariableSymbol(identifier.value, type = currentSymbolMap.find(type.last().value)?:UnknownType) //TODO: handle complex types
         currentSymbolMap.add(identifier.value, variableSymbol)
 
-        return ASTNode.ParameterDef(variableSymbol)
+        return variableSymbol
     }
 
-    private fun newFunction(identifier: Identifier, parameters: List<ASTNode.ParameterDef>, block: List<ASTNode.Expression> ): ASTNode.Function {
+    private fun newFunction(identifier: Identifier, parameters: List<JFVariableSymbol>, block: List<ASTNode.Expression> ): ASTNode.Function {
         println("PARAMETERS: $parameters")
         popSymbolMap(Unit)
-        val symbol = JFMethod(parameters.map { it.identifier.type }, parameters, JFClass("HelloWorld"), identifier.value, VoidType, associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX, static = true)
+        val symbol = JFMethod(parameters.map { it.type }, parameters, JFClass("HelloWorld"), identifier.value, VoidType, associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX, static = true)
         currentSymbolMap.add(identifier.value, symbol)
         return ASTNode.Function(symbol, block)
     }
