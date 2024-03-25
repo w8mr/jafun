@@ -214,8 +214,7 @@ class CompilerTest {
                print prefix
                println a
             }
-            test("test: ",5)
-""")
+            test("test: ",5)""")
         assertEquals("test: 5\n", result)
     }
 

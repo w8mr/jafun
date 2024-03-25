@@ -76,7 +76,7 @@ object Parser {
         return ASTNode.Variable(variableSymbol)
     }
 
-    private fun newParameterDef(identifier: Token.Identifier, type: List<Token.Identifier>): JFVariableSymbol{
+    private fun newParameterDef(identifier: Identifier, type: List<Identifier>): JFVariableSymbol{
         val variableSymbol = JFVariableSymbol(identifier.value, type = currentSymbolMap.find(type.last().value)?:UnknownType) //TODO: handle complex types
         currentSymbolMap.add(identifier.value, variableSymbol)
 

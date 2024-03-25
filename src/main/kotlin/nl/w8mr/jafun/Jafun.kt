@@ -44,7 +44,7 @@ fun test(code: String, className: String = "HelloWorld", methodName: String = "m
 
 }
 
-private fun runMethod(bytes: ByteArray, className: String, methodName: String): kotlin.Unit {
+private fun runMethod(bytes: ByteArray, className: String, methodName: String): Unit {
     val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
     val helloWorldClass = loader.define(className, bytes)
     helloWorldClass.getMethod(methodName, Array<String>::class.java).invoke(null, null)

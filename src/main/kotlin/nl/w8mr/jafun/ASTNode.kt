@@ -116,9 +116,6 @@ sealed interface ASTNode {
         }
     }
 
-    data class ParameterDef(val identifier: JFVariableSymbol) {
-    }
-
     data class ValAssignment(val variableSymbol: JFVariableSymbol, val expression: Expression) : Expression()
     {
         override fun type() = expression.type()
@@ -155,7 +152,7 @@ sealed interface ASTNode {
         }
     }
 
-    data class Function(val symbol: JFMethod, val block: List<ASTNode.Expression>): Expression() {
+    data class Function(val symbol: JFMethod, val block: List<Expression>): Expression() {
         override fun type(): TypeSig {
             return UnknownType
         }
@@ -166,7 +163,7 @@ sealed interface ASTNode {
 
     }
 
-    data class Block(val block: List<ASTNode.Statement>): Expression() {
+    data class Block(val block: List<Statement>): Expression() {
         override fun type(): TypeSig {
             return UnknownType
         }

@@ -56,7 +56,7 @@ fun test() {
     }
 }
 
-public fun main(args: Array<String>): Unit {
+fun main(args: Array<String>): Unit {
 test() }
 
 suspend fun sus() {

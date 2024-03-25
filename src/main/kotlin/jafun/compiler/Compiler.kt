@@ -65,7 +65,7 @@ object IdentifierCache: SymbolMap {
                     val typeSigs = listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt").map {
                         val jClass = Class.forName(it)
                         findInClass(jClass, name)
-                    }.firstOrNull() { it != null }
+                    }.firstOrNull { it != null }
                      typeSigs
                 }
                 else -> {
