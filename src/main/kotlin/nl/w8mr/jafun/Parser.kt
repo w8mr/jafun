@@ -5,6 +5,7 @@ import jafun.compiler.*
 import nl.w8mr.jafun.Token.*
 import nl.w8mr.parsek.*
 import nl.w8mr.parsek.Parser
+import nl.w8mr.parsek.text.Parsers.followedBy
 import java.lang.IllegalArgumentException
 
 object Parser {
@@ -76,8 +77,17 @@ object Parser {
         return ASTNode.Variable(variableSymbol)
     }
 
-    private fun newFunction(identifier: Identifier, block: List<ASTNode.Expression> ): ASTNode.Function {
-        val symbol = JFMethod(emptyList(), JFClass("HelloWorld"), identifier.value, VoidType, associativity = Associativity.SOLO, static = true)
+    private fun newParameterDef(identifier: Token.Identifier, type: List<Token.Identifier>): ASTNode.ParameterDef {
+        val variableSymbol = JFVariableSymbol(identifier.value, type = currentSymbolMap.find(type.last().value)?:UnknownType) //TODO: handle complex types
+        currentSymbolMap.add(identifier.value, variableSymbol)
+
+        return ASTNode.ParameterDef(variableSymbol)
+    }
+
+    private fun newFunction(identifier: Identifier, parameters: List<ASTNode.ParameterDef>, block: List<ASTNode.Expression> ): ASTNode.Function {
+        println("PARAMETERS: $parameters")
+        popSymbolMap(Unit)
+        val symbol = JFMethod(parameters.map { it.identifier.type }, parameters, JFClass("HelloWorld"), identifier.value, VoidType, associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX, static = true)
         currentSymbolMap.add(identifier.value, symbol)
         return ASTNode.Function(symbol, block)
     }
@@ -85,6 +95,9 @@ object Parser {
     private val identifierTerm = literal(Identifier::class)
     private val newlineTerm = iLiteral(Newline::class)
     private val dotTerm = iLiteral(Dot::class)
+    private val colonTerm = iLiteral(Colon::class)
+    private val commaTerm = iLiteral(Comma::class)
+    private val semicolonTerm = iLiteral(Semicolon::class)
     private val lParenTerm = iLiteral(LParen::class)
     private val rParenTerm = iLiteral(RParen::class)
     private val lCurlTerm = iLiteral(LCurl::class)
@@ -101,7 +114,7 @@ object Parser {
     private val variableIdentifier : Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
     private val arguments = (lParenTerm prefixLiteral (ref(::expression) sepByAllowEmpty literal(Comma::class)) postfixLiteral rParenTerm).map(ASTNode::ExpressionList)
     private val nullaryMethod = complexIdentifier.mapResult { isMethodIdentifier(it, Associativity.SOLO, 10) }.map { invocation(it, emptyList()) }
-    //TODO: Check if expression and complexExpression can be combined. Or at least if it is used correctly now
+    //TODO: Check if expression and complexExpression can be combined.  Maybe use longest match? Or at least if it is used correctly now.
     private val expression : Parser<ASTNode.Expression> = oneOf(stringLiteral_term, integerLiteral_term, variableIdentifier, arguments, ref(::function), ref(::operations), nullaryMethod)
     private val complexExpression : Parser<ASTNode.Expression> = oneOf(arguments, ref(::function), ref(::operations), nullaryMethod, stringLiteral_term, integerLiteral_term, variableIdentifier)
 
@@ -122,9 +135,9 @@ object Parser {
     }
     private val curlBlock = seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> b }
 
-    private val function : Parser<ASTNode.Expression> = seq(funTerm, identifierTerm, seq(lParenTerm, rParenTerm), curlBlock) { _, i, _, b -> newFunction(i,b) }
-    private val statement : Parser<ASTNode.Statement> = seq(expression, oneOf(newlineTerm, eof(), lookAhead(rCurlTerm))) { expr, _ -> ASTNode.Statement(expr) }
-    private val block = complexExpression sepByAllowEmpty newlineTerm
+    private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
+    private val function : Parser<ASTNode.Expression> = seq(funTerm.map(::pushSymbolMap), identifierTerm, lParenTerm, parameter sepByAllowEmpty commaTerm, rParenTerm, curlBlock) { _, i, _, p, _, b -> newFunction(i, p, b) }
+    private val block = seq(zeroOrMore(oneOf(newlineTerm, semicolonTerm)), complexExpression sepByAllowEmpty oneOf(newlineTerm, eof(), semicolonTerm), zeroOrMore(oneOf(newlineTerm, eof(), semicolonTerm))) { _, i, _ -> i}
     private val parser = block
 
     var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache)
@@ -137,7 +150,6 @@ object Parser {
         val oldSymbolMap = currentSymbolMap
         currentSymbolMap = if (oldSymbolMap is LocalSymbolMap) oldSymbolMap.parent else throw IllegalStateException("already at top of symbol map stack")
     }
-
 
     fun parse(tokens: List<Token>): List<ASTNode.Expression> {
             return parser.parse(tokens)

@@ -1,5 +1,7 @@
 package jafun.compiler
 
+import nl.w8mr.jafun.ASTNode
+
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionAssociativity(val associativity: Associativity)
@@ -34,6 +36,9 @@ object IdentifierCache: SymbolMap {
         )
         identifierMap["System.out.println"]= systemOutPrintln
         identifierMap["java.lang.System.out.println"]= systemOutPrintln
+        identifierMap["Int"]=IntegerType
+        identifierMap["String"]=StringType
+
     }
 
     private fun staticFieldMethod(
@@ -44,7 +49,7 @@ object IdentifierCache: SymbolMap {
     ): TypeSig {
         val parent = jfClass(containingClass)
         val field = JFField(parent, staticFieldType.replace('.','/'), staticField)
-        return JFMethod(listOf(jfClass("java.lang.String")), field, methodName, VoidType, false)
+        return JFMethod(listOf(jfClass("java.lang.String")), listOf(ASTNode.ParameterDef(JFVariableSymbol("param1", jfClass("java.lang.String")))), field, methodName, VoidType, false)
     }
 
     override fun find(path: String) : TypeSig? {
@@ -90,7 +95,7 @@ object IdentifierCache: SymbolMap {
                 jMethod.annotations.filterIsInstance<FunctionPrecedence>().map(FunctionPrecedence::precedence)
                     .firstOrNull() ?: 10
             val method = JFMethod(
-                params, JFClass("${jClass.name.replace('.', '/')}"), name, rtn,
+                params, params.mapIndexed { i, t -> ASTNode.ParameterDef(JFVariableSymbol("param${i+1}", t))}, JFClass("${jClass.name.replace('.', '/')}"), name, rtn,
                 true, associativity, precedence
             )
             method
@@ -130,6 +135,7 @@ data class JFField(val parent: JFClass, override val path: String, val name: Str
 
 data class JFMethod(
     val parameters: List<TypeSig>,
+    val parametersDef: List<ASTNode.ParameterDef>,
     val parent: HasPath,
     val name: String,
     val rtn: TypeSig,
@@ -157,6 +163,7 @@ open class Generic(override val signature: String) : TypeSig {
 }
 
 val ThisType = JFField(JFClass(""), "this", "this")
+val StringType = JFClass("java/lang/String")
 
 object ClassType: Generic("L")
 object UnknownType: Generic("?")
@@ -169,6 +176,7 @@ object IntegerType: Generic("I")
 object LongType: Generic("J")
 object ShortType: Generic("S")
 object BooleanType: Generic("Z")
+
 
 interface TypeSig {
     val signature: String

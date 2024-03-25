@@ -34,6 +34,7 @@ val lCurl = char('{').map { LCurl }
 val rCurl = char('}').map { RCurl }
 val comma = char(',').map { Comma }
 val colon = char(':').map { Colon }
+val semicolon = char(';').map { Semicolon }
 val assignment = char('=').map { Assignment }
 val val_token = literal("val").map { Val }
 val fun_token = literal("fun").map { Fun }

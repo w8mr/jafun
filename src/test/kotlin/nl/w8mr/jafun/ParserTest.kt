@@ -51,7 +51,7 @@ class ParserTest {
     fun complexHelloWorldParser() {
         test("""java.lang.System.out.println "Hello World"""",
             staticFieldInvocation(
-                method("println", VoidType, stringType,
+                method("println", VoidType, JFVariableSymbol("param1", stringType),
                     parent = JFField(JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                     static = false),
                 JFField(JFClass("java/lang/System"),"java/io/PrintStream", "out"), s("Hello World")))
@@ -84,6 +84,19 @@ class ParserTest {
                      println,
                      staticInvocation(plus, i(1), i(2))
                  )
+            )
+        )
+    }
+
+    @Test
+    fun parameterFunction() {
+        test("fun test(a: Int) { println 1 + a }",
+            function(
+                method("test", VoidType, JFVariableSymbol("a", IntegerType)),
+                staticInvocation(
+                    println,
+                    staticInvocation(plus, i(1), Variable(JFVariableSymbol("a", IntegerType)))
+                )
             )
         )
     }
@@ -159,12 +172,33 @@ class ParserTest {
     private fun method(
         name: String,
         returnType: TypeSig,
+        vararg parameters: JFVariableSymbol,
+        static: Boolean = true,
+        associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
+        precedence: Int = 10,
+        parent: HasPath = JFClass("HelloWorld")
+    ) = JFMethod(parameters.map(JFVariableSymbol::type), parameters.toList().map(::ParameterDef), parent, name, returnType,
+        static, associativity, precedence)
+
+    private fun method(
+        name: String,
+        returnType: TypeSig,
         vararg parameters: TypeSig,
         static: Boolean = true,
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
         parent: HasPath = JFClass("HelloWorld")
-    ) = JFMethod(parameters.toList(), parent, name, returnType,
+    ) = JFMethod(parameters.toList(), parameters.toList().mapIndexed { i, type -> ParameterDef(JFVariableSymbol("param${i+1}", type))}, parent, name, returnType,
+        static, associativity, precedence)
+
+    private fun method(
+        name: String,
+        returnType: TypeSig,
+        static: Boolean = true,
+        associativity: Associativity = Associativity.SOLO,
+        precedence: Int = 10,
+        parent: HasPath = JFClass("HelloWorld")
+    ) = JFMethod(emptyList(), emptyList(), parent, name, returnType,
         static, associativity, precedence)
 
     private fun i(integer: Int) = IntegerLiteral(integer)

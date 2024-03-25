@@ -196,4 +196,28 @@ class CompilerTest {
         """)
         assertEquals("2\n2\n", result)
     }
+
+    @Test
+    fun funDeclarationAndInvocationWithParam() {
+        val result = test("""
+            fun test(a: Int) { println 2 * a }
+            test 2
+            test(3)
+        """)
+        assertEquals("4\n6\n", result)
+    }
+
+    @Test
+    fun funDeclarationAndInvocationWithTwoParams() {
+        val result = test("""
+            fun test(prefix: String, a: Int) { 
+               print prefix
+               println a
+            }
+            test("test: ",5)
+""")
+        assertEquals("test: 5\n", result)
+    }
+
+
 }

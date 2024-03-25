@@ -38,8 +38,8 @@ fun test(code: String, className: String = "HelloWorld", methodName: String = "m
     }
     val result = String(output.toByteArray())
     println("OUTPUT: $result")
-    print("DISASSEMBLE: ")
-    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
+ //   print("DISASSEMBLE: ")
+ //   println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
     return result
 
 }

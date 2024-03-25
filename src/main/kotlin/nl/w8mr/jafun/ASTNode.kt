@@ -116,6 +116,9 @@ sealed interface ASTNode {
         }
     }
 
+    data class ParameterDef(val identifier: JFVariableSymbol) {
+    }
+
     data class ValAssignment(val variableSymbol: JFVariableSymbol, val expression: Expression) : Expression()
     {
         override fun type() = expression.type()
@@ -157,7 +160,8 @@ sealed interface ASTNode {
             return UnknownType
         }
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            compileMethod(builder.parent, block, symbol.name, "()V")
+            symbol.parametersDef.forEach { builder.parameter(it.identifier.name) }
+            compileMethod(builder.parent, block, symbol.name, "(${symbol.parameters.map{it.signature}.joinToString(separator = "")})V")
         }
 
     }
