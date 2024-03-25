@@ -48,10 +48,10 @@ sealed interface ASTNode {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
             if (field.path == ThisType.path) { //TODO: check implementation
                 val methodClassName = method.parent.path
-                val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
+                val methodSignature = "(${method.parameters.map(JFVariableSymbol::signature).joinToString("")})${method.rtn.signature}"
                 with(builder) {
                     aload("this")
-                    loadArguments(builder, arguments, method.parameters)
+                    loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                     invokeVirtual(methodClassName, method.name, methodSignature)
                 }
             } else TODO()
@@ -67,10 +67,10 @@ sealed interface ASTNode {
             val fieldClassName = field.parent.path
             val fieldTypeSig = field.signature
             val methodClassName = method.parent.path
-            val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
+            val methodSignature = "(${method.parameters.map(JFVariableSymbol::signature).joinToString("")})${method.rtn.signature}"
             with(builder) {
                 getStatic(fieldClassName, field.name, fieldTypeSig)
-                loadArguments(builder, arguments, method.parameters)
+                loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                 invokeVirtual(methodClassName, method.name, methodSignature)
             }
         }
@@ -83,9 +83,9 @@ sealed interface ASTNode {
     data class StaticInvocation(val method: JFMethod, val arguments: List<Expression>) : Expression() {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
             val methodClassName = method.parent.path
-            val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
+            val methodSignature = "(${method.parameters.map(JFVariableSymbol::signature).joinToString("")})${method.rtn.signature}"
             with(builder) {
-                loadArguments(builder, arguments, method.parameters)
+                loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                 invokeStatic(methodClassName, method.name, methodSignature)
             }
         }
@@ -160,8 +160,8 @@ sealed interface ASTNode {
             return UnknownType
         }
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            symbol.parametersDef.forEach { builder.parameter(it.name) }
-            compileMethod(builder.parent, block, symbol.name, "(${symbol.parameters.map{it.signature}.joinToString(separator = "")})V")
+            symbol.parameters.forEach { builder.parameter(it.name) }
+            compileMethod(builder.parent, block, symbol.name, "(${symbol.parameters.map(JFVariableSymbol::signature).joinToString(separator = "")})V")
         }
 
     }

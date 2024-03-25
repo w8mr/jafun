@@ -177,8 +177,10 @@ class ParserTest {
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
         parent: HasPath = JFClass("HelloWorld")
-    ) = JFMethod(parameters.map(JFVariableSymbol::type), parameters.toList(), parent, name, returnType,
-        static, associativity, precedence)
+    ) = JFMethod(
+        parameters.toList(), parent, name, returnType, static,
+        associativity, precedence
+    )
 
     private fun method(
         name: String,
@@ -188,8 +190,15 @@ class ParserTest {
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
         parent: HasPath = JFClass("HelloWorld")
-    ) = JFMethod(parameters.toList(), parameters.toList().mapIndexed { i, type -> JFVariableSymbol("param${i+1}", type)}, parent, name, returnType,
-        static, associativity, precedence)
+    ) = JFMethod(
+        parameters.toList().mapIndexed { i, type -> JFVariableSymbol("param${i+1}", type) },
+        parent,
+        name,
+        returnType,
+        static,
+        associativity,
+        precedence
+    )
 
     private fun method(
         name: String,
@@ -198,8 +207,10 @@ class ParserTest {
         associativity: Associativity = Associativity.SOLO,
         precedence: Int = 10,
         parent: HasPath = JFClass("HelloWorld")
-    ) = JFMethod(emptyList(), emptyList(), parent, name, returnType,
-        static, associativity, precedence)
+    ) = JFMethod(
+        emptyList(), parent, name, returnType, static,
+        associativity, precedence
+    )
 
     private fun i(integer: Int) = IntegerLiteral(integer)
     private fun s(string: String) = StringLiteral(string)

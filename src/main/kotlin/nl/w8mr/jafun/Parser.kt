@@ -5,7 +5,6 @@ import jafun.compiler.*
 import nl.w8mr.jafun.Token.*
 import nl.w8mr.parsek.*
 import nl.w8mr.parsek.Parser
-import nl.w8mr.parsek.text.Parsers.followedBy
 import java.lang.IllegalArgumentException
 
 object Parser {
@@ -87,7 +86,14 @@ object Parser {
     private fun newFunction(identifier: Identifier, parameters: List<JFVariableSymbol>, block: List<ASTNode.Expression> ): ASTNode.Function {
         println("PARAMETERS: $parameters")
         popSymbolMap(Unit)
-        val symbol = JFMethod(parameters.map { it.type }, parameters, JFClass("HelloWorld"), identifier.value, VoidType, associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX, static = true)
+        val symbol = JFMethod(
+            parameters,
+            JFClass("HelloWorld"),
+            identifier.value,
+            VoidType,
+            static = true,
+            associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX
+        )
         currentSymbolMap.add(identifier.value, symbol)
         return ASTNode.Function(symbol, block)
     }

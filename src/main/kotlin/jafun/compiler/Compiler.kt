@@ -1,7 +1,5 @@
 package jafun.compiler
 
-import nl.w8mr.jafun.ASTNode
-
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionAssociativity(val associativity: Associativity)
@@ -49,7 +47,13 @@ object IdentifierCache: SymbolMap {
     ): TypeSig {
         val parent = jfClass(containingClass)
         val field = JFField(parent, staticFieldType.replace('.','/'), staticField)
-        return JFMethod(listOf(jfClass("java.lang.String")), listOf(JFVariableSymbol("param1", jfClass("java.lang.String"))), field, methodName, VoidType, false)
+        return JFMethod(
+            listOf(JFVariableSymbol("param1", jfClass("java.lang.String"))),
+            field,
+            methodName,
+            VoidType,
+            false
+        )
     }
 
     override fun find(path: String) : TypeSig? {
@@ -95,8 +99,13 @@ object IdentifierCache: SymbolMap {
                 jMethod.annotations.filterIsInstance<FunctionPrecedence>().map(FunctionPrecedence::precedence)
                     .firstOrNull() ?: 10
             val method = JFMethod(
-                params, params.mapIndexed { i, t -> JFVariableSymbol("param${i+1}", t)}, JFClass("${jClass.name.replace('.', '/')}"), name, rtn,
-                true, associativity, precedence
+                params.mapIndexed { i, t -> JFVariableSymbol("param${i+1}", t)},
+                JFClass("${jClass.name.replace('.', '/')}"),
+                name,
+                rtn,
+                true,
+                associativity,
+                precedence
             )
             method
         }
@@ -134,8 +143,7 @@ data class JFField(val parent: JFClass, override val path: String, val name: Str
 }
 
 data class JFMethod(
-    val parameters: List<TypeSig>,
-    val parametersDef: List<JFVariableSymbol>,
+    val parameters: List<JFVariableSymbol>,
     val parent: HasPath,
     val name: String,
     val rtn: TypeSig,
