@@ -7,6 +7,7 @@ sealed interface Token {
     object LCurl : Token
     object RCurl : Token
     object Comma : Token
+    object Colon : Token
     object Assignment : Token
     object Val : Token
     object Fun : Token

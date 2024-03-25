@@ -4,7 +4,7 @@ import jafun.compiler.*
 import nl.w8mr.kasmine.*
 
 sealed interface ASTNode {
-    fun compile(builder: ClassBuilder.MethodDSL.DSL, expression: Boolean = true)
+    fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean = true)
 
     data class Statement(val expression: Expression): ASTNode {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
@@ -15,7 +15,7 @@ sealed interface ASTNode {
 
     abstract class Expression: ASTNode {
         abstract fun type() : TypeSig
-        override fun compile(builder: ClassBuilder.MethodDSL.DSL, expression: Boolean) {  }
+        override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {  }
     }
     data class StringLiteral(val value: String) : Expression() {
         override fun type(): TypeSig {
@@ -46,8 +46,8 @@ sealed interface ASTNode {
 
     data class FieldInvocation(val method: JFMethod, val field: JFField, val arguments: List<Expression>) : Expression() {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            if (field.typeSig == ThisType) {
-                val methodClassName = method.parent!!.path!!
+            if (field.path == ThisType.path) { //TODO: check implementation
+                val methodClassName = method.parent.path
                 val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
                 with(builder) {
                     aload("this")
@@ -64,9 +64,9 @@ sealed interface ASTNode {
 
     data class StaticFieldInvocation(val method: JFMethod, val field: JFField, val arguments: List<Expression>) : Expression() {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            val fieldClassName = field.parent!!.path!!
-            val fieldTypeSig = field.typeSig.signature
-            val methodClassName = method.parent!!.path!!
+            val fieldClassName = field.parent.path
+            val fieldTypeSig = field.signature
+            val methodClassName = method.parent.path
             val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
             with(builder) {
                 getStatic(fieldClassName, field.name, fieldTypeSig)
@@ -82,7 +82,7 @@ sealed interface ASTNode {
 
     data class StaticInvocation(val method: JFMethod, val arguments: List<Expression>) : Expression() {
         override fun compile(builder: ClassBuilder.MethodDSL.DSL, isExpression: Boolean) {
-            val methodClassName = method.parent!!.path!!
+            val methodClassName = method.parent.path
             val methodSignature = "(${method.parameters.map(TypeSig::signature).joinToString("")})${method.rtn.signature}"
             with(builder) {
                 loadArguments(builder, arguments, method.parameters)
@@ -152,7 +152,7 @@ sealed interface ASTNode {
         }
     }
 
-    data class Function(val symbol: JFMethod, val block: List<ASTNode.Statement>): Expression() {
+    data class Function(val symbol: JFMethod, val block: List<ASTNode.Expression>): Expression() {
         override fun type(): TypeSig {
             return UnknownType
         }

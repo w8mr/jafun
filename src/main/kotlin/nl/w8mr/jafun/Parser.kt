@@ -76,7 +76,7 @@ object Parser {
         return ASTNode.Variable(variableSymbol)
     }
 
-    private fun newFunction(identifier: Identifier, block: List<ASTNode.Statement> ): ASTNode.Function {
+    private fun newFunction(identifier: Identifier, block: List<ASTNode.Expression> ): ASTNode.Function {
         val symbol = JFMethod(emptyList(), JFClass("HelloWorld"), identifier.value, VoidType, associativity = Associativity.SOLO, static = true)
         currentSymbolMap.add(identifier.value, symbol)
         return ASTNode.Function(symbol, block)
@@ -101,7 +101,10 @@ object Parser {
     private val variableIdentifier : Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
     private val arguments = (lParenTerm prefixLiteral (ref(::expression) sepByAllowEmpty literal(Comma::class)) postfixLiteral rParenTerm).map(ASTNode::ExpressionList)
     private val nullaryMethod = complexIdentifier.mapResult { isMethodIdentifier(it, Associativity.SOLO, 10) }.map { invocation(it, emptyList()) }
+    //TODO: Check if expression and complexExpression can be combined. Or at least if it is used correctly now
     private val expression : Parser<ASTNode.Expression> = oneOf(stringLiteral_term, integerLiteral_term, variableIdentifier, arguments, ref(::function), ref(::operations), nullaryMethod)
+    private val complexExpression : Parser<ASTNode.Expression> = oneOf(arguments, ref(::function), ref(::operations), nullaryMethod, stringLiteral_term, integerLiteral_term, variableIdentifier)
+
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm).map(::newVariable)
 
     private fun methodIdentifier(associativity: Associativity = Associativity.PREFIX, precedence: Int = 10): Parser<ASTNode.MethodIdentifier> = complexIdentifier.mapResult { isMethodIdentifier(it, associativity, precedence) }
@@ -121,7 +124,7 @@ object Parser {
 
     private val function : Parser<ASTNode.Expression> = seq(funTerm, identifierTerm, seq(lParenTerm, rParenTerm), curlBlock) { _, i, _, b -> newFunction(i,b) }
     private val statement : Parser<ASTNode.Statement> = seq(expression, oneOf(newlineTerm, eof(), lookAhead(rCurlTerm))) { expr, _ -> ASTNode.Statement(expr) }
-    private val block = seq(zeroOrMore(statement),zeroOrMore(newlineTerm)) { s, _ -> s }
+    private val block = complexExpression sepByAllowEmpty newlineTerm
     private val parser = block
 
     var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache)
@@ -136,7 +139,7 @@ object Parser {
     }
 
 
-    fun parse(tokens: List<Token>): List<ASTNode.Statement> {
+    fun parse(tokens: List<Token>): List<ASTNode.Expression> {
             return parser.parse(tokens)
     }
 

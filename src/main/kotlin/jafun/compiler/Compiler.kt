@@ -43,7 +43,7 @@ object IdentifierCache: SymbolMap {
         methodName: String
     ): TypeSig {
         val parent = jfClass(containingClass)
-        val field = JFField(parent, staticFieldType.replace('.','/'), jfClass(staticFieldType), staticField)
+        val field = JFField(parent, staticFieldType.replace('.','/'), staticField)
         return JFMethod(listOf(jfClass("java.lang.String")), field, methodName, VoidType, false)
     }
 
@@ -124,8 +124,8 @@ data class JFClass(override val path: String): TypeSig, HasPath {
 }
 
 
-data class JFField(val parent: JFClass, override val path: String, val typeSig: TypeSig, val name: String): TypeSig, HasPath {
-    override val signature: String = path
+data class JFField(val parent: JFClass, override val path: String, val name: String): TypeSig, HasPath {
+    override val signature: String = "L${path};"
 }
 
 data class JFMethod(
@@ -156,7 +156,7 @@ open class Generic(override val signature: String) : TypeSig {
         signature.hashCode()
 }
 
-val ThisType = JFField(JFClass(""), "this", Generic("this"), "this")
+val ThisType = JFField(JFClass(""), "this", "this")
 
 object ClassType: Generic("L")
 object UnknownType: Generic("?")

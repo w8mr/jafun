@@ -13,7 +13,7 @@ import nl.w8mr.parsek.text.literal
 import nl.w8mr.parsek.zeroOrMore
 import java.lang.Character.isLetter
 
-val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', ':', '-', '~')
+val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~')
 
 val underscore = char('_')
 val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
@@ -33,6 +33,7 @@ val rParen = char(')').map { RParen }
 val lCurl = char('{').map { LCurl }
 val rCurl = char('}').map { RCurl }
 val comma = char(',').map { Comma }
+val colon = char(':').map { Colon }
 val assignment = char('=').map { Assignment }
 val val_token = literal("val").map { Val }
 val fun_token = literal("fun").map { Fun }
@@ -40,7 +41,7 @@ val fun_token = literal("fun").map { Fun }
 val lineStringContent = zeroOrMore(char(" is not valid string Char") { it != '"' && it != '\\' })
 val lineStringLiteral = ('"' followedBy lineStringContent followedBy '"').map(::StringLiteral)
 
-val ws = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.map { WS }
+val ws = oneOrMore(char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }).map { WS }
 val newline = oneOf(seq(char('\n')),  seq(char('\r'), char(('\n')))).map { Newline }
 
-val lexer = zeroOrMore(oneOf(fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws, newline, lCurl, rCurl, lParen, rParen, comma, assignment))
+val lexer = zeroOrMore(oneOf(fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws, newline, lCurl, rCurl, lParen, rParen, comma, colon, assignment))
