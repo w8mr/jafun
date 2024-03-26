@@ -54,7 +54,7 @@ fun test(
     val result = String(output.toByteArray())
     println("OUTPUT: $result")
     print("DISASSEMBLE: ")
-    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
+    //  println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
     return result
 }
 

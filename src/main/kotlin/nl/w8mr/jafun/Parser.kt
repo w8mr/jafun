@@ -115,7 +115,7 @@ object Parser {
         expression: ASTNode.Expression,
     ): ASTNode.ValAssignment {
         // if (identifier !is ASTNode.Variable) throw IllegalArgumentException()
-a        val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
+        val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
         currentSymbolMap.add(identifier.value, variableSymbol)
         return ASTNode.ValAssignment(variableSymbol, expression)
     }
