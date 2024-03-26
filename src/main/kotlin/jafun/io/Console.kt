@@ -5,9 +5,14 @@ import jafun.compiler.FunctionAssociativity
 import jafun.compiler.FunctionPrecedence
 
 fun print(text: Any?) = System.out.print(text)
+
 fun println(text: Any?) = System.out.println(text)
 
-fun join(str1: String, str2: String) = listOf(str1,str2).joinToString(separator = " ")
+fun join(
+    str1: String,
+    str2: String,
+) = listOf(str1, str2).joinToString(separator = " ")
+
 fun reverse(str: String) = str.reversed()
 
 @FunctionPrecedence(40)
@@ -18,6 +23,6 @@ fun euro(n: Int) = n * 100
 @FunctionAssociativity(Associativity.POSTFIX)
 fun cent(n: Int) = n
 
-//@FunctionPrecedence(10)
-//@FunctionAssociativity(Associativity.SOLO)
-//fun test() = 5
+// @FunctionPrecedence(10)
+// @FunctionAssociativity(Associativity.SOLO)
+// fun test() = 5

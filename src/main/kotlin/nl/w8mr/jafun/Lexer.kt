@@ -1,11 +1,26 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.Token.*
+import nl.w8mr.jafun.Token.Assignment
+import nl.w8mr.jafun.Token.Colon
+import nl.w8mr.jafun.Token.Comma
+import nl.w8mr.jafun.Token.Dot
+import nl.w8mr.jafun.Token.Fun
+import nl.w8mr.jafun.Token.Identifier
+import nl.w8mr.jafun.Token.IntegerLiteral
+import nl.w8mr.jafun.Token.LCurl
+import nl.w8mr.jafun.Token.LParen
+import nl.w8mr.jafun.Token.Newline
+import nl.w8mr.jafun.Token.RCurl
+import nl.w8mr.jafun.Token.RParen
+import nl.w8mr.jafun.Token.Semicolon
+import nl.w8mr.jafun.Token.StringLiteral
+import nl.w8mr.jafun.Token.Val
+import nl.w8mr.jafun.Token.WS
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.oneOf
-import nl.w8mr.parsek.text.Parsers.oneOrMore
 import nl.w8mr.parsek.or
 import nl.w8mr.parsek.text.Parsers.followedBy
+import nl.w8mr.parsek.text.Parsers.oneOrMore
 import nl.w8mr.parsek.text.Parsers.seq
 import nl.w8mr.parsek.text.Parsers.zeroOrMore
 import nl.w8mr.parsek.text.char
@@ -22,10 +37,13 @@ val letter = char(" is not Unicode Letter", ::isLetter)
 val normalIdentifier = seq(oneOf(letter, underscore), zeroOrMore(oneOf(letter, underscore, unicode_digit))).map(::Identifier)
 val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
 val identifier = normalIdentifier or operatorIdentifier
-val decimalDigit = char { it in '0'..'9'}
-val decimalDigitNoZero = char { it in '1'..'9'}
+val decimalDigit = char { it in '0'..'9' }
+val decimalDigitNoZero = char { it in '1'..'9' }
 val decimalDigitOrSeparator = oneOf(decimalDigit, char('_'))
-val integerLiteral = oneOf(seq(decimalDigitNoZero, zeroOrMore(decimalDigitOrSeparator)), seq(decimalDigit)).map { IntegerLiteral(it.replace("_","").toInt()) }
+val integerLiteral =
+    oneOf(seq(decimalDigitNoZero, zeroOrMore(decimalDigitOrSeparator)), seq(decimalDigit)).map {
+        IntegerLiteral(it.replace("_", "").toInt())
+    }
 
 val dot = char('.').map { Dot }
 val lParen = char('(').map { LParen }
@@ -43,6 +61,12 @@ val lineStringContent = zeroOrMore(char(" is not valid string Char") { it != '"'
 val lineStringLiteral = ('"' followedBy lineStringContent followedBy '"').map(::StringLiteral)
 
 val ws = oneOrMore(char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }).map { WS }
-val newline = oneOf(seq(char('\n')),  seq(char('\r'), char(('\n')))).map { Newline }
+val newline = oneOf(seq(char('\n')), seq(char('\r'), char(('\n')))).map { Newline }
 
-val lexer = zeroOrMore(oneOf(fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws, newline, lCurl, rCurl, lParen, rParen, comma, colon, assignment))
+val lexer =
+    zeroOrMore(
+        oneOf(
+            fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws,
+            newline, lCurl, rCurl, lParen, rParen, comma, colon, assignment,
+        ),
+    )

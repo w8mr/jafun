@@ -27,7 +27,10 @@ internal class LiteralTest {
         try {
             parser.parse("keyring 532", errorLevel = 3)
         } catch (pe: ParseException) {
-            assertEquals("partial match for keyword, key matched, expected character w but found character r at position 3 (ring 532)", pe.error.message)
+            assertEquals(
+                "partial match for keyword, key matched, expected character w but found character r at position 3 (ring 532)",
+                pe.error.message,
+            )
         }
     }
 
@@ -40,5 +43,4 @@ internal class LiteralTest {
             assertEquals("keyword not found at position 0 (word 532)", pe.error.message)
         }
     }
-
 }

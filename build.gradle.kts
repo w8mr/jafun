@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm") version "1.7.21"
     application
     `maven-publish`
-
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 group = "nl.w8mr"

@@ -5,6 +5,5 @@ enum class Associativity {
     INFIXR,
     PREFIX,
     POSTFIX,
-    SOLO
-
+    SOLO,
 }

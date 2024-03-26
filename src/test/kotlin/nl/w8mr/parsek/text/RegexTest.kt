@@ -21,7 +21,6 @@ internal class RegexTest {
         }
     }
 
-
     @org.junit.jupiter.api.Test
     fun simpel() {
         val parser = regex("regex")
@@ -44,7 +43,10 @@ internal class RegexTest {
         try {
             parser.parse("regular expression 532", errorLevel = 3)
         } catch (pe: ParseException) {
-            assertEquals("Partial match for pattern regex, reg matched, failed for character u at position 3 (ular expre)", pe.error.message)
+            assertEquals(
+                "Partial match for pattern regex, reg matched, failed for character u at position 3 (ular expre)",
+                pe.error.message,
+            )
         }
     }
 
@@ -57,5 +59,4 @@ internal class RegexTest {
             assertEquals("Expected pattern regex to match at position 0 (no regex 5)", pe.error.message)
         }
     }
-
 }

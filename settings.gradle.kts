@@ -1,6 +1,4 @@
-
 rootProject.name = "jafun"
-
 
 include(":parsek")
 project(":parsek").projectDir = file("../parsek")
