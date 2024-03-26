@@ -10,6 +10,7 @@ import jafun.compiler.JFVariableSymbol
 import jafun.compiler.ThisType
 import jafun.compiler.TypeSig
 import jafun.compiler.UnknownType
+import jafun.compiler.VoidType
 import nl.w8mr.kasmine.ClassBuilder
 
 sealed interface ASTNode {
@@ -18,14 +19,14 @@ sealed interface ASTNode {
         isExpression: Boolean = true,
     )
 
-    data class Statement(val expression: Expression) : ASTNode {
-        override fun compile(
-            builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
-        ) {
-            expression.compile(builder, isExpression)
-        }
-    }
+//    data class Statement(val expression: Expression) : ASTNode {
+//        override fun compile(
+//            builder: ClassBuilder.MethodDSL.DSL,
+//            isExpression: Boolean,
+//        ) {
+//            expression.compile(builder, isExpression)
+//        }
+//    }
 
     abstract class Expression : ASTNode {
         abstract fun type(): TypeSig
@@ -66,8 +67,15 @@ sealed interface ASTNode {
         }
     }
 
-    data class ExpressionList(val arguments: List<Expression>) : Expression() {
-        override fun type(): TypeSig = UnknownType
+    data class ExpressionList(val expressions: List<Expression>) : Expression() {
+        override fun type(): TypeSig = expressions.lastOrNull()?.type() ?: VoidType
+
+        override fun compile(
+            builder: ClassBuilder.MethodDSL.DSL,
+            isExpression: Boolean,
+        ) {
+            expressions.forEach { expression -> expression.compile(builder, isExpression) }
+        }
     }
 
     data class FieldInvocation(val method: JFMethod, val field: JFField, val arguments: List<Expression>) : Expression() {
@@ -139,14 +147,14 @@ sealed interface ASTNode {
     ) {
         arguments.zip(parameters).forEach { (argument, parameter) ->
             if (argument.type() == parameter) {
-                argument.compile(builder)
+                compileAsExpression(argument, builder)
             } else {
                 if (((argument.type() is JFClass) || (argument.type() is ClassType)) &&
                     ((parameter is JFClass) || (parameter is ClassType))
                 ) {
-                    argument.compile(builder)
+                    compileAsExpression(argument, builder)
                 } else if ((argument.type() == IntegerType) && ((parameter is JFClass) || (parameter is ClassType))) {
-                    argument.compile(builder)
+                    compileAsExpression(argument, builder)
                     invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 } else {
                     TODO()
@@ -166,9 +174,9 @@ sealed interface ASTNode {
                 expression.compile(builder, isExpression)
                 if (isExpression) dup()
                 when (variableSymbol.type) {
-                    is JFClass -> astore(variableSymbol.name)
-                    is ClassType -> astore(variableSymbol.name)
-                    is IntegerType -> istore(variableSymbol.name)
+                    is JFClass -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is ClassType -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is IntegerType -> istore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")
                 }
             }
@@ -182,9 +190,9 @@ sealed interface ASTNode {
         ) {
             with(builder) {
                 when (variableSymbol.type) {
-                    is JFClass -> aload(variableSymbol.name)
-                    is ClassType -> aload(variableSymbol.name)
-                    is IntegerType -> iload(variableSymbol.name)
+                    is JFClass -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is ClassType -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is IntegerType -> iload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")
                 }
             }
@@ -197,28 +205,28 @@ sealed interface ASTNode {
 
     data class Function(val symbol: JFMethod, val block: List<Expression>) : Expression() {
         override fun type(): TypeSig {
-            return UnknownType
+            return VoidType
         }
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
             isExpression: Boolean,
         ) {
-            symbol.parameters.forEach { builder.parameter(it.name) }
+            symbol.parameters.forEach { builder.parameter("${it.symbolMap.symbolMapId}.${it.name}") }
             compileMethod(
                 builder.parent,
                 block,
                 symbol.name,
-                "(${symbol.parameters.map(JFVariableSymbol::signature).joinToString(separator = "")})V",
+                "(${symbol.parameters.map(JFVariableSymbol::signature).joinToString(separator = "")})${symbol.signature}",
             )
         }
     }
 
-    data class Block(val block: List<Statement>) : Expression() {
-        override fun type(): TypeSig {
-            return UnknownType
-        }
-    }
+//    data class Block(val block: List<Statement>) : Expression() {
+//        override fun type(): TypeSig {
+//            return UnknownType
+//        }
+//    }
 
     data class MethodIdentifier(val method: JFMethod, val field: JFField?) : Expression() {
         override fun type(): TypeSig = UnknownType

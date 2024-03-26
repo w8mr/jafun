@@ -267,7 +267,9 @@ class CompilerTest {
         val result =
             test(
                 """
-            fun test(a: Int) { println 2 * a }
+            fun test(a: Int) { 
+                println 2 * a
+            }
             test 2
             test(3)
         """,
@@ -306,5 +308,77 @@ class CompilerTest {
         """,
             )
         assertEquals("test: 5\ntest: 10\n", result)
+    }
+
+    @Test
+    fun stackTest() {
+        val result =
+            test(
+                """
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+        """,
+            )
+        assertEquals("", result)
+    }
+
+    @Test
+    fun funReturnIntValue() {
+        val result =
+            test(
+                """
+                    fun add2(a: Int) {
+                      a + 2
+                    }
+                    println add2 4
+                    println add2(6)
+        """,
+            )
+        assertEquals("6\n8\n", result)
+    }
+
+    @Test
+    fun funReturnStringValue() {
+        val result =
+            test(
+                """
+                    fun prefixed(text: String) {
+                      join("PREFIXED:", text)
+                    }
+                    println prefixed "Test"
+                    println(prefixed("Test2"))
+        """,
+            )
+        assertEquals("PREFIXED: Test\nPREFIXED: Test2\n", result)
+    }
+
+    @Test
+    fun scope() {
+        val result =
+            test(
+                """
+                val a = 2
+                {
+                    val a = 4
+                    {
+                        val a = a
+                        println a
+                    }
+                    println a
+                }
+                println a
+        """,
+            )
+        assertEquals("4\n4\n2\n", result)
     }
 }

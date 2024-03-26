@@ -40,7 +40,6 @@ import nl.w8mr.parsek.sepByAllowEmpty
 import nl.w8mr.parsek.seq
 import nl.w8mr.parsek.unary
 import nl.w8mr.parsek.zeroOrMore
-import java.lang.IllegalArgumentException
 
 object Parser {
     private fun invocation(
@@ -65,7 +64,7 @@ object Parser {
     ) = invocation(
         methodIdentifier,
         when (expression) {
-            is ASTNode.ExpressionList -> expression.arguments
+            is ASTNode.ExpressionList -> expression.expressions
             else -> listOf(expression)
         },
     )
@@ -81,12 +80,12 @@ object Parser {
                 method?.let {
                     if (it is JFMethod) {
                         if (it.associativity == associativity && it.precedence == precedence) {
-                            if (it.static) {
-                                return Parser.Success(ASTNode.MethodIdentifier(it, null))
+                            return if (it.static) {
+                                Parser.Success(ASTNode.MethodIdentifier(it, null))
                             } else if (it.parent is JFField) {
-                                return Parser.Success(ASTNode.MethodIdentifier(it, it.parent))
+                                Parser.Success(ASTNode.MethodIdentifier(it, it.parent))
                             } else {
-                                return Parser.Success(ASTNode.MethodIdentifier(it, ThisType))
+                                Parser.Success(ASTNode.MethodIdentifier(it, ThisType))
                             }
                         }
                     }
@@ -112,19 +111,13 @@ object Parser {
     }
 
     private fun assignment(
-        identifier: ASTNode.Expression,
+        identifier: Identifier,
         expression: ASTNode.Expression,
     ): ASTNode.ValAssignment {
-        if (identifier !is ASTNode.Variable) throw IllegalArgumentException()
-        val variableSymbol = JFVariableSymbol(identifier.variableSymbol.name, expression.type())
-        currentSymbolMap.add(identifier.variableSymbol.name, variableSymbol)
-        return ASTNode.ValAssignment(variableSymbol, expression)
-    }
-
-    private fun newVariable(identifier: Identifier): ASTNode.Variable {
-        val variableSymbol = JFVariableSymbol(identifier.value, type = UnknownType)
+        // if (identifier !is ASTNode.Variable) throw IllegalArgumentException()
+a        val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
         currentSymbolMap.add(identifier.value, variableSymbol)
-        return ASTNode.Variable(variableSymbol)
+        return ASTNode.ValAssignment(variableSymbol, expression)
     }
 
     private fun newParameterDef(
@@ -135,6 +128,7 @@ object Parser {
             JFVariableSymbol(
                 identifier.value,
                 type = currentSymbolMap.find(type.last().value) ?: UnknownType,
+                currentSymbolMap,
             ) // TODO: handle complex types
         currentSymbolMap.add(identifier.value, variableSymbol)
 
@@ -144,7 +138,7 @@ object Parser {
     private fun newFunction(
         identifier: Identifier,
         parameters: List<JFVariableSymbol>,
-        block: List<ASTNode.Expression>,
+        block: ASTNode.ExpressionList,
     ): ASTNode.Function {
         popSymbolMap(Unit)
         val symbol =
@@ -152,12 +146,12 @@ object Parser {
                 parameters,
                 JFClass("HelloWorld"),
                 identifier.value,
-                VoidType,
+                block.expressions.lastOrNull()?.type() ?: VoidType,
                 static = true,
                 associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
             )
         currentSymbolMap.add(identifier.value, symbol)
-        return ASTNode.Function(symbol, block)
+        return ASTNode.Function(symbol, block.expressions)
     }
 
     private val identifierTerm = literal(Identifier::class)
@@ -191,11 +185,29 @@ object Parser {
 
     // TODO: Check if expression and complexExpression can be combined.  Maybe use longest match? Or at least if it is used correctly now.
     private val expression: Parser<ASTNode.Expression> =
-        oneOf(stringLiteral_term, integerLiteral_term, variableIdentifier, arguments, ref(::function), ref(::operations), nullaryMethod)
+        oneOf(
+            stringLiteral_term,
+            integerLiteral_term,
+            variableIdentifier,
+            arguments,
+            ref(::curlBlock),
+            ref(::function),
+            ref(::operations),
+            nullaryMethod,
+        )
     private val complexExpression: Parser<ASTNode.Expression> =
-        oneOf(arguments, ref(::function), ref(::operations), nullaryMethod, stringLiteral_term, integerLiteral_term, variableIdentifier)
+        oneOf(
+            arguments,
+            ref(::curlBlock),
+            ref(::function),
+            ref(::operations),
+            nullaryMethod,
+            stringLiteral_term,
+            integerLiteral_term,
+            variableIdentifier,
+        )
 
-    private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm).map(::newVariable)
+    private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
 
     private fun methodIdentifier(
         associativity: Associativity = Associativity.PREFIX,
@@ -209,33 +221,39 @@ object Parser {
         OparatorTable.create(expression) {
             // TODO: add based on methods
 
-            postfix(40, methodIdentifier(Associativity.POSTFIX, 40).unary { ident -> { expr -> invocation(ident, expr) } })
+            postfix(
+                40,
+                methodIdentifier(Associativity.POSTFIX, 40)
+                    .unary { ident -> { expr -> invocation(ident, expr) } },
+            )
             infixr(
                 40,
-                methodIdentifier(Associativity.INFIXR, 40).binary {
-                        ident ->
-                    { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) }
-                },
+                methodIdentifier(Associativity.INFIXR, 40)
+                    .binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } },
             )
             infixl(
                 30,
-                methodIdentifier(Associativity.INFIXL, 30).binary {
-                        ident ->
-                    { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) }
-                },
+                methodIdentifier(Associativity.INFIXL, 30)
+                    .binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } },
             )
             infixl(
                 20,
-                methodIdentifier(Associativity.INFIXL, 20).binary {
-                        ident ->
-                    { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) }
-                },
+                methodIdentifier(Associativity.INFIXL, 20)
+                    .binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } },
             )
-            prefix(10, methodIdentifier().unary { ident -> { expr -> invocation(ident, expr) } })
-
-            prefix(0, initVal.unary { ident -> { expr -> assignment(ident, expr) } })
+            prefix(
+                10,
+                methodIdentifier()
+                    .unary { ident -> { expr -> invocation(ident, expr) } },
+            )
+            prefix(
+                0,
+                initVal
+                    .unary { ident -> { expr -> assignment(ident, expr) } },
+            )
         }
-    private val curlBlock = seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> b }
+    private val curlBlock =
+        seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> ASTNode.ExpressionList(b) }
 
     private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
     private val function: Parser<ASTNode.Expression> =
@@ -255,9 +273,9 @@ object Parser {
         ) { _, i, _ -> i }
     private val parser = block
 
-    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache)
+    private var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset())
 
-    fun pushSymbolMap(unit: Unit) {
+    private fun pushSymbolMap(unit: Unit) {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
     }
 

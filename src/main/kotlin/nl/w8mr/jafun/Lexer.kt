@@ -67,6 +67,6 @@ val lexer =
     zeroOrMore(
         oneOf(
             fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws,
-            newline, lCurl, rCurl, lParen, rParen, comma, colon, assignment,
+            newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon, assignment,
         ),
     )

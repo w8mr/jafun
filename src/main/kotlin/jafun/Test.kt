@@ -77,3 +77,13 @@ suspend fun sus() {
     delay(100L)
     println("test2")
 }
+
+fun testExpression(
+    a: Int,
+    b: Int,
+): Int {
+    a + b
+    a + b
+    a + b
+    return a + b
+}

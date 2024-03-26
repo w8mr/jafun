@@ -1,5 +1,8 @@
 package nl.w8mr.jafun
 
+import jafun.compiler.IntegerType
+import jafun.compiler.JFClass
+import jafun.compiler.VoidType
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.DynamicClassLoader
 import nl.w8mr.kasmine.classBuilder
@@ -76,7 +79,7 @@ private fun writeFile(
 }
 
 fun compile(
-    statements: List<ASTNode>,
+    statements: List<ASTNode.Expression>,
     className: String = "HelloWorld",
     methodName: String = "main",
     methodSig: String = "([Ljava/lang/String;)V",
@@ -92,7 +95,7 @@ fun compile(
 
 fun compileMethod(
     classBuilder: ClassBuilder.ClassDSL.DSL,
-    statements: List<ASTNode>,
+    statements: List<ASTNode.Expression>,
     methodName: String,
     methodSig: String,
 ) {
@@ -100,10 +103,42 @@ fun compileMethod(
         method {
             name = methodName
             signature = methodSig
-            statements.forEachIndexed { index, statement -> statement.compile(this, (statements.size - 1) == index) }
-            ret()
+            val lastIndex = statements.size - 1
+            statements.forEachIndexed { index, statement ->
+                if ((lastIndex == index)) {
+                    if (methodSig.endsWith('V')) {
+                        compileAsStatement(statement, this)
+                        `return`()
+                    } else {
+                        compileAsExpression(statement, this)
+                        when (statement.type()) {
+                            is IntegerType -> ireturn()
+                            is JFClass -> areturn()
+                            else -> TODO("Need to implement other return types")
+                        }
+                    }
+                } else {
+                    compileAsStatement(statement, this)
+                }
+            }
         }
     }
+}
+
+private fun compileAsStatement(
+    expression: ASTNode.Expression,
+    builder: ClassBuilder.MethodDSL.DSL,
+) {
+    expression.compile(builder)
+    if (expression.type() != VoidType) builder.pop()
+}
+
+fun compileAsExpression(
+    expression: ASTNode.Expression,
+    builder: ClassBuilder.MethodDSL.DSL,
+) {
+    expression.compile(builder)
+    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "jafun/Unit")
 }
 
 fun String.runCommand(workingDir: File): String? {

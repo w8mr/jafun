@@ -2,6 +2,7 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import jafun.compiler.Associativity
 import jafun.compiler.HasPath
+import jafun.compiler.IdentifierCache
 import jafun.compiler.IntegerType
 import jafun.compiler.JFClass
 import jafun.compiler.JFField
@@ -72,7 +73,7 @@ class ParserTest {
                 method(
                     "println",
                     VoidType,
-                    JFVariableSymbol("param1", stringType),
+                    JFVariableSymbol("param1", stringType, IdentifierCache),
                     parent = JFField(JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                     static = false,
                 ),
@@ -88,8 +89,8 @@ class ParserTest {
             """
             |val str = "Hello World"
             |println str""",
-            ValAssignment(JFVariableSymbol("str", stringType), s("Hello World")),
-            staticInvocation(println, Variable(JFVariableSymbol("str", stringType))),
+            ValAssignment(JFVariableSymbol("str", stringType, IdentifierCache), s("Hello World")),
+            staticInvocation(println, Variable(JFVariableSymbol("str", stringType, IdentifierCache))),
         )
     }
 
@@ -122,10 +123,10 @@ class ParserTest {
         test(
             "fun test(a: Int) { println 1 + a }",
             function(
-                method("test", VoidType, JFVariableSymbol("a", IntegerType)),
+                method("test", VoidType, JFVariableSymbol("a", IntegerType, IdentifierCache)),
                 staticInvocation(
                     println,
-                    staticInvocation(plus, i(1), Variable(JFVariableSymbol("a", IntegerType))),
+                    staticInvocation(plus, i(1), Variable(JFVariableSymbol("a", IntegerType, IdentifierCache))),
                 ),
             ),
         )
@@ -136,7 +137,7 @@ class ParserTest {
         test(
             "fun test() { 1 + 2 }",
             function(
-                method("test", VoidType),
+                method("test", IntegerType),
                 staticInvocation(plus, i(1), i(2)),
             ),
         )
@@ -249,7 +250,7 @@ class ParserTest {
         precedence: Int = 10,
         parent: HasPath = JFClass("HelloWorld"),
     ) = JFMethod(
-        parameters.toList().mapIndexed { i, type -> JFVariableSymbol("param${i + 1}", type) },
+        parameters.toList().mapIndexed { i, type -> JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
         parent,
         name,
         returnType,

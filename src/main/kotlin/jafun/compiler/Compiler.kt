@@ -1,5 +1,7 @@
 package jafun.compiler
 
+import jafun.compiler.IdentifierCache.incSymbolMapCount
+
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionAssociativity(val associativity: Associativity)
@@ -15,9 +17,13 @@ interface SymbolMap {
         path: String,
         typeSig: TypeSig,
     )
+
+    fun incSymbolMapCount(): Int
+
+    val symbolMapId: Int
 }
 
-class LocalSymbolMap(val parent: SymbolMap) : SymbolMap {
+data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
     private val identifierMap = mutableMapOf<String, TypeSig?>()
 
     override fun find(path: String): TypeSig? = identifierMap[path] ?: parent.find(path)
@@ -26,12 +32,17 @@ class LocalSymbolMap(val parent: SymbolMap) : SymbolMap {
         path: String,
         typeSig: TypeSig,
     ) {
+        // TODO: Add shadow check
         identifierMap[path] = typeSig
     }
+
+    override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
 }
 
 object IdentifierCache : SymbolMap {
-    val identifierMap = mutableMapOf<String, TypeSig?>()
+    private val identifierMap = mutableMapOf<String, TypeSig?>()
+    private var symbolMapCounter: Int = 0
+    override val symbolMapId: Int = 0
 
     init {
         val systemOutPrintln =
@@ -56,7 +67,7 @@ object IdentifierCache : SymbolMap {
         val parent = jfClass(containingClass)
         val field = JFField(parent, staticFieldType.replace('.', '/'), staticField)
         return JFMethod(
-            listOf(JFVariableSymbol("param1", jfClass("java.lang.String"))),
+            listOf(JFVariableSymbol("param1", jfClass("java.lang.String"), IdentifierCache)),
             field,
             methodName,
             VoidType,
@@ -96,6 +107,11 @@ object IdentifierCache : SymbolMap {
         identifierMap[path] = typeSig
     }
 
+    override fun incSymbolMapCount(): Int {
+        symbolMapCounter++
+        return symbolMapCounter
+    }
+
     private fun findInClass(
         jClass: Class<*>,
         name: String,
@@ -113,8 +129,8 @@ object IdentifierCache : SymbolMap {
                     .firstOrNull() ?: 10
             val method =
                 JFMethod(
-                    params.mapIndexed { i, t -> JFVariableSymbol("param${i + 1}", t) },
-                    JFClass("${jClass.name.replace('.', '/')}"),
+                    params.mapIndexed { i, t -> JFVariableSymbol("param${i + 1}", t, IdentifierCache) },
+                    JFClass(jClass.name.replace('.', '/')),
                     name,
                     rtn,
                     true,
@@ -141,6 +157,11 @@ object IdentifierCache : SymbolMap {
     private fun jvmType(returnName: String) = jvmTypes[returnName] ?: jfClass(returnName)
 
     private fun jfClass(name: String) = JFClass(name.replace('.', '/'))
+
+    fun reset(): IdentifierCache {
+        symbolMapCounter = 0
+        return this
+    }
 }
 
 interface HasPath {
@@ -167,9 +188,22 @@ data class JFMethod(
     override val signature: String = rtn.signature
 }
 
-data class JFVariableSymbol(val name: String, val type: TypeSig) : TypeSig {
+data class JFVariableSymbol(val name: String, val type: TypeSig, val symbolMap: SymbolMap) : TypeSig {
     override val signature: String
         get() = type.signature
+
+    override fun equals(other: Any?): Boolean =
+        when (other) {
+            null -> false
+            is JFVariableSymbol -> name == other.name && type == other.type
+            else -> super.equals(other)
+        }
+
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
+    }
 }
 
 open class Generic(override val signature: String) : TypeSig {
