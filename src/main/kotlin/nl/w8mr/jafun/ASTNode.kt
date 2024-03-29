@@ -77,14 +77,25 @@ sealed interface ASTNode {
         }
     }
 
-    data class ExpressionList(val expressions: List<Expression>) : Expression() {
+    data class ExpressionList(val expressions: List<Expression>, val singleValue: Boolean = false) : Expression() {
         override fun type(): TypeSig = expressions.lastOrNull()?.type() ?: VoidType
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
             returnValue: Boolean,
         ) {
-            expressions.forEach { expression -> expression.compile(builder, returnValue) }
+            if (singleValue) {
+                val lastIndex = expressions.size - 1
+                expressions.forEachIndexed { index, statement ->
+                    if (returnValue && (lastIndex == index)) {
+                        compileAsExpression(statement, builder)
+                    } else {
+                        compileAsStatement(statement, builder)
+                    }
+                }
+            } else {
+                expressions.forEach { expression -> compileAsExpression(expression, builder) }
+            }
         }
     }
 
@@ -100,6 +111,7 @@ sealed interface ASTNode {
                     aload("this")
                     loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                     invokeVirtual(methodClassName, method.name, methodSignature)
+                    if (!returnValue && (method.rtn != VoidType)) pop()
                 }
             } else {
                 TODO()
@@ -124,6 +136,7 @@ sealed interface ASTNode {
                 getStatic(fieldClassName, field.name, fieldTypeSig)
                 loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                 invokeVirtual(methodClassName, method.name, methodSignature)
+                if (!returnValue && (method.rtn != VoidType)) pop()
             }
         }
 
@@ -142,6 +155,7 @@ sealed interface ASTNode {
             with(builder) {
                 loadArguments(builder, arguments, method.parameters.map(JFVariableSymbol::type))
                 invokeStatic(methodClassName, method.name, methodSignature)
+                if (!returnValue && (method.rtn != VoidType)) pop()
             }
         }
 
@@ -188,7 +202,7 @@ sealed interface ASTNode {
             returnValue: Boolean,
         ) {
             with(builder) {
-                expression.compile(builder, returnValue)
+                compileAsExpression(expression, builder)
                 if (returnValue) dup()
                 when (variableSymbol.type) {
                     is JFClass -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")

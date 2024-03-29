@@ -274,7 +274,7 @@ object Parser {
             )
         }
     private val curlBlock =
-        seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> ASTNode.ExpressionList(b) }
+        seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> ASTNode.ExpressionList(b, true) }
 
     private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
     private val function: Parser<ASTNode.Expression> =

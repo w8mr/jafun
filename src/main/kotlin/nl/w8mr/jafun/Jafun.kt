@@ -125,7 +125,7 @@ fun compileMethod(
     }
 }
 
-private fun compileAsStatement(
+fun compileAsStatement(
     expression: ASTNode.Expression,
     builder: ClassBuilder.MethodDSL.DSL,
 ) {
@@ -137,7 +137,7 @@ fun compileAsExpression(
     builder: ClassBuilder.MethodDSL.DSL,
 ) {
     expression.compile(builder, true)
-    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "jafun/Unit")
+    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "Ljafun/Unit;")
 }
 
 fun String.runCommand(workingDir: File): String? {
