@@ -1,7 +1,6 @@
 package nl.w8mr.jafun
 
 import jafun.compiler.BooleanType
-import jafun.compiler.ClassType
 import jafun.compiler.IdentifierCache
 import jafun.compiler.IntegerType
 import jafun.compiler.JFClass
@@ -177,14 +176,12 @@ sealed interface ASTNode {
             if (argument.type() == parameter) {
                 compileAsExpression(argument, builder)
             } else {
-                if (((argument.type() is JFClass) || (argument.type() is ClassType)) &&
-                    ((parameter is JFClass) || (parameter is ClassType))
-                ) {
+                if (argument.type() is JFClass && parameter is JFClass) {
                     compileAsExpression(argument, builder)
-                } else if ((argument.type() == IntegerType) && ((parameter is JFClass) || (parameter is ClassType))) {
+                } else if (argument.type() == IntegerType && parameter is JFClass) {
                     compileAsExpression(argument, builder)
                     invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                } else if ((argument.type() == BooleanType) && ((parameter is JFClass) || (parameter is ClassType))) {
+                } else if (argument.type() == BooleanType && parameter is JFClass) {
                     compileAsExpression(argument, builder)
                     invokeStatic("java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;")
                 } else {
@@ -206,7 +203,6 @@ sealed interface ASTNode {
                 if (returnValue) dup()
                 when (variableSymbol.type) {
                     is JFClass -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
-                    is ClassType -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is IntegerType -> istore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is BooleanType -> istore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")
@@ -223,7 +219,6 @@ sealed interface ASTNode {
             with(builder) {
                 when (variableSymbol.type) {
                     is JFClass -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
-                    is ClassType -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is IntegerType -> iload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is BooleanType -> iload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")

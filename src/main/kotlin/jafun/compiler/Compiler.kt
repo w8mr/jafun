@@ -215,8 +215,6 @@ open class Generic(override val signature: String) : TypeSig {
 val ThisType = JFField(JFClass(""), "this", "this")
 val StringType = JFClass("java/lang/String")
 
-object ClassType : Generic("L")
-
 object UnknownType : Generic("?")
 
 object VoidType : Generic("V")
