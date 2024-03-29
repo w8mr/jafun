@@ -147,7 +147,7 @@ object Parser {
         val symbol =
             JFMethod(
                 parameters,
-                JFClass("HelloWorld"),
+                JFClass("Script"),
                 identifier.value,
                 block.expressions.lastOrNull()?.type() ?: VoidType,
                 static = true,

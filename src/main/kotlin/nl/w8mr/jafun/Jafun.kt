@@ -8,14 +8,12 @@ import nl.w8mr.kasmine.DynamicClassLoader
 import nl.w8mr.kasmine.classBuilder
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.IOException
 import java.io.PrintStream
-import java.util.concurrent.TimeUnit
 import kotlin.Array
 
 fun compile(
     code: String,
-    className: String = "HelloWorld",
+    className: String = "Script",
     methodName: String = "main",
     methodSig: String = "([Ljava/lang/String;)V",
 ): ByteArray {
@@ -28,16 +26,23 @@ fun compile(
 }
 
 fun runMain(bytes: ByteArray) {
-    writeFile("HelloWorld", bytes)
-    runMethod(bytes, "HelloWorld", "main")
+    writeFile("Script", bytes)
+    runMethod(bytes, "Script", "main")
 }
 
 fun test(
     code: String,
-    className: String = "HelloWorld",
+    className: String = "Script",
     methodName: String = "main",
     methodSig: String = "([Ljava/lang/String;)V",
-): String {
+) = testBytes(code, className, methodName, methodSig).first
+
+fun testBytes(
+    code: String,
+    className: String = "Script",
+    methodName: String = "main",
+    methodSig: String = "([Ljava/lang/String;)V",
+): Pair<String, ByteArray> {
     val bytes = compile(code.trimIndent(), className, methodName, methodSig)
     writeFile(className, bytes)
     val oldOut = System.out
@@ -53,9 +58,7 @@ fun test(
     }
     val result = String(output.toByteArray())
     println("OUTPUT: $result")
-    print("DISASSEMBLE: ")
-    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
-    return result
+    return result to bytes
 }
 
 private fun runMethod(
@@ -64,11 +67,11 @@ private fun runMethod(
     methodName: String,
 ) {
     val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
-    val helloWorldClass = loader.define(className, bytes)
-    helloWorldClass.getMethod(methodName, Array<String>::class.java).invoke(null, null)
+    val scriptClass = loader.define(className, bytes)
+    scriptClass.getMethod(methodName, Array<String>::class.java).invoke(null, null)
 }
 
-private fun writeFile(
+fun writeFile(
     className: String,
     bytes: ByteArray,
 ) {
@@ -80,7 +83,7 @@ private fun writeFile(
 
 fun compile(
     statements: List<ASTNode.Expression>,
-    className: String = "HelloWorld",
+    className: String = "Script",
     methodName: String = "main",
     methodSig: String = "([Ljava/lang/String;)V",
 ): ByteArray {
@@ -138,22 +141,4 @@ fun compileAsExpression(
 ) {
     expression.compile(builder, true)
     if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "Ljafun/Unit;")
-}
-
-fun String.runCommand(workingDir: File): String? {
-    try {
-        val parts = this.split("\\s".toRegex())
-        val proc =
-            ProcessBuilder(*parts.toTypedArray())
-                .directory(workingDir)
-                .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                .redirectError(ProcessBuilder.Redirect.PIPE)
-                .start()
-
-        proc.waitFor(60, TimeUnit.MINUTES)
-        return proc.inputStream.bufferedReader().readText()
-    } catch (e: IOException) {
-        e.printStackTrace()
-        return null
-    }
 }

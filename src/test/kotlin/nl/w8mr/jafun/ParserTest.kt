@@ -281,7 +281,7 @@ class ParserTest {
         static: Boolean = true,
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = JFClass("HelloWorld"),
+        parent: HasPath = JFClass("Script"),
     ) = JFMethod(
         parameters.toList(),
         parent,
@@ -299,7 +299,7 @@ class ParserTest {
         static: Boolean = true,
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = JFClass("HelloWorld"),
+        parent: HasPath = JFClass("Script"),
     ) = JFMethod(
         parameters.toList().mapIndexed { i, type -> JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
         parent,
@@ -316,7 +316,7 @@ class ParserTest {
         static: Boolean = true,
         associativity: Associativity = Associativity.SOLO,
         precedence: Int = 10,
-        parent: HasPath = JFClass("HelloWorld"),
+        parent: HasPath = JFClass("Script"),
     ) = JFMethod(
         emptyList(),
         parent,

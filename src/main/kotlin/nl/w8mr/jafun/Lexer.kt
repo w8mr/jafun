@@ -73,7 +73,8 @@ val newline = oneOf(seq(char('\n')), seq(char('\r'), char(('\n')))).map { Newlin
 val lexer =
     zeroOrMore(
         oneOf(
-            fun_token, val_token, when_token, true_token, false_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws,
-            newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon, equality, assignment,
+            fun_token, val_token, when_token, true_token, false_token, identifier, operatorIdentifier, dot,
+            lineStringLiteral, integerLiteral, ws, newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon,
+            equality, assignment,
         ),
     )
