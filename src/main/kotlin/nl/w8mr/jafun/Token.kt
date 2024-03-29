@@ -1,35 +1,43 @@
 package nl.w8mr.jafun
 
-sealed interface Token {
-    object Dot : Token
+sealed class Token(val name: String) {
+    override fun toString(): String = name
 
-    object LParen : Token
+    object Dot : Token(".")
 
-    object RParen : Token
+    object LParen : Token("(")
 
-    object LCurl : Token
+    object RParen : Token(")")
 
-    object RCurl : Token
+    object LCurl : Token("{")
 
-    object Comma : Token
+    object RCurl : Token("}")
 
-    object Colon : Token
+    object Comma : Token(",")
 
-    object Semicolon : Token
+    object Colon : Token(":")
 
-    object Assignment : Token
+    object Semicolon : Token(";")
 
-    object Val : Token
+    object Assignment : Token("=")
 
-    object Fun : Token
+    object Val : Token("val")
 
-    object WS : Token
+    object Fun : Token("fun")
 
-    object Newline : Token
+    object When : Token("when")
 
-    data class Identifier(val value: String, val operator: Boolean = false) : Token
+    object True : Token("true")
 
-    data class StringLiteral(val value: String) : Token
+    object False : Token("false")
 
-    data class IntegerLiteral(val value: Int) : Token
+    object WS : Token("WS")
+
+    object Newline : Token("NL")
+
+    data class Identifier(val value: String, val operator: Boolean = false) : Token(value)
+
+    data class StringLiteral(val value: String) : Token(value)
+
+    data class IntegerLiteral(val value: Int) : Token(value.toString())
 }

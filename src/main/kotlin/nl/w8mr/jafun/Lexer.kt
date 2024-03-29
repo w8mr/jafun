@@ -4,6 +4,7 @@ import nl.w8mr.jafun.Token.Assignment
 import nl.w8mr.jafun.Token.Colon
 import nl.w8mr.jafun.Token.Comma
 import nl.w8mr.jafun.Token.Dot
+import nl.w8mr.jafun.Token.False
 import nl.w8mr.jafun.Token.Fun
 import nl.w8mr.jafun.Token.Identifier
 import nl.w8mr.jafun.Token.IntegerLiteral
@@ -14,8 +15,10 @@ import nl.w8mr.jafun.Token.RCurl
 import nl.w8mr.jafun.Token.RParen
 import nl.w8mr.jafun.Token.Semicolon
 import nl.w8mr.jafun.Token.StringLiteral
+import nl.w8mr.jafun.Token.True
 import nl.w8mr.jafun.Token.Val
 import nl.w8mr.jafun.Token.WS
+import nl.w8mr.jafun.Token.When
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.oneOf
 import nl.w8mr.parsek.or
@@ -53,9 +56,13 @@ val rCurl = char('}').map { RCurl }
 val comma = char(',').map { Comma }
 val colon = char(':').map { Colon }
 val semicolon = char(';').map { Semicolon }
+val equality = literal("==").map { Identifier("==", true) }
 val assignment = char('=').map { Assignment }
 val val_token = literal("val").map { Val }
 val fun_token = literal("fun").map { Fun }
+val when_token = literal("when").map { When }
+val true_token = literal("true").map { True }
+val false_token = literal("false").map { False }
 
 val lineStringContent = zeroOrMore(char(" is not valid string Char") { it != '"' && it != '\\' })
 val lineStringLiteral = ('"' followedBy lineStringContent followedBy '"').map(::StringLiteral)
@@ -66,7 +73,7 @@ val newline = oneOf(seq(char('\n')), seq(char('\r'), char(('\n')))).map { Newlin
 val lexer =
     zeroOrMore(
         oneOf(
-            fun_token, val_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws,
-            newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon, assignment,
+            fun_token, val_token, when_token, true_token, false_token, identifier, operatorIdentifier, dot, lineStringLiteral, integerLiteral, ws,
+            newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon, equality, assignment,
         ),
     )

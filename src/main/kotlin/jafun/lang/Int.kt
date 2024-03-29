@@ -5,6 +5,14 @@ import jafun.compiler.FunctionAssociativity
 import jafun.compiler.FunctionPrecedence
 
 @Suppress("ktlint:standard:function-naming")
+@FunctionPrecedence(40)
+@FunctionAssociativity(Associativity.INFIXL)
+fun `==`(
+    a: Int,
+    b: Int,
+) = a == b
+
+@Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(20)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `+`(

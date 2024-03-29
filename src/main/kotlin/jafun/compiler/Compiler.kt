@@ -188,7 +188,7 @@ data class JFMethod(
     override val signature: String = rtn.signature
 }
 
-data class JFVariableSymbol(val name: String, val type: TypeSig, val symbolMap: SymbolMap) : TypeSig {
+data class JFVariableSymbol(val name: String, val type: TypeSig, val symbolMap: SymbolMap = IdentifierCache) : TypeSig {
     override val signature: String
         get() = type.signature
 

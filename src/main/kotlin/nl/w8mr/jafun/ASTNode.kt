@@ -1,5 +1,6 @@
 package nl.w8mr.jafun
 
+import jafun.compiler.BooleanType
 import jafun.compiler.ClassType
 import jafun.compiler.IdentifierCache
 import jafun.compiler.IntegerType
@@ -16,24 +17,15 @@ import nl.w8mr.kasmine.ClassBuilder
 sealed interface ASTNode {
     fun compile(
         builder: ClassBuilder.MethodDSL.DSL,
-        isExpression: Boolean = true,
+        returnValue: Boolean = true,
     )
-
-//    data class Statement(val expression: Expression) : ASTNode {
-//        override fun compile(
-//            builder: ClassBuilder.MethodDSL.DSL,
-//            isExpression: Boolean,
-//        ) {
-//            expression.compile(builder, isExpression)
-//        }
-//    }
 
     abstract class Expression : ASTNode {
         abstract fun type(): TypeSig
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) { }
     }
 
@@ -44,7 +36,7 @@ sealed interface ASTNode {
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             with(builder) {
                 loadConstant(value)
@@ -55,7 +47,7 @@ sealed interface ASTNode {
     data class IntegerLiteral(val value: Int) : Expression() {
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             with(builder) {
                 loadConstant(value)
@@ -67,21 +59,39 @@ sealed interface ASTNode {
         }
     }
 
+    data class BooleanLiteral(val value: Boolean) : Expression() {
+        override fun compile(
+            builder: ClassBuilder.MethodDSL.DSL,
+            returnValue: Boolean,
+        ) {
+            with(builder) {
+                when (value) {
+                    false -> loadConstant(0)
+                    true -> loadConstant(1)
+                }
+            }
+        }
+
+        override fun type(): TypeSig {
+            return BooleanType
+        }
+    }
+
     data class ExpressionList(val expressions: List<Expression>) : Expression() {
         override fun type(): TypeSig = expressions.lastOrNull()?.type() ?: VoidType
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
-            expressions.forEach { expression -> expression.compile(builder, isExpression) }
+            expressions.forEach { expression -> expression.compile(builder, returnValue) }
         }
     }
 
     data class FieldInvocation(val method: JFMethod, val field: JFField, val arguments: List<Expression>) : Expression() {
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             if (field.path == ThisType.path) { // TODO: check implementation
                 val methodClassName = method.parent.path
@@ -104,7 +114,7 @@ sealed interface ASTNode {
     data class StaticFieldInvocation(val method: JFMethod, val field: JFField, val arguments: List<Expression>) : Expression() {
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             val fieldClassName = field.parent.path
             val fieldTypeSig = field.signature
@@ -125,7 +135,7 @@ sealed interface ASTNode {
     data class StaticInvocation(val method: JFMethod, val arguments: List<Expression>) : Expression() {
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             val methodClassName = method.parent.path
             val methodSignature = "(${method.parameters.map(JFVariableSymbol::signature).joinToString("")})${method.rtn.signature}"
@@ -138,6 +148,10 @@ sealed interface ASTNode {
         override fun type(): TypeSig {
             return method.rtn
         }
+    }
+
+    data class When(val input: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
+        override fun type(): TypeSig = matches.last().second.type() // TODO: find common type
     }
 
     fun ClassBuilder.MethodDSL.DSL.loadArguments(
@@ -156,6 +170,9 @@ sealed interface ASTNode {
                 } else if ((argument.type() == IntegerType) && ((parameter is JFClass) || (parameter is ClassType))) {
                     compileAsExpression(argument, builder)
                     invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                } else if ((argument.type() == BooleanType) && ((parameter is JFClass) || (parameter is ClassType))) {
+                    compileAsExpression(argument, builder)
+                    invokeStatic("java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;")
                 } else {
                     TODO()
                 }
@@ -168,15 +185,16 @@ sealed interface ASTNode {
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             with(builder) {
-                expression.compile(builder, isExpression)
-                if (isExpression) dup()
+                expression.compile(builder, returnValue)
+                if (returnValue) dup()
                 when (variableSymbol.type) {
                     is JFClass -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is ClassType -> astore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is IntegerType -> istore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is BooleanType -> istore("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")
                 }
             }
@@ -186,13 +204,14 @@ sealed interface ASTNode {
     data class Variable(val variableSymbol: JFVariableSymbol) : Expression() {
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             with(builder) {
                 when (variableSymbol.type) {
                     is JFClass -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is ClassType -> aload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     is IntegerType -> iload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
+                    is BooleanType -> iload("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}")
                     else -> TODO("Need to implement types")
                 }
             }
@@ -210,7 +229,7 @@ sealed interface ASTNode {
 
         override fun compile(
             builder: ClassBuilder.MethodDSL.DSL,
-            isExpression: Boolean,
+            returnValue: Boolean,
         ) {
             symbol.parameters.forEach { builder.parameter("${it.symbolMap.symbolMapId}.${it.name}") }
             compileMethod(
@@ -221,12 +240,6 @@ sealed interface ASTNode {
             )
         }
     }
-
-//    data class Block(val block: List<Statement>) : Expression() {
-//        override fun type(): TypeSig {
-//            return UnknownType
-//        }
-//    }
 
     data class MethodIdentifier(val method: JFMethod, val field: JFField?) : Expression() {
         override fun type(): TypeSig = UnknownType

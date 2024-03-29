@@ -381,4 +381,37 @@ class CompilerTest {
             )
         assertEquals("4\n4\n2\n", result)
     }
+
+    @Test
+    fun integerLiterals() {
+        val result =
+            test(
+                """
+                    println 0
+                    println 1
+                    println 2
+                    println 3
+                    println 4
+                    println 5
+                    println 6
+                    println 127
+                    println 128
+                    println 32767
+                    println 32768
+        """,
+            )
+        assertEquals("0\n1\n2\n3\n4\n5\n6\n127\n128\n32767\n32768\n", result)
+    }
+
+    @Test
+    fun basicBoolean() {
+        val result =
+            test(
+                """
+                val b = true
+                println b
+        """,
+            )
+        assertEquals("true\n", result)
+    }
 }

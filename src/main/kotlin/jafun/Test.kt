@@ -66,6 +66,8 @@ fun test() {
 
     fun next(iterator: Iterator<Manager>) {
     }
+
+    println(boolean(true))
 }
 
 fun main(args: Array<String>) {
@@ -86,4 +88,39 @@ fun testExpression(
     a + b
     a + b
     return a + b
+}
+
+fun boolean(a: Boolean): Boolean {
+    val b = false
+    return a && b
+}
+
+fun whenExample(a: Int) {
+    println(
+        when {
+            a == 1 -> "One"
+            a == 2 -> "Two"
+            a == 3 -> "Three"
+            a == 5 -> "Five"
+            a == 6 -> "SixF"
+            a == 10 -> "Ten"
+            a == 100 -> "Hundred"
+            a == 127 -> "127"
+            a == 128 -> "128"
+            a == 200 -> "Two Hundred"
+            a == 32767 -> "32767"
+            a == 32768 -> "32768"
+            a == 0 -> "Zero"
+            a == -1 -> "Miuns one"
+            a == -2 -> "Minus two"
+            a == -128 -> "-128"
+            a == -129 -> "-129"
+            a == -32768 -> "-32768"
+            a == -32769 -> "-32769"
+
+            a > 100000 -> "Large"
+            a < -100000 -> "Small"
+            else -> "More or less"
+        },
+    )
 }

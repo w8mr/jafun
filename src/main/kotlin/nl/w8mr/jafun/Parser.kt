@@ -23,15 +23,18 @@ import nl.w8mr.jafun.Token.RCurl
 import nl.w8mr.jafun.Token.RParen
 import nl.w8mr.jafun.Token.Semicolon
 import nl.w8mr.jafun.Token.Val
+import nl.w8mr.jafun.Token.When
 import nl.w8mr.parsek.OparatorTable
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.binary
 import nl.w8mr.parsek.eof
+import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.iLiteral
 import nl.w8mr.parsek.literal
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.mapResult
 import nl.w8mr.parsek.oneOf
+import nl.w8mr.parsek.optional
 import nl.w8mr.parsek.postfixLiteral
 import nl.w8mr.parsek.prefixLiteral
 import nl.w8mr.parsek.ref
@@ -156,6 +159,7 @@ object Parser {
 
     private val identifierTerm = literal(Identifier::class)
     private val newlineTerm = iLiteral(Newline::class)
+    private val newlines = zeroOrMore(newlineTerm).map { }
     private val dotTerm = iLiteral(Dot::class)
     private val colonTerm = iLiteral(Colon::class)
     private val commaTerm = iLiteral(Comma::class)
@@ -166,11 +170,17 @@ object Parser {
     private val rCurlTerm = iLiteral(RCurl::class)
     private val valTerm = iLiteral(Val::class)
     private val funTerm = iLiteral(Fun::class)
+    private val whenTerm = iLiteral(When::class)
 
     private val assignmentTerm = iLiteral(Token.Assignment::class)
 
     private val stringLiteral_term = literal(Token.StringLiteral::class) map { ASTNode.StringLiteral(it.value) }
     private val integerLiteral_term = literal(Token.IntegerLiteral::class) map { ASTNode.IntegerLiteral(it.value) }
+    private val booleanLiteral_term =
+        oneOf(
+            literal(Token.True::class).map { ASTNode.BooleanLiteral(true) },
+            literal(Token.False::class).map { ASTNode.BooleanLiteral(false) },
+        )
 
     private val complexIdentifier = identifierTerm sepBy dotTerm
     private val variableIdentifier: Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
@@ -185,27 +195,33 @@ object Parser {
 
     // TODO: Check if expression and complexExpression can be combined.  Maybe use longest match? Or at least if it is used correctly now.
     private val expression: Parser<ASTNode.Expression> =
-        oneOf(
-            stringLiteral_term,
-            integerLiteral_term,
-            variableIdentifier,
-            arguments,
-            ref(::curlBlock),
-            ref(::function),
-            ref(::operations),
-            nullaryMethod,
-        )
+        newlines prefixLiteral
+            oneOf(
+                stringLiteral_term,
+                integerLiteral_term,
+                booleanLiteral_term,
+                variableIdentifier,
+                arguments,
+                ref(::curlBlock),
+                ref(::function),
+                ref(::whenExpression),
+                ref(::operations),
+                nullaryMethod,
+            ) postfixLiteral newlines
     private val complexExpression: Parser<ASTNode.Expression> =
-        oneOf(
-            arguments,
-            ref(::curlBlock),
-            ref(::function),
-            ref(::operations),
-            nullaryMethod,
-            stringLiteral_term,
-            integerLiteral_term,
-            variableIdentifier,
-        )
+        newlines prefixLiteral
+            oneOf(
+                arguments,
+                ref(::curlBlock),
+                ref(::function),
+                ref(::whenExpression),
+                ref(::operations),
+                nullaryMethod,
+                stringLiteral_term,
+                integerLiteral_term,
+                booleanLiteral_term,
+                variableIdentifier,
+            ) postfixLiteral newlines
 
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
 
@@ -225,6 +241,11 @@ object Parser {
                 40,
                 methodIdentifier(Associativity.POSTFIX, 40)
                     .unary { ident -> { expr -> invocation(ident, expr) } },
+            )
+            infixl(
+                40,
+                methodIdentifier(Associativity.INFIXL, 40)
+                    .binary { ident -> { expr1, expr2 -> invocation(ident, ASTNode.ExpressionList(listOf(expr1, expr2))) } },
             )
             infixr(
                 40,
@@ -265,12 +286,23 @@ object Parser {
             rParenTerm,
             curlBlock,
         ) { _, i, _, p, _, b -> newFunction(i, p, b) }
-    private val block =
+
+    private val whenArrow = identifierTerm.filter { it.value == "->" }.map {}
+    private val whenMatch = seq(complexExpression postfixLiteral whenArrow, expression)
+    private val whenExpression: Parser<ASTNode.When> =
         seq(
-            zeroOrMore(oneOf(newlineTerm, semicolonTerm)),
-            complexExpression sepByAllowEmpty oneOf(newlineTerm, eof(), semicolonTerm),
-            zeroOrMore(oneOf(newlineTerm, eof(), semicolonTerm)),
-        ) { _, i, _ -> i }
+            whenTerm.map(::pushSymbolMap),
+            optional(lParenTerm prefixLiteral expression postfixLiteral rParenTerm),
+            lCurlTerm prefixLiteral zeroOrMore(whenMatch) postfixLiteral rCurlTerm,
+        ) { _, input, matches -> ASTNode.When(input, matches) }
+    private val block =
+        zeroOrMore(
+            seq(
+                zeroOrMore(oneOf(newlineTerm, semicolonTerm)),
+                complexExpression,
+                zeroOrMore(oneOf(newlineTerm, eof(), semicolonTerm)),
+            ) { _, i, _ -> i },
+        )
     private val parser = block
 
     private var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset())

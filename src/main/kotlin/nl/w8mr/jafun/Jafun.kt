@@ -54,7 +54,7 @@ fun test(
     val result = String(output.toByteArray())
     println("OUTPUT: $result")
     print("DISASSEMBLE: ")
-    //  println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
+    println("javap -v HelloWorld.class".runCommand(File("./build/classes/jafun/test")))
     return result
 }
 
@@ -129,15 +129,14 @@ private fun compileAsStatement(
     expression: ASTNode.Expression,
     builder: ClassBuilder.MethodDSL.DSL,
 ) {
-    expression.compile(builder)
-    if (expression.type() != VoidType) builder.pop()
+    expression.compile(builder, false)
 }
 
 fun compileAsExpression(
     expression: ASTNode.Expression,
     builder: ClassBuilder.MethodDSL.DSL,
 ) {
-    expression.compile(builder)
+    expression.compile(builder, true)
     if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "jafun/Unit")
 }
 

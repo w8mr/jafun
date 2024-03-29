@@ -1,6 +1,7 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import jafun.compiler.Associativity
+import jafun.compiler.BooleanType
 import jafun.compiler.HasPath
 import jafun.compiler.IdentifierCache
 import jafun.compiler.IntegerType
@@ -10,6 +11,7 @@ import jafun.compiler.JFMethod
 import jafun.compiler.JFVariableSymbol
 import jafun.compiler.TypeSig
 import jafun.compiler.VoidType
+import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.ASTNode.Expression
 import nl.w8mr.jafun.ASTNode.Function
 import nl.w8mr.jafun.ASTNode.IntegerLiteral
@@ -177,6 +179,44 @@ class ParserTest {
         )
     }
 
+    @Test
+    fun simpleWhen() {
+        test(
+            """
+            |when { 
+            |    1 == 2 -> "False"
+            |    1 == 1 -> "True"
+            |}
+            """,
+            ASTNode.When(
+                null,
+                listOf(
+                    StaticInvocation(equals, listOf(i(1), i(2))) to s("False"),
+                    StaticInvocation(equals, listOf(i(1), i(1))) to s("True"),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun whenWithInput() {
+        test(
+            """
+            |when (val a = 2) { 
+            |    a == 2 -> "False"
+            |    a == 1 -> "True"
+            |}
+            """,
+            ASTNode.When(
+                ValAssignment(JFVariableSymbol("a", IntegerType), i(2)),
+                listOf(
+                    StaticInvocation(equals, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(2))) to s("False"),
+                    StaticInvocation(equals, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(1))) to s("True"),
+                ),
+            ),
+        )
+    }
+
     private fun test(
         code: String,
         vararg expressions: Expression,
@@ -220,6 +260,17 @@ class ParserTest {
             IntegerType,
             associativity = Associativity.INFIXL,
             precedence = 20,
+            parent = JFClass("jafun/lang/IntKt"),
+        )
+
+    private val equals =
+        method(
+            "==",
+            BooleanType,
+            IntegerType,
+            IntegerType,
+            associativity = Associativity.INFIXL,
+            precedence = 40,
             parent = JFClass("jafun/lang/IntKt"),
         )
 
