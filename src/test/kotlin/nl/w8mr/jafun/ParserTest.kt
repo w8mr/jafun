@@ -15,8 +15,6 @@ import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.ASTNode.Expression
 import nl.w8mr.jafun.ASTNode.Function
 import nl.w8mr.jafun.ASTNode.IntegerLiteral
-import nl.w8mr.jafun.ASTNode.StaticFieldInvocation
-import nl.w8mr.jafun.ASTNode.StaticInvocation
 import nl.w8mr.jafun.ASTNode.StringLiteral
 import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
@@ -31,7 +29,7 @@ class ParserTest {
     fun helloWorldParser() {
         test(
             "println \"Hello World\"",
-            staticInvocation(println, s("Hello World")),
+            invocation(println, null, s("Hello World")),
         )
     }
 
@@ -39,7 +37,7 @@ class ParserTest {
     fun integerParser() {
         test(
             "println 7",
-            staticInvocation(println, i(7)),
+            invocation(println, null, i(7)),
         )
     }
 
@@ -47,7 +45,7 @@ class ParserTest {
     fun helloWorldNormalParser() {
         test(
             "println(\"Hello World\")",
-            staticInvocation(println, s("Hello World")),
+            invocation(println, null, s("Hello World")),
         )
     }
 
@@ -55,7 +53,7 @@ class ParserTest {
     fun helloWorldTwoLevelParser() {
         test(
             """println(join("Hello","World"))""",
-            staticInvocation(println, staticInvocation(join, s("Hello"), s("World"))),
+            invocation(println, null, invocation(join, null, s("Hello"), s("World"))),
         )
     }
 
@@ -63,7 +61,7 @@ class ParserTest {
     fun twoArgFunParser() {
         test(
             """join("Hello", "World")""",
-            staticInvocation(join, s("Hello"), s("World")),
+            invocation(join, null, s("Hello"), s("World")),
         )
     }
 
@@ -71,7 +69,7 @@ class ParserTest {
     fun complexHelloWorldParser() {
         test(
             """java.lang.System.out.println "Hello World"""",
-            staticFieldInvocation(
+            invocation(
                 method(
                     "println",
                     VoidType,
@@ -92,7 +90,7 @@ class ParserTest {
             |val str = "Hello World"
             |println str""",
             ValAssignment(JFVariableSymbol("str", stringType, IdentifierCache), s("Hello World")),
-            staticInvocation(println, Variable(JFVariableSymbol("str", stringType, IdentifierCache))),
+            invocation(println, null, Variable(JFVariableSymbol("str", stringType, IdentifierCache))),
         )
     }
 
@@ -112,9 +110,10 @@ class ParserTest {
             "fun test() { println 1 + 2 }",
             function(
                 method("test", VoidType),
-                staticInvocation(
+                invocation(
                     println,
-                    staticInvocation(plus, i(1), i(2)),
+                    null,
+                    invocation(plus, null, i(1), i(2)),
                 ),
             ),
         )
@@ -126,9 +125,10 @@ class ParserTest {
             "fun test(a: Int) { println 1 + a }",
             function(
                 method("test", VoidType, JFVariableSymbol("a", IntegerType, IdentifierCache)),
-                staticInvocation(
+                invocation(
                     println,
-                    staticInvocation(plus, i(1), Variable(JFVariableSymbol("a", IntegerType, IdentifierCache))),
+                    null,
+                    invocation(plus, null, i(1), Variable(JFVariableSymbol("a", IntegerType, IdentifierCache))),
                 ),
             ),
         )
@@ -140,7 +140,7 @@ class ParserTest {
             "fun test() { 1 + 2 }",
             function(
                 method("test", IntegerType),
-                staticInvocation(plus, i(1), i(2)),
+                invocation(plus, null, i(1), i(2)),
             ),
         )
     }
@@ -153,9 +153,10 @@ class ParserTest {
                 method("test", VoidType),
                 function(
                     method("inner", VoidType),
-                    staticInvocation(
+                    invocation(
                         println,
-                        staticInvocation(plus, i(1), i(2)),
+                        null,
+                        invocation(plus, null, i(1), i(2)),
                     ),
                 ),
             ),
@@ -170,12 +171,13 @@ class ParserTest {
             |test""",
             function(
                 method("test", VoidType),
-                staticInvocation(
+                invocation(
                     println,
-                    staticInvocation(plus, i(1), i(2)),
+                    null,
+                    invocation(plus, null, i(1), i(2)),
                 ),
             ),
-            staticInvocation(method("test", VoidType)),
+            invocation(method("test", VoidType), null),
         )
     }
 
@@ -191,8 +193,8 @@ class ParserTest {
             ASTNode.When(
                 null,
                 listOf(
-                    StaticInvocation(equals, listOf(i(1), i(2))) to s("False"),
-                    StaticInvocation(equals, listOf(i(1), i(1))) to s("True"),
+                    ASTNode.Invocation(equals, null, listOf(i(1), i(2))) to s("False"),
+                    ASTNode.Invocation(equals, null, listOf(i(1), i(1))) to s("True"),
                 ),
             ),
         )
@@ -210,8 +212,8 @@ class ParserTest {
             ASTNode.When(
                 ValAssignment(JFVariableSymbol("a", IntegerType), i(2)),
                 listOf(
-                    StaticInvocation(equals, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(2))) to s("False"),
-                    StaticInvocation(equals, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(1))) to s("True"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(2))) to s("False"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(JFVariableSymbol("a", IntegerType)), i(1))) to s("True"),
                 ),
             ),
         )
@@ -331,19 +333,11 @@ class ParserTest {
 
     private fun s(string: String) = StringLiteral(string)
 
-    private fun staticInvocation(
+    private fun invocation(
         method: JFMethod,
+        field: JFField?,
         vararg parameters: Expression,
-    ) = StaticInvocation(
-        method,
-        parameters.toList(),
-    )
-
-    private fun staticFieldInvocation(
-        method: JFMethod,
-        field: JFField,
-        vararg parameters: Expression,
-    ) = StaticFieldInvocation(
+    ) = ASTNode.Invocation(
         method,
         field,
         parameters.toList(),

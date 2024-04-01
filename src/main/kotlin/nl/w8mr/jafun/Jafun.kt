@@ -111,12 +111,12 @@ fun compileMethod(
                 if ((lastIndex == index)) {
                     if (methodSig.endsWith('V')) {
                         compileAsStatement(statement, this)
-                        `return`()
+                        JVMBackend.Context(this).compile(IR.Return(IR.Unit))
                     } else {
                         compileAsExpression(statement, this)
                         when (statement.type()) {
-                            is IntegerType -> ireturn()
-                            is JFClass -> areturn()
+                            is IntegerType -> JVMBackend.Context(this).compile(IR.Return(IR.SInt32))
+                            is JFClass -> JVMBackend.Context(this).compile(IR.Return(IR.Reference<Any?>()))
                             else -> TODO("Need to implement other return types")
                         }
                     }
@@ -140,5 +140,5 @@ fun compileAsExpression(
     builder: ClassBuilder.MethodDSL.DSL,
 ) {
     expression.compile(builder, true)
-    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "Ljafun/Unit;")
+    if (expression.type() == VoidType) JVMBackend.Context(builder).compile(IR.GetStatic("jafun/Unit", "INSTANCE", "jafun/Unit"))
 }

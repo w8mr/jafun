@@ -49,16 +49,16 @@ object Parser {
         methodIdentifier: ASTNode.MethodIdentifier,
         arguments: List<ASTNode.Expression>,
     ): ASTNode.Expression {
-        return when {
-            methodIdentifier.field?.signature == "this" ->
-                ASTNode.FieldInvocation(
-                    methodIdentifier.method,
-                    methodIdentifier.field,
-                    arguments,
-                )
-            methodIdentifier.field != null -> ASTNode.StaticFieldInvocation(methodIdentifier.method, methodIdentifier.field, arguments)
-            else -> ASTNode.StaticInvocation(methodIdentifier.method, arguments)
-        }
+//        return when {
+//            methodIdentifier.field?.signature == "this" ->
+//                ASTNode.FieldInvocation(
+//                    methodIdentifier.method,
+//                    methodIdentifier.field,
+//                    arguments,
+//                )
+//            methodIdentifier.field != null -> ASTNode.StaticFieldInvocation(methodIdentifier.method, methodIdentifier.field, arguments)
+//            else -> ASTNode.StaticInvocation(methodIdentifier.method, arguments)
+        return ASTNode.Invocation(methodIdentifier.method, methodIdentifier.field, arguments)
     }
 
     private fun invocation(
