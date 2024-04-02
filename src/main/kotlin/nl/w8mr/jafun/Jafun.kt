@@ -1,8 +1,5 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.IntegerType
-import jafun.compiler.JFClass
-import jafun.compiler.VoidType
 import nl.w8mr.kasmine.DynamicClassLoader
 import nl.w8mr.kasmine.classBuilder
 import java.io.ByteArrayOutputStream
@@ -143,11 +140,7 @@ fun compileMethod(
                             `return`(IR.Unit)
                         } else {
                             compileAsExpression(statement, this)
-                            when (statement.type()) {
-                                is IntegerType -> `return`(IR.SInt32)
-                                is JFClass -> `return`(IR.Reference<Any?>(statement.type().signature))
-                                else -> TODO("Need to implement other return types")
-                            }
+                            `return`(statement.type())
                         }
                     } else {
                         compileAsStatement(statement, this)
@@ -170,5 +163,5 @@ fun compileAsExpression(
     builder: IRBuilder.CodeBlockDSL,
 ) {
     expression.compile(builder, true)
-    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "jafun/Unit")
+    if (expression.type() == IR.Unit) builder.getStatic("jafun/Unit", "INSTANCE", IR.Unit)
 }

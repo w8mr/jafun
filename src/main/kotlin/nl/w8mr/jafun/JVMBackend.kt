@@ -1,6 +1,6 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.JFVariableSymbol
+import nl.w8mr.jafun.IR.Companion.signature
 import nl.w8mr.kasmine.ClassBuilder
 
 class JVMBackend {
@@ -21,13 +21,16 @@ class JVMBackend {
 
                         is IR.Reference -> TODO()
                         is IR.Array -> TODO()
+                        is IR.JFClass -> TODO()
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
                     }
                 is IR.Invoke -> {
                     with(method) {
                         val methodClassName = instruction.method.parent.path
-                        val methodSignature = "(${instruction.method.parameters.map(
-                            JFVariableSymbol::signature,
-                        ).joinToString("")})${instruction.method.rtn.signature}"
+                        val methodSignature =
+                            "(${instruction.method.parameters.map { signature(it.type) }.joinToString("")})" +
+                                "${signature(instruction.method.rtn)}"
                         when (instruction.field) {
                             null -> invokeStatic(methodClassName, instruction.method.name, methodSignature)
                             else -> invokeVirtual(methodClassName, instruction.method.name, methodSignature)
@@ -43,6 +46,9 @@ class JVMBackend {
                         is IR.StringType -> method.astore(instruction.registerName)
                         is IR.UInt1 -> method.istore(instruction.registerName)
                         is IR.Array -> TODO()
+                        is IR.JFClass -> method.astore(instruction.registerName)
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
@@ -51,15 +57,21 @@ class JVMBackend {
                         is IR.StringType -> method.aload(instruction.registerName)
                         is IR.UInt1 -> method.iload(instruction.registerName)
                         is IR.Array -> TODO()
+                        is IR.JFClass -> method.aload(instruction.registerName)
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
                         is IR.Unit -> method.`return`() // TODO: check how to handle unit.
                         is IR.Reference -> method.areturn()
                         is IR.SInt32 -> method.ireturn()
-                        is IR.StringType -> method.ireturn()
+                        is IR.StringType -> method.areturn()
                         is IR.UInt1 -> method.ireturn()
                         is IR.Array -> TODO()
+                        is IR.JFClass -> method.areturn()
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
                     }
 
                 is IR.GetStatic -> method.getStatic(instruction.className, instruction.fieldName, instruction.type)

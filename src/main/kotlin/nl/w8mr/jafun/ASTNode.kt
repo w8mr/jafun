@@ -1,16 +1,7 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.BooleanType
 import jafun.compiler.IdentifierCache
-import jafun.compiler.IntegerType
-import jafun.compiler.JFClass
-import jafun.compiler.JFField
-import jafun.compiler.JFMethod
-import jafun.compiler.JFVariableSymbol
-import jafun.compiler.ThisType
-import jafun.compiler.TypeSig
-import jafun.compiler.UnknownType
-import jafun.compiler.VoidType
+import nl.w8mr.jafun.ASTNode.Expression
 
 sealed interface ASTNode {
     fun compile(
@@ -19,7 +10,7 @@ sealed interface ASTNode {
     )
 
     abstract class Expression : ASTNode {
-        abstract fun type(): TypeSig
+        abstract fun type(): IR.OperandType<*>
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -28,9 +19,7 @@ sealed interface ASTNode {
     }
 
     data class StringLiteral(val value: String) : Expression() {
-        override fun type(): TypeSig {
-            return IdentifierCache.find("java.lang.String") as TypeSig
-        }
+        override fun type() = IR.StringType
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -48,9 +37,7 @@ sealed interface ASTNode {
             builder.loadConstant(value, IR.SInt32)
         }
 
-        override fun type(): TypeSig {
-            return IntegerType
-        }
+        override fun type() = IR.SInt32
     }
 
     data class BooleanLiteral(val value: Boolean) : Expression() {
@@ -61,13 +48,11 @@ sealed interface ASTNode {
             builder.loadConstant(value, IR.UInt1)
         }
 
-        override fun type(): TypeSig {
-            return BooleanType
-        }
+        override fun type() = IR.UInt1
     }
 
     data class ExpressionList(val expressions: List<Expression>, val singleValue: Boolean = false) : Expression() {
-        override fun type(): TypeSig = expressions.lastOrNull()?.type() ?: VoidType
+        override fun type() = expressions.lastOrNull()?.type() ?: IR.Unit
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -88,19 +73,19 @@ sealed interface ASTNode {
         }
     }
 
-    data class Invocation(val method: JFMethod, val field: JFField?, val arguments: List<Expression>) : Expression() {
+    data class Invocation(val method: IR.JFMethod, val field: IR.JFField?, val arguments: List<Expression>) : Expression() {
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
             returnValue: Boolean,
         ) {
             with(builder) {
                 if (field != null) {
-                    if (field.path == ThisType.path) {
+                    if (field.path == "this") {
                         // TODO: check implementation
-                        load("this", IR.Reference<Any?>(field.signature))
+                        load("this", IR.Reference<Any?>(field.path))
                     } else {
                         val fieldClassName = field.parent.path
-                        val fieldTypeSig = field.signature
+                        val fieldTypeSig = IR.Reference<Any?>(field.path)
                         getStatic(fieldClassName, field.name, fieldTypeSig)
                     }
                 }
@@ -108,25 +93,23 @@ sealed interface ASTNode {
                 loadArguments(
                     builder,
                     arguments,
-                    method.parameters.map(JFVariableSymbol::type),
+                    method.parameters.map(IR.JFVariableSymbol::type),
                 )
                 invoke(method, field)
-                if (!returnValue && (method.rtn != VoidType)) {
+                if (!returnValue && (method.rtn != IR.Unit)) {
                     pop()
                 }
             }
         }
 
-        override fun type(): TypeSig {
-            return method.rtn
-        }
+        override fun type() = method.rtn
     }
 
     data class When(val input: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
-        override fun type(): TypeSig = matches.last().second.type() // TODO: find common type
+        override fun type() = matches.last().second.type() // TODO: find common type
     }
 
-    data class ValAssignment(val variableSymbol: JFVariableSymbol, val expression: Expression) : Expression() {
+    data class ValAssignment(val variableSymbol: IR.JFVariableSymbol, val expression: Expression) : Expression() {
         override fun type() = expression.type()
 
         override fun compile(
@@ -138,28 +121,24 @@ sealed interface ASTNode {
 
             builder.store(
                 "${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}",
-                IR.operandType(this.variableSymbol),
+                this.variableSymbol.type,
             )
         }
     }
 
-    data class Variable(val variableSymbol: JFVariableSymbol) : Expression() {
+    data class Variable(val variableSymbol: IR.JFVariableSymbol) : Expression() {
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
             returnValue: Boolean,
         ) {
-            builder.load("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}", IR.operandType(this.variableSymbol))
+            builder.load("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}", this.variableSymbol.type)
         }
 
-        override fun type(): TypeSig {
-            return variableSymbol.type
-        }
+        override fun type() = variableSymbol.type
     }
 
-    data class Function(val symbol: JFMethod, val block: List<Expression>) : Expression() {
-        override fun type(): TypeSig {
-            return VoidType
-        }
+    data class Function(val symbol: IR.JFMethod, val block: List<Expression>) : Expression() {
+        override fun type() = IR.Unit
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -169,33 +148,35 @@ sealed interface ASTNode {
                 builder.parent.parent,
                 block,
                 symbol.name,
-                IR.operandType(symbol.rtn),
-                symbol.parameters.map(IR::operandType),
+                symbol.rtn,
+                symbol.parameters.map(IR.JFVariableSymbol::type),
             )
         }
     }
 
-    data class MethodIdentifier(val method: JFMethod, val field: JFField?) : Expression() {
-        override fun type(): TypeSig = UnknownType
+    data class MethodIdentifier(val method: IR.JFMethod, val field: IR.JFField?) : Expression() {
+        override fun type() = method.rtn
     }
 
     fun loadArguments(
         builder: IRBuilder.CodeBlockDSL,
         arguments: List<Expression>,
-        parameters: List<TypeSig>,
+        parameters: List<IR.OperandType<*>>,
     ) {
         arguments.zip(parameters).forEach { (argument, parameter) ->
             if (argument.type() == parameter) {
                 compileAsExpression(argument, builder)
             } else {
-                if (argument.type() is JFClass && parameter is JFClass) {
+                if (argument.type() is IR.StringType && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                } else if (argument.type() == IntegerType && parameter is JFClass) {
+                } else if (argument.type() is IR.JFClass && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                    builder.invoke(IdentifierCache.find("java.lang.Integer.valueOf") as JFMethod, null)
-                } else if (argument.type() == BooleanType && parameter is JFClass) {
+                } else if (argument.type() == IR.SInt32 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                    builder.invoke(IdentifierCache.find("java.lang.Boolean.valueOf") as JFMethod, null)
+                    builder.invoke(IdentifierCache.find("java.lang.Integer.valueOf") as IR.JFMethod, null)
+                } else if (argument.type() == IR.UInt1 && parameter is IR.JFClass) {
+                    compileAsExpression(argument, builder)
+                    builder.invoke(IdentifierCache.find("java.lang.Boolean.valueOf") as IR.JFMethod, null)
                 } else {
                     TODO()
                 }

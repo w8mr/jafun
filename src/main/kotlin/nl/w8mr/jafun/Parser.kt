@@ -2,15 +2,8 @@ package nl.w8mr.jafun
 
 import jafun.compiler.Associativity
 import jafun.compiler.IdentifierCache
-import jafun.compiler.JFClass
-import jafun.compiler.JFField
-import jafun.compiler.JFMethod
-import jafun.compiler.JFVariableSymbol
 import jafun.compiler.LocalSymbolMap
 import jafun.compiler.SymbolMap
-import jafun.compiler.ThisType
-import jafun.compiler.UnknownType
-import jafun.compiler.VoidType
 import nl.w8mr.jafun.Token.Colon
 import nl.w8mr.jafun.Token.Comma
 import nl.w8mr.jafun.Token.Dot
@@ -81,14 +74,14 @@ object Parser {
             is Parser.Success<List<Identifier>> -> {
                 val method = currentSymbolMap.find(result.value.map(Identifier::value).joinToString(".").replace('/', '∕'))
                 method?.let {
-                    if (it is JFMethod) {
+                    if (it is IR.JFMethod) {
                         if (it.associativity == associativity && it.precedence == precedence) {
                             return if (it.static) {
                                 Parser.Success(ASTNode.MethodIdentifier(it, null))
-                            } else if (it.parent is JFField) {
+                            } else if (it.parent is IR.JFField) {
                                 Parser.Success(ASTNode.MethodIdentifier(it, it.parent))
                             } else {
-                                Parser.Success(ASTNode.MethodIdentifier(it, ThisType))
+                                TODO()
                             }
                         }
                     }
@@ -105,7 +98,7 @@ object Parser {
             is Parser.Success<List<Identifier>> -> {
                 val name = result.value.last().value
                 when (val symbol = currentSymbolMap.find(name)) {
-                    is JFVariableSymbol -> Parser.Success(ASTNode.Variable(symbol), emptyList())
+                    is IR.JFVariableSymbol -> Parser.Success(ASTNode.Variable(symbol), emptyList())
                     else -> Parser.Error("no variable identifier")
                 }
             }
@@ -118,7 +111,7 @@ object Parser {
         expression: ASTNode.Expression,
     ): ASTNode.ValAssignment {
         // if (identifier !is ASTNode.Variable) throw IllegalArgumentException()
-        val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
+        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
         currentSymbolMap.add(identifier.value, variableSymbol)
         return ASTNode.ValAssignment(variableSymbol, expression)
     }
@@ -126,11 +119,11 @@ object Parser {
     private fun newParameterDef(
         identifier: Identifier,
         type: List<Identifier>,
-    ): JFVariableSymbol {
+    ): IR.JFVariableSymbol {
         val variableSymbol =
-            JFVariableSymbol(
+            IR.JFVariableSymbol(
                 identifier.value,
-                type = currentSymbolMap.find(type.last().value) ?: UnknownType,
+                type = currentSymbolMap.find(type.last().value) ?: throw IllegalStateException(),
                 currentSymbolMap,
             ) // TODO: handle complex types
         currentSymbolMap.add(identifier.value, variableSymbol)
@@ -140,16 +133,16 @@ object Parser {
 
     private fun newFunction(
         identifier: Identifier,
-        parameters: List<JFVariableSymbol>,
+        parameters: List<IR.JFVariableSymbol>,
         block: ASTNode.ExpressionList,
     ): ASTNode.Function {
         popSymbolMap(Unit)
         val symbol =
-            JFMethod(
+            IR.JFMethod(
                 parameters,
-                JFClass("Script"),
+                IR.JFClass("Script"),
                 identifier.value,
-                block.expressions.lastOrNull()?.type() ?: VoidType,
+                block.expressions.lastOrNull()?.type() ?: IR.Unit,
                 static = true,
                 associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
             )

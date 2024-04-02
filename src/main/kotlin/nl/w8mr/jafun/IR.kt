@@ -1,13 +1,9 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.BooleanType
-import jafun.compiler.IntegerType
-import jafun.compiler.JFClass
-import jafun.compiler.JFField
-import jafun.compiler.JFMethod
-import jafun.compiler.JFVariableSymbol
-import jafun.compiler.TypeSig
-import jafun.compiler.VoidType
+import jafun.compiler.Associativity
+import jafun.compiler.HasPath
+import jafun.compiler.IdentifierCache
+import jafun.compiler.SymbolMap
 
 class IR {
     sealed interface OperandType<J> {
@@ -52,19 +48,19 @@ class IR {
     data class Return<J>(val type: OperandType<J>) : Instruction
 
     companion object {
-        fun operandType(variableSymbol: JFVariableSymbol): IR.OperandType<out Any?> = operandType(variableSymbol.type)
+//        fun operandType(variableSymbol: JFVariableSymbol): IR.OperandType<out Any?> = operandType(variableSymbol.type)
 
-        fun operandType(typeSig: TypeSig): IR.OperandType<out Any?> {
-            return when (typeSig) {
-                is JFClass -> IR.Reference<Any?>(typeSig.path)
-                is IntegerType -> IR.SInt32
-                is BooleanType -> IR.UInt1
-                is VoidType -> IR.Unit
-                else -> TODO("Need to implement types")
-            }
-        }
+//        fun operandType(typeSig: TypeSig): IR.OperandType<out Any?> {
+//            return when (typeSig) {
+//                is JFClass -> IR.Reference<Any?>(typeSig.path)
+//                is IntegerType -> IR.SInt32
+//                is BooleanType -> IR.UInt1
+//                is VoidType -> IR.Unit
+//                else -> TODO("Need to implement types")
+//            }
+//        }
 
-        fun signature(type: IR.OperandType<*>): String =
+        fun signature(type: OperandType<*>): String =
             when (type) {
                 is Array -> "[${signature(type.type)}"
                 is Unit -> "V"
@@ -72,6 +68,42 @@ class IR {
                 is Reference -> "L${type.type.replace('.', '/')};"
                 is SInt32 -> "I"
                 is UInt1 -> "Z"
+                is JFMethod -> TODO()
+                is JFClass -> "L${type.path.replace('.', '/')};"
+                is JFVariableSymbol -> TODO()
             }
+    }
+
+    data class JFClass(override val path: String) : OperandType<Any?>, HasPath
+
+    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath
+
+    data class JFMethod(
+        val parameters: List<JFVariableSymbol>,
+        val parent: HasPath,
+        val name: String,
+        val rtn: OperandType<*>,
+        val static: Boolean = false,
+        val associativity: Associativity = Associativity.PREFIX,
+        val precedence: Int = 10,
+    ) : OperandType<Any?>
+
+    data class JFVariableSymbol(
+        val name: String,
+        val type: OperandType<*>,
+        val symbolMap: SymbolMap = IdentifierCache,
+    ) : OperandType<Any?> {
+        override fun equals(other: Any?): Boolean =
+            when (other) {
+                null -> false
+                is JFVariableSymbol -> name == other.name && type == other.type
+                else -> super.equals(other)
+            }
+
+        override fun hashCode(): Int {
+            var result = name.hashCode()
+            result = 31 * result + type.hashCode()
+            return result
+        }
     }
 }

@@ -1,8 +1,5 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.JFField
-import jafun.compiler.JFMethod
-
 object IRBuilder {
     fun define(init: BuilderDSL.() -> Unit): BuilderContext {
         val builderContext = BuilderContext()
@@ -79,8 +76,8 @@ object IRBuilder {
         }
 
         fun invoke(
-            method: JFMethod,
-            field: JFField?,
+            method: IR.JFMethod,
+            field: IR.JFField?,
         ) {
             context.instructions.add(IR.Invoke(method, field))
         }
@@ -88,9 +85,9 @@ object IRBuilder {
         fun getStatic(
             className: String,
             fieldName: String,
-            type: String,
+            type: IR.Reference<*>,
         ) {
-            context.instructions.add(IR.GetStatic(className, fieldName, type))
+            context.instructions.add(IR.GetStatic(className, fieldName, IR.signature(type)))
         }
 
         fun pop() {
