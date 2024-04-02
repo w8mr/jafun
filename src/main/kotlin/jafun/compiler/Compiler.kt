@@ -52,8 +52,25 @@ object IdentifierCache : SymbolMap {
                 "java.io.PrintStream",
                 "println",
             )
+        val integerValueOf =
+            staticMethod(
+                "java.lang.Integer",
+                "valueOf",
+                jfClass("java/lang/Integer"),
+                IntegerType,
+            )
+        val booleanValueOf =
+            staticMethod(
+                "java.lang.Boolean",
+                "valueOf",
+                jfClass("java/lang/Boolean"),
+                BooleanType,
+            )
         identifierMap["System.out.println"] = systemOutPrintln
         identifierMap["java.lang.System.out.println"] = systemOutPrintln
+        identifierMap["java.lang.Integer.valueOf"] = integerValueOf
+        identifierMap["java.lang.Boolean.valueOf"] = booleanValueOf
+
         identifierMap["Int"] = IntegerType
         identifierMap["String"] = StringType
     }
@@ -72,6 +89,22 @@ object IdentifierCache : SymbolMap {
             methodName,
             VoidType,
             false,
+        )
+    }
+
+    private fun staticMethod(
+        containingClass: String,
+        methodName: String,
+        rtnType: TypeSig,
+        vararg parameterTypes: TypeSig,
+    ): TypeSig {
+        val parent = jfClass(containingClass)
+        return JFMethod(
+            parameterTypes.mapIndexed { index, param -> JFVariableSymbol("param${index + 1}", param, IdentifierCache) },
+            parent,
+            methodName,
+            rtnType,
+            true,
         )
     }
 

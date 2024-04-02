@@ -3,7 +3,6 @@ package nl.w8mr.jafun
 import jafun.compiler.IntegerType
 import jafun.compiler.JFClass
 import jafun.compiler.VoidType
-import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.DynamicClassLoader
 import nl.w8mr.kasmine.classBuilder
 import java.io.ByteArrayOutputStream
@@ -87,41 +86,59 @@ fun compile(
     methodName: String = "main",
     methodSig: String = "([Ljava/lang/String;)V",
 ): ByteArray {
+    val builder =
+        IRBuilder.define {
+            `class`(className) {
+                compileMethod(this, statements, methodName, methodSig)
+            }
+        }
+
     val clazz =
         classBuilder {
             name = className
-            compileMethod(this, statements, methodName, methodSig)
+            builder.classes[className]?.let {
+                it.methods.forEach { method ->
+                    method.codeBlocks.forEach { codeBlock ->
+                        method {
+                            name = method.name
+                            signature = method.signature
+                            val context = JVMBackend.Context(this)
+                            codeBlock.instructions.forEach(context::compile)
+                        }
+                    }
+                }
+            }
         }
 
     return clazz.write()
 }
 
 fun compileMethod(
-    classBuilder: ClassBuilder.ClassDSL.DSL,
+    builder: IRBuilder.ClassDSL,
     statements: List<ASTNode.Expression>,
     methodName: String,
     methodSig: String,
 ) {
-    with(classBuilder) {
-        method {
-            name = methodName
-            signature = methodSig
-            val lastIndex = statements.size - 1
-            statements.forEachIndexed { index, statement ->
-                if ((lastIndex == index)) {
-                    if (methodSig.endsWith('V')) {
-                        compileAsStatement(statement, this)
-                        JVMBackend.Context(this).compile(IR.Return(IR.Unit))
-                    } else {
-                        compileAsExpression(statement, this)
-                        when (statement.type()) {
-                            is IntegerType -> JVMBackend.Context(this).compile(IR.Return(IR.SInt32))
-                            is JFClass -> JVMBackend.Context(this).compile(IR.Return(IR.Reference<Any?>()))
-                            else -> TODO("Need to implement other return types")
+    with(builder) {
+        method(methodName, methodSig) {
+            codeBlock {
+                val lastIndex = statements.size - 1
+                statements.forEachIndexed { index, statement ->
+                    if ((lastIndex == index)) {
+                        if (methodSig.endsWith('V')) {
+                            compileAsStatement(statement, this)
+                            `return`(IR.Unit)
+                        } else {
+                            compileAsExpression(statement, this)
+                            when (statement.type()) {
+                                is IntegerType -> `return`(IR.SInt32)
+                                is JFClass -> `return`(IR.Reference<Any?>())
+                                else -> TODO("Need to implement other return types")
+                            }
                         }
+                    } else {
+                        compileAsStatement(statement, this)
                     }
-                } else {
-                    compileAsStatement(statement, this)
                 }
             }
         }
@@ -130,15 +147,15 @@ fun compileMethod(
 
 fun compileAsStatement(
     expression: ASTNode.Expression,
-    builder: ClassBuilder.MethodDSL.DSL,
+    builder: IRBuilder.CodeBlockDSL,
 ) {
     expression.compile(builder, false)
 }
 
 fun compileAsExpression(
     expression: ASTNode.Expression,
-    builder: ClassBuilder.MethodDSL.DSL,
+    builder: IRBuilder.CodeBlockDSL,
 ) {
     expression.compile(builder, true)
-    if (expression.type() == VoidType) JVMBackend.Context(builder).compile(IR.GetStatic("jafun/Unit", "INSTANCE", "jafun/Unit"))
+    if (expression.type() == VoidType) builder.getStatic("jafun/Unit", "INSTANCE", "jafun/Unit")
 }

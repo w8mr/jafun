@@ -33,7 +33,7 @@ class IR {
 
     data class Load<J>(val registerName: String, val type: OperandType<J>) : Instruction
 
-    data class Invoke(val method: JFMethod, val field: JFField?, val arguments: List<ASTNode.Expression>) : Instruction
+    data class Invoke(val method: JFMethod, val field: JFField?) : Instruction
 
     data class GetStatic(val className: String, val fieldName: String, val type: String) : Instruction
 

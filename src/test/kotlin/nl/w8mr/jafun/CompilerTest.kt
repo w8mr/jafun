@@ -521,16 +521,16 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                `return`()
+            }
+            method {
                 name = "test"
                 signature = "()V"
                 loadConstant(2)
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
-            }
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
                 `return`()
             }
         }
@@ -547,18 +547,18 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                invokeStatic("Script", "test", "()V")
+                invokeStatic("Script", "test", "()V")
+                `return`()
+            }
+            method {
                 name = "test"
                 signature = "()V"
                 loadConstant(2)
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
-            }
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                invokeStatic("Script", "test", "()V")
-                invokeStatic("Script", "test", "()V")
                 `return`()
             }
         }
@@ -577,6 +577,15 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(2)
+                invokeStatic("Script", "test", "(I)V")
+                loadConstant(3)
+                invokeStatic("Script", "test", "(I)V")
+                `return`()
+            }
+            method {
                 name = "test"
                 signature = "(I)V"
                 loadConstant(2)
@@ -584,15 +593,6 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "*", "(II)I")
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
-            }
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant(2)
-                invokeStatic("Script", "test", "(I)V")
-                loadConstant(3)
-                invokeStatic("Script", "test", "(I)V")
                 `return`()
             }
         }
@@ -611,6 +611,14 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant("test: ")
+                loadConstant(5)
+                invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
+                `return`()
+            }
+            method {
                 name = "test"
                 signature = "(Ljava/lang/String;I)V"
                 aload("prefix")
@@ -618,14 +626,6 @@ class CompilerTest {
                 iload("a")
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
-            }
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant("test: ")
-                loadConstant(5)
-                invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
                 `return`()
             }
         }
@@ -648,6 +648,16 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant("test: ")
+                loadConstant(5)
+                invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
+                loadConstant("test: ")
+                invokeStatic("Script", "test2", "(Ljava/lang/String;)V")
+                `return`()
+            }
+            method {
                 name = "test"
                 signature = "(Ljava/lang/String;I)V"
                 aload("prefix")
@@ -663,16 +673,6 @@ class CompilerTest {
                 aload("prefix")
                 loadConstant(10)
                 invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
-                `return`()
-            }
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant("test: ")
-                loadConstant(5)
-                invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
-                loadConstant("test: ")
-                invokeStatic("Script", "test2", "(Ljava/lang/String;)V")
                 `return`()
             }
         }
@@ -725,14 +725,6 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
-                name = "add2"
-                signature = "(I)I"
-                iload("a")
-                loadConstant(2)
-                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
-                ireturn()
-            }
-            method {
                 name = "main"
                 signature = "([Ljava/lang/String;)V"
                 loadConstant(4)
@@ -744,6 +736,14 @@ class CompilerTest {
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
+            }
+            method {
+                name = "add2"
+                signature = "(I)I"
+                iload("a")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                ireturn()
             }
         }
     }
@@ -761,14 +761,6 @@ class CompilerTest {
         ) {
             name = "Script"
             method {
-                name = "prefixed"
-                signature = "(Ljava/lang/String;)Ljava/lang/String;"
-                loadConstant("PREFIXED:")
-                aload("text")
-                invokeStatic("jafun/io/ConsoleKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
-                areturn()
-            }
-            method {
                 name = "main"
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Test")
@@ -778,6 +770,14 @@ class CompilerTest {
                 invokeStatic("Script", "prefixed", "(Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
+            }
+            method {
+                name = "prefixed"
+                signature = "(Ljava/lang/String;)Ljava/lang/String;"
+                loadConstant("PREFIXED:")
+                aload("text")
+                invokeStatic("jafun/io/ConsoleKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                areturn()
             }
         }
     }
