@@ -14,14 +14,15 @@ fun compile(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    methodSig: String = "([Ljava/lang/String;)V",
+    returnType: IR.OperandType<*> = IR.Unit,
+    parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val lexed = lexer.parse(code).filter { it !is Token.WS }
     println("LEXED: $lexed")
     val parsed = Parser.parse(lexed)
     println("PARSED: $parsed")
     println()
-    return compile(parsed, className, methodName, methodSig)
+    return compile(parsed, className, methodName, returnType, parameterTypes)
 }
 
 fun runMain(bytes: ByteArray) {
@@ -33,16 +34,25 @@ fun test(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    methodSig: String = "([Ljava/lang/String;)V",
-) = testBytes(code, className, methodName, methodSig).first
+    returnType: IR.OperandType<*> = IR.Unit,
+    parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
+) = testBytes(code, className, methodName, returnType, parameterTypes).first
 
 fun testBytes(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    methodSig: String = "([Ljava/lang/String;)V",
+    returnType: IR.OperandType<*> = IR.Unit,
+    parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): Pair<String, ByteArray> {
-    val bytes = compile(code.trimIndent(), className, methodName, methodSig)
+    val bytes =
+        compile(
+            code.trimIndent(),
+            className,
+            methodName,
+            returnType,
+            parameterTypes,
+        )
     writeFile(className, bytes)
     val oldOut = System.out
     val output = ByteArrayOutputStream()
@@ -84,12 +94,13 @@ fun compile(
     statements: List<ASTNode.Expression>,
     className: String = "Script",
     methodName: String = "main",
-    methodSig: String = "([Ljava/lang/String;)V",
+    returnType: IR.OperandType<*> = IR.Unit,
+    parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val builder =
         IRBuilder.define {
             `class`(className) {
-                compileMethod(this, statements, methodName, methodSig)
+                compileMethod(this, statements, methodName, returnType, parameterTypes)
             }
         }
 
@@ -101,7 +112,8 @@ fun compile(
                     method.codeBlocks.forEach { codeBlock ->
                         method {
                             name = method.name
-                            signature = method.signature
+                            signature = "(${method.parameterTypes.map(IR::signature).joinToString(separator = "")})" +
+                                "${IR.signature(method.returnType)}"
                             val context = JVMBackend.Context(this)
                             codeBlock.instructions.forEach(context::compile)
                         }
@@ -117,22 +129,23 @@ fun compileMethod(
     builder: IRBuilder.ClassDSL,
     statements: List<ASTNode.Expression>,
     methodName: String,
-    methodSig: String,
+    returnType: IR.OperandType<*>,
+    parameterTypes: List<IR.OperandType<*>>,
 ) {
     with(builder) {
-        method(methodName, methodSig) {
+        method(methodName, returnType, parameterTypes) {
             codeBlock {
                 val lastIndex = statements.size - 1
                 statements.forEachIndexed { index, statement ->
                     if ((lastIndex == index)) {
-                        if (methodSig.endsWith('V')) {
+                        if (returnType is IR.Unit) {
                             compileAsStatement(statement, this)
                             `return`(IR.Unit)
                         } else {
                             compileAsExpression(statement, this)
                             when (statement.type()) {
                                 is IntegerType -> `return`(IR.SInt32)
-                                is JFClass -> `return`(IR.Reference<Any?>())
+                                is JFClass -> `return`(IR.Reference<Any?>(statement.type().signature))
                                 else -> TODO("Need to implement other return types")
                             }
                         }

@@ -97,7 +97,7 @@ sealed interface ASTNode {
                 if (field != null) {
                     if (field.path == ThisType.path) {
                         // TODO: check implementation
-                        load("this", IR.Reference<Any?>())
+                        load("this", IR.Reference<Any?>(field.signature))
                     } else {
                         val fieldClassName = field.parent.path
                         val fieldTypeSig = field.signature
@@ -138,20 +138,9 @@ sealed interface ASTNode {
 
             builder.store(
                 "${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}",
-                operandType(this.variableSymbol),
+                IR.operandType(this.variableSymbol),
             )
         }
-    }
-
-    fun operandType(variableSymbol: JFVariableSymbol): IR.OperandType<out Any?> {
-        val type =
-            when (variableSymbol.type) {
-                is JFClass -> IR.Reference<Any?>()
-                is IntegerType -> IR.SInt32
-                is BooleanType -> IR.UInt1
-                else -> TODO("Need to implement types")
-            }
-        return type
     }
 
     data class Variable(val variableSymbol: JFVariableSymbol) : Expression() {
@@ -159,7 +148,7 @@ sealed interface ASTNode {
             builder: IRBuilder.CodeBlockDSL,
             returnValue: Boolean,
         ) {
-            builder.load("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}", operandType(this.variableSymbol))
+            builder.load("${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}", IR.operandType(this.variableSymbol))
         }
 
         override fun type(): TypeSig {
@@ -180,7 +169,8 @@ sealed interface ASTNode {
                 builder.parent.parent,
                 block,
                 symbol.name,
-                "(${symbol.parameters.map(JFVariableSymbol::signature).joinToString(separator = "")})${symbol.signature}",
+                IR.operandType(symbol.rtn),
+                symbol.parameters.map(IR::operandType),
             )
         }
     }

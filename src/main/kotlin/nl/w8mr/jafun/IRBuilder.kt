@@ -14,7 +14,13 @@ object IRBuilder {
 
     data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext)
 
-    data class MethodContext(val name: String, val signature: String, val codeBlocks: MutableList<CodeBlock> = mutableListOf(), val parent: ClassContext)
+    data class MethodContext(
+        val name: String,
+        val returnType: IR.OperandType<*>,
+        val parameterTypes: List<IR.OperandType<*>>,
+        val codeBlocks: MutableList<CodeBlock> = mutableListOf(),
+        val parent: ClassContext,
+    )
 
     data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext)
 
@@ -32,10 +38,11 @@ object IRBuilder {
     class ClassDSL(val context: ClassContext, val parent: BuilderDSL) {
         fun method(
             name: String,
-            signature: String,
+            returnType: IR.OperandType<*>,
+            parameterTypes: List<IR.OperandType<*>>,
             init: MethodDSL.() -> Unit,
         ) {
-            val methodContext = MethodContext(name, signature, parent = context)
+            val methodContext = MethodContext(name, returnType, parameterTypes, parent = context)
             context.methods.add(methodContext)
             init.invoke(MethodDSL(methodContext, this))
         }

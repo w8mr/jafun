@@ -1,5 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
+import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.test
 import nl.w8mr.jafun.testBytes
 import nl.w8mr.jafun.writeFile
@@ -34,14 +35,14 @@ class CompilerTest {
     fun test(
         code: String,
         result: String,
-    ) = assertEquals(result, test(code))
-
-    fun test(
-        code: String,
-        result: String,
         bytecode: ClassBuilder.ClassDSL.DSL.() -> Unit,
     ) {
-        val tested = testBytes(code)
+        val tested =
+            testBytes(
+                code,
+                returnType = IR.Unit,
+                parameterTypes = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
+            )
         val expected = classBuilder(bytecode).write()
         if ((result != tested.first) || (expected.zip(tested.second).any { it.first != it.second })) {
             val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))

@@ -20,6 +20,7 @@ class JVMBackend {
                             )
 
                         is IR.Reference -> TODO()
+                        is IR.Array -> TODO()
                     }
                 is IR.Invoke -> {
                     with(method) {
@@ -41,6 +42,7 @@ class JVMBackend {
                         is IR.SInt32 -> method.istore(instruction.registerName)
                         is IR.StringType -> method.astore(instruction.registerName)
                         is IR.UInt1 -> method.istore(instruction.registerName)
+                        is IR.Array -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
@@ -48,6 +50,7 @@ class JVMBackend {
                         is IR.SInt32 -> method.iload(instruction.registerName)
                         is IR.StringType -> method.aload(instruction.registerName)
                         is IR.UInt1 -> method.iload(instruction.registerName)
+                        is IR.Array -> TODO()
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
@@ -56,6 +59,7 @@ class JVMBackend {
                         is IR.SInt32 -> method.ireturn()
                         is IR.StringType -> method.ireturn()
                         is IR.UInt1 -> method.ireturn()
+                        is IR.Array -> TODO()
                     }
 
                 is IR.GetStatic -> method.getStatic(instruction.className, instruction.fieldName, instruction.type)
