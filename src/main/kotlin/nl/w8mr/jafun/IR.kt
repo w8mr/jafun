@@ -39,7 +39,7 @@ class IR {
 
     data class Invoke(val method: JFMethod, val field: JFField?) : Instruction
 
-    data class GetStatic(val className: String, val fieldName: String, val type: String) : Instruction
+    data class GetStatic(val className: String, val fieldName: String, val type: OperandType<*>) : Instruction
 
     data object Pop : Instruction
 
@@ -47,32 +47,9 @@ class IR {
 
     data class Return<J>(val type: OperandType<J>) : Instruction
 
-    companion object {
-//        fun operandType(variableSymbol: JFVariableSymbol): IR.OperandType<out Any?> = operandType(variableSymbol.type)
+    data class IfFalse(val block: IRBuilder.CodeBlock) : Instruction
 
-//        fun operandType(typeSig: TypeSig): IR.OperandType<out Any?> {
-//            return when (typeSig) {
-//                is JFClass -> IR.Reference<Any?>(typeSig.path)
-//                is IntegerType -> IR.SInt32
-//                is BooleanType -> IR.UInt1
-//                is VoidType -> IR.Unit
-//                else -> TODO("Need to implement types")
-//            }
-//        }
-
-        fun signature(type: OperandType<*>): String =
-            when (type) {
-                is Array -> "[${signature(type.type)}"
-                is Unit -> "V"
-                is StringType -> "Ljava/lang/String;"
-                is Reference -> "L${type.type.replace('.', '/')};"
-                is SInt32 -> "I"
-                is UInt1 -> "Z"
-                is JFMethod -> TODO()
-                is JFClass -> "L${type.path.replace('.', '/')};"
-                is JFVariableSymbol -> TODO()
-            }
-    }
+    data class Goto(val block: IRBuilder.CodeBlock) : Instruction
 
     data class JFClass(override val path: String) : OperandType<Any?>, HasPath
 

@@ -42,15 +42,6 @@ object Parser {
         methodIdentifier: ASTNode.MethodIdentifier,
         arguments: List<ASTNode.Expression>,
     ): ASTNode.Expression {
-//        return when {
-//            methodIdentifier.field?.signature == "this" ->
-//                ASTNode.FieldInvocation(
-//                    methodIdentifier.method,
-//                    methodIdentifier.field,
-//                    arguments,
-//                )
-//            methodIdentifier.field != null -> ASTNode.StaticFieldInvocation(methodIdentifier.method, methodIdentifier.field, arguments)
-//            else -> ASTNode.StaticInvocation(methodIdentifier.method, arguments)
         return ASTNode.Invocation(methodIdentifier.method, methodIdentifier.field, arguments)
     }
 
@@ -132,22 +123,41 @@ object Parser {
     }
 
     private fun newFunction(
-        identifier: Identifier,
-        parameters: List<IR.JFVariableSymbol>,
+        functionDef: FunctionDef,
         block: ASTNode.ExpressionList,
     ): ASTNode.Function {
         popSymbolMap(Unit)
         val symbol =
             IR.JFMethod(
+                functionDef.parameters,
+                IR.JFClass("Script"),
+                functionDef.identifier.value,
+                block.expressions.lastOrNull()?.type() ?: IR.Unit,
+                static = true,
+                associativity = if (functionDef.parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
+            )
+        currentSymbolMap.add(functionDef.identifier.value, symbol)
+        return ASTNode.Function(symbol, block.expressions)
+    }
+
+    data class FunctionDef(val identifier: Identifier, val parameters: List<IR.JFVariableSymbol>, val returnType: Identifier?)
+
+    private fun defineFunction(
+        identifier: Identifier,
+        parameters: List<IR.JFVariableSymbol>,
+        returnType: Identifier?,
+    ): FunctionDef {
+        val symbol =
+            IR.JFMethod(
                 parameters,
                 IR.JFClass("Script"),
                 identifier.value,
-                block.expressions.lastOrNull()?.type() ?: IR.Unit,
+                returnType?.value?.let { currentSymbolMap.find(it) } ?: IR.Unit,
                 static = true,
                 associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
             )
         currentSymbolMap.add(identifier.value, symbol)
-        return ASTNode.Function(symbol, block.expressions)
+        return FunctionDef(identifier, parameters, returnType)
     }
 
     private val identifierTerm = literal(Identifier::class)
@@ -272,16 +282,17 @@ object Parser {
     private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
     private val function: Parser<ASTNode.Expression> =
         seq(
-            funTerm.map(::pushSymbolMap),
-            identifierTerm,
-            lParenTerm,
-            parameter sepByAllowEmpty commaTerm,
-            rParenTerm,
+            seq(
+                funTerm.map(::pushSymbolMap) prefixLiteral
+                    identifierTerm postfixLiteral lParenTerm,
+                parameter sepByAllowEmpty commaTerm postfixLiteral rParenTerm,
+                optional(colonTerm prefixLiteral identifierTerm),
+            ) { i, p, t -> defineFunction(i, p, t) },
             curlBlock,
-        ) { _, i, _, p, _, b -> newFunction(i, p, b) }
+        ) { s, b -> newFunction(s, b) }
 
     private val whenArrow = identifierTerm.filter { it.value == "->" }.map {}
-    private val whenMatch = seq(complexExpression postfixLiteral whenArrow, expression)
+    private val whenMatch = seq(complexExpression postfixLiteral whenArrow, complexExpression)
     private val whenExpression: Parser<ASTNode.When> =
         seq(
             whenTerm.map(::pushSymbolMap),

@@ -107,6 +107,35 @@ sealed interface ASTNode {
 
     data class When(val input: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
         override fun type() = matches.last().second.type() // TODO: find common type
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            input?.let { compileAsExpression(it, builder) }
+            val after = builder.newCodeBlock()
+            val lastIndex = matches.size - 1
+            matches.forEachIndexed { index, (condition, expression) ->
+                val nextBlock = builder.newCodeBlock()
+                when {
+                    (index == lastIndex) && (condition == ASTNode.BooleanLiteral(true)) -> {
+                        builder.addCodeBlock(builder.newCodeBlock())
+                        compileAsExpression(expression, builder)
+                        builder.goto(after)
+                    }
+                    else -> {
+                        compileAsExpression(condition, builder)
+                        builder.iffalse(nextBlock)
+                        builder.addCodeBlock(builder.newCodeBlock())
+                        compileAsExpression(expression, builder)
+                        builder.goto(after)
+                    }
+                }
+                builder.addCodeBlock(nextBlock)
+            }
+            if ((matches.last().second == ASTNode.BooleanLiteral(true))) builder.pop() // throw Exception
+            builder.addCodeBlock(after)
+        }
     }
 
     data class ValAssignment(val variableSymbol: IR.JFVariableSymbol, val expression: Expression) : Expression() {
@@ -177,6 +206,8 @@ sealed interface ASTNode {
                 } else if (argument.type() == IR.UInt1 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
                     builder.invoke(IdentifierCache.find("java.lang.Boolean.valueOf") as IR.JFMethod, null)
+                } else if (argument.type() == parameter) {
+                    compileAsExpression(argument, builder)
                 } else {
                     TODO()
                 }

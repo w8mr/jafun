@@ -35,7 +35,7 @@ class CompilerTest {
     fun test(
         code: String,
         result: String,
-        bytecode: ClassBuilder.ClassDSL.DSL.() -> Unit,
+        bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
     ) {
         val tested =
             testBytes(
@@ -43,7 +43,7 @@ class CompilerTest {
                 returnType = IR.Unit,
                 parameterTypes = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
             )
-        val expected = classBuilder(bytecode).write()
+        val expected = bytecode?.let { classBuilder(bytecode).write() } ?: tested.second
         if ((result != tested.first) || (expected.zip(tested.second).any { it.first != it.second })) {
             val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
             writeFile("Script", expected)
@@ -874,5 +874,113 @@ class CompilerTest {
                 `return`()
             }
         }
+    }
+
+    @Test
+    fun basicWhen() {
+        test(
+            """
+                val a = 2
+                println when {
+                    a == 1 -> "One"
+                    a == 2 -> "Two"
+                    a == 3 -> "Three"
+                    true -> "More"
+                }""",
+            "Two\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(2)
+                istore("a")
+                iload("a")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("One")
+                goto(39)
+                iload("a")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Two")
+                goto(24)
+                iload("a")
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Three")
+                goto(9)
+                loadConstant("More")
+                goto(3)
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun factorial() {
+        test(
+            """
+                fun factorial(n: Int): Int {
+                    when {
+                        n == 0 -> 1
+                        true -> n * factorial n - 1
+                    }
+                }
+                println factorial 6""",
+            "720\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(6)
+                invokeStatic("Script", "factorial", "(I)I")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+            method {
+                name = "factorial"
+                signature = "(I)I"
+                iload("param1")
+                loadConstant(0)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(7)
+                loadConstant(1)
+                goto(20)
+                iload("param1")
+                iload("param1")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                invokeStatic("Script", "factorial", "(I)I")
+                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                goto(3)
+                `ireturn`()
+            }
+        }
+    }
+
+    @Test
+    fun simpleFibonacci() {
+        test(
+            """
+                fun fibonacci(n: Int): Int {
+                    when {
+                        n == 0 -> 0
+                        n == 1 -> 1
+                        true -> {
+                            val f2 = fibonacci n - 2
+                            f2 + fibonacci n - 1
+                        }
+                    }
+                }
+                println fibonacci 13""",
+            "233\n",
+        )
     }
 }

@@ -19,7 +19,11 @@ object IRBuilder {
         val parent: ClassContext,
     )
 
-    data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext)
+    data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext) {
+        val byteSize: Int by lazy {
+            instructions.sumOf(::byteSize)
+        }
+    }
 
     class BuilderDSL(val context: BuilderContext) {
         fun `class`(
@@ -53,7 +57,14 @@ object IRBuilder {
         }
     }
 
-    class CodeBlockDSL(val context: CodeBlock, val parent: MethodDSL) {
+    class CodeBlockDSL(var context: CodeBlock, val parent: MethodDSL) {
+        fun newCodeBlock(): CodeBlock = CodeBlock(parent = this.context.parent)
+
+        fun addCodeBlock(codeBlock: CodeBlock) {
+            context.parent.codeBlocks.add(codeBlock)
+            context = codeBlock
+        }
+
         fun <J> loadConstant(
             operand1: J,
             type: IR.OperandType<J>,
@@ -87,7 +98,7 @@ object IRBuilder {
             fieldName: String,
             type: IR.Reference<*>,
         ) {
-            context.instructions.add(IR.GetStatic(className, fieldName, IR.signature(type)))
+            context.instructions.add(IR.GetStatic(className, fieldName, type))
         }
 
         fun pop() {
@@ -100,6 +111,14 @@ object IRBuilder {
 
         fun <J> `return`(type: IR.OperandType<J>) {
             context.instructions.add(IR.Return(type))
+        }
+
+        fun iffalse(block: IRBuilder.CodeBlock) {
+            context.instructions.add(IR.IfFalse(block))
+        }
+
+        fun goto(block: IRBuilder.CodeBlock) {
+            context.instructions.add(IR.Goto(block))
         }
     }
 }

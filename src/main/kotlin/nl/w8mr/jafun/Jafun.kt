@@ -1,7 +1,6 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.kasmine.DynamicClassLoader
-import nl.w8mr.kasmine.classBuilder
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -101,25 +100,7 @@ fun compile(
             }
         }
 
-    val clazz =
-        classBuilder {
-            name = className
-            builder.classes[className]?.let {
-                it.methods.forEach { method ->
-                    method.codeBlocks.forEach { codeBlock ->
-                        method {
-                            name = method.name
-                            signature = "(${method.parameterTypes.map(IR::signature).joinToString(separator = "")})" +
-                                "${IR.signature(method.returnType)}"
-                            val context = JVMBackend.Context(this)
-                            codeBlock.instructions.forEach(context::compile)
-                        }
-                    }
-                }
-            }
-        }
-
-    return clazz.write()
+    return compileJVM(className, builder)
 }
 
 fun compileMethod(
