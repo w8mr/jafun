@@ -118,7 +118,7 @@ sealed interface ASTNode {
             matches.forEachIndexed { index, (condition, expression) ->
                 val nextBlock = builder.newCodeBlock()
                 when {
-                    (index == lastIndex) && (condition == ASTNode.BooleanLiteral(true)) -> {
+                    (index == lastIndex) && (condition == BooleanLiteral(true)) -> {
                         builder.addCodeBlock(builder.newCodeBlock())
                         compileAsExpression(expression, builder)
                         builder.goto(after)
@@ -133,7 +133,7 @@ sealed interface ASTNode {
                 }
                 builder.addCodeBlock(nextBlock)
             }
-            if ((matches.last().second == ASTNode.BooleanLiteral(true))) builder.pop() // throw Exception
+            if ((matches.last().second == BooleanLiteral(true))) builder.pop() // throw Exception
             builder.addCodeBlock(after)
         }
     }

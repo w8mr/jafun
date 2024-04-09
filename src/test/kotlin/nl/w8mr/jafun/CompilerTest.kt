@@ -48,6 +48,7 @@ class CompilerTest {
             val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
             writeFile("Script", expected)
             val expectedDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
+            if (bytecode == null) println(resultDecompiled)
             assertEquals(expectedDecompiled, resultDecompiled)
             assertEquals(result, tested.first)
             assertContentEquals(expected, tested.second)
@@ -398,6 +399,63 @@ class CompilerTest {
     }
 
     @Test
+    fun calcWithAssignment() {
+        val result =
+            test(
+                """
+            val a = 4 + 3 * 5 - 6 / 2
+            println a""",
+                "16\n",
+            ) {
+                name = "Script"
+                method {
+                    name = "main"
+                    signature = "([Ljava/lang/String;)V"
+                    loadConstant(4)
+                    loadConstant(3)
+                    loadConstant(5)
+                    invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    loadConstant(6)
+                    loadConstant(2)
+                    invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                    istore("a")
+                    iload("a")
+                    invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                    `return`()
+                }
+            }
+    }
+
+    @Test
+    fun calcParentheses() {
+        val result =
+            test(
+                """
+            println((4 + 3) * (6 - 4))""",
+                "14\n",
+            ) {
+                name = "Script"
+                method {
+                    name = "main"
+                    signature = "([Ljava/lang/String;)V"
+                    loadConstant(4)
+                    loadConstant(3)
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    loadConstant(6)
+                    loadConstant(4)
+                    invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                    invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                    `return`()
+                }
+            }
+    }
+
+    @Test
     fun operatorIdentifier() {
         test(
             """
@@ -440,6 +498,29 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "**", "(II)I")
                 loadConstant(3)
                 invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun infixl() {
+        test(
+            """
+            println 10-4-2""",
+            "4\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(10)
+                loadConstant(4)
+                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
@@ -928,7 +1009,7 @@ class CompilerTest {
                 fun factorial(n: Int): Int {
                     when {
                         n == 0 -> 1
-                        true -> n * factorial n - 1
+                        true -> n * (factorial n - 1)
                     }
                 }
                 println factorial 6""",
@@ -973,10 +1054,23 @@ class CompilerTest {
                     when {
                         n == 0 -> 0
                         n == 1 -> 1
-                        true -> {
-                            val f2 = fibonacci n - 2
-                            f2 + fibonacci n - 1
-                        }
+                        true -> (fibonacci n - 1) + (fibonacci n - 2)
+                    }
+                }
+                println fibonacci 13""",
+            "233\n",
+        )
+    }
+
+    @Test
+    fun simpleFibonacci2() {
+        test(
+            """
+                fun fibonacci(n: Int): Int {
+                    when {
+                        n == 0 -> 0
+                        n == 1 -> 1
+                        true -> fibonacci(n - 1) + fibonacci(n - 2)
                     }
                 }
                 println fibonacci 13""",

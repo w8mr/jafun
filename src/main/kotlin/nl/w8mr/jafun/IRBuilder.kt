@@ -113,11 +113,11 @@ object IRBuilder {
             context.instructions.add(IR.Return(type))
         }
 
-        fun iffalse(block: IRBuilder.CodeBlock) {
+        fun iffalse(block: CodeBlock) {
             context.instructions.add(IR.IfFalse(block))
         }
 
-        fun goto(block: IRBuilder.CodeBlock) {
+        fun goto(block: CodeBlock) {
             context.instructions.add(IR.Goto(block))
         }
     }

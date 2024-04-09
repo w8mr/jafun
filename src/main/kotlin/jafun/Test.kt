@@ -1,6 +1,6 @@
 package jafun
 
-import kotlinx.coroutines.delay
+/*import kotlinx.coroutines.delay
 
 data class Employee(val name: String, val age: Int, val salary: Int)
 
@@ -121,6 +121,20 @@ fun whenExample(a: Int) {
             a > 100000 -> "Large"
             a < -100000 -> "Small"
             else -> "More or less"
+        },
+    )
+}
+*/
+
+fun main(args: Array<String>) {
+    whenTest(2)
+}
+
+fun whenTest(a: Int) {
+    println(
+        when (a) {
+            1 -> "true"
+            else -> "false"
         },
     )
 }
