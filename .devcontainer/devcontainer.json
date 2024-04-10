@@ -2,23 +2,17 @@
     "image":"mcr.microsoft.com/devcontainers/universal:2",
     "customizations": {
         "codespaces": {
-            "repositories": {
-            "w8mr/jafun": {
-                "permissions": {
-                "permissions": "write-all"
-                }
-            },
-            "w8mr/kasmine": {
-                "permissions": {
-                    "permissions": "write-all"
-                }
-                }
-            },
-            "w8mr/parsek": {
-                "permissions": {
-                    "permissions": "write-all"
-                }
-                }
-        }
+			"repositories": {
+				"w8mr/jafun": {
+					"permissions": "write-all"
+				},
+				"w8mr/kasmine": {
+					"permissions": "write-all"
+				},
+				"w8mr/parsek": {
+					"permissions": "write-all"
+				}
+			},
+		}
     }
 }
