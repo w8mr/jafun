@@ -13,7 +13,7 @@ fun `==`(
 ) = a == b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `﹤=`(
     a: Int,
@@ -21,7 +21,7 @@ fun `﹤=`(
 ) = a <= b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `﹤`(
     a: Int,
@@ -29,7 +29,7 @@ fun `﹤`(
 ) = a < b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `﹥`(
     a: Int,
@@ -37,7 +37,7 @@ fun `﹥`(
 ) = a > b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `﹥=`(
     a: Int,
@@ -45,7 +45,7 @@ fun `﹥=`(
 ) = a >= b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(20)
+@FunctionPrecedence(100)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `+`(
     a: Int,
@@ -53,7 +53,7 @@ fun `+`(
 ) = a + b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(20)
+@FunctionPrecedence(100)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `-`(
     a: Int,
@@ -61,7 +61,7 @@ fun `-`(
 ) = a - b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(30)
+@FunctionPrecedence(110)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `*`(
     a: Int,
@@ -69,7 +69,7 @@ fun `*`(
 ) = a * b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(30)
+@FunctionPrecedence(110)
 @FunctionAssociativity(Associativity.INFIXL)
 fun `∕`(
     a: Int,
@@ -77,7 +77,7 @@ fun `∕`(
 ) = a / b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(115)
 @FunctionAssociativity(Associativity.INFIXR)
 fun `**`(
     a: Int,
@@ -89,11 +89,11 @@ fun `**`(
     }
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(140)
 @FunctionAssociativity(Associativity.POSTFIX)
 fun `++`(a: Int): Int = a + 1
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
+@FunctionPrecedence(140)
 @FunctionAssociativity(Associativity.POSTFIX)
 fun `--`(a: Int): Int = a - 1

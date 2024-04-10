@@ -253,7 +253,7 @@ class ParserTest {
             IR.SInt32,
             IR.SInt32,
             associativity = Associativity.INFIXL,
-            precedence = 20,
+            precedence = 100,
             parent = IR.JFClass("jafun/lang/IntKt"),
         )
 

@@ -16,7 +16,7 @@
 			"jdkVersion": "latest",
 			"jdkDistro": "ms"
 		}
-	}
+	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
@@ -26,8 +26,8 @@
 
 	// Configure tool-specific properties.
 	 "customizations": {
-			"codespaces": {
-			  "repositories": {
+		 "codespaces": {
+			 "repositories": {
 				"w8mr/jafun": {
 				  "permissions": {
 					"permissions": "write-all"
@@ -44,9 +44,8 @@
 					  "permissions": "write-all"
 					}
 				  }
-			  }
-		  }
-	 },
+		 }
+	 }
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
