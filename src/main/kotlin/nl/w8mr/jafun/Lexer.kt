@@ -57,6 +57,8 @@ val comma = char(',').map { Comma }
 val colon = char(':').map { Colon }
 val semicolon = char(';').map { Semicolon }
 val equality = literal("==").map { Identifier("==", true) }
+val lteq = literal("<=").map { Identifier("<=", true) }
+val gteq = literal(">=").map { Identifier(">=", true) }
 val assignment = char('=').map { Assignment }
 val val_token = literal("val").map { Val }
 val fun_token = literal("fun").map { Fun }
@@ -73,8 +75,8 @@ val newline = oneOf(seq(char('\n')), seq(char('\r'), char(('\n')))).map { Newlin
 val lexer =
     zeroOrMore(
         oneOf(
-            fun_token, val_token, when_token, true_token, false_token, identifier, operatorIdentifier, dot,
+            fun_token, val_token, when_token, true_token, false_token, dot,
             lineStringLiteral, integerLiteral, ws, newline, lCurl, rCurl, lParen, rParen, comma, colon, semicolon,
-            equality, assignment,
+            equality, lteq, gteq, assignment, operatorIdentifier, identifier,
         ),
     )

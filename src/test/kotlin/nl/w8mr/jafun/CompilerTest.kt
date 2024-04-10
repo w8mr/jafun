@@ -1003,12 +1003,149 @@ class CompilerTest {
     }
 
     @Test
+    fun basicWhenWithVariableSubject() {
+        test(
+            """
+                val a = 2
+                println when (a) {
+                    1 -> "One"
+                    2 -> "Two"
+                    3 -> "Three"
+                    true -> "More"
+                }""",
+            "Two\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(2)
+                istore("a")
+                iload("a")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("One")
+                goto(39)
+                iload("a")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Two")
+                goto(24)
+                iload("a")
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Three")
+                goto(9)
+                loadConstant("More")
+                goto(3)
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun basicWhenWithSubjectExpression() {
+        test(
+            """
+                println when (1+1) {
+                    1 -> "One"
+                    2 -> "Two"
+                    3 -> "Three"
+                    true -> "More"
+                }""",
+            "Two\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("tmp")
+                iload("tmp")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("One")
+                goto(39)
+                iload("tmp")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Two")
+                goto(24)
+                iload("tmp")
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Three")
+                goto(9)
+                loadConstant("More")
+                goto(3)
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun basicWhenWithSubjectValExpression() {
+        test(
+            """
+                println when (val a = 1+1) {
+                    1 -> "One"
+                    2 -> "Two"
+                    3 -> "Three"
+                    true -> "More"
+                }""",
+            "Two\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("a")
+                iload("a")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("One")
+                goto(39)
+                iload("a")
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Two")
+                goto(24)
+                iload("a")
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("Three")
+                goto(9)
+                loadConstant("More")
+                goto(3)
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
     fun factorial() {
         test(
             """
                 fun factorial(n: Int): Int {
-                    when {
-                        n == 0 -> 1
+                    when (n) {
+                        0 -> 1
                         true -> n * (factorial n - 1)
                     }
                 }
@@ -1051,9 +1188,9 @@ class CompilerTest {
         test(
             """
                 fun fibonacci(n: Int): Int {
-                    when {
-                        n == 0 -> 0
-                        n == 1 -> 1
+                    when (n) {
+                        0 -> 0
+                        1 -> 1
                         true -> (fibonacci n - 1) + (fibonacci n - 2)
                     }
                 }
@@ -1068,8 +1205,7 @@ class CompilerTest {
             """
                 fun fibonacci(n: Int): Int {
                     when {
-                        n == 0 -> 0
-                        n == 1 -> 1
+                        n <= 1 -> n
                         true -> fibonacci(n - 1) + fibonacci(n - 2)
                     }
                 }

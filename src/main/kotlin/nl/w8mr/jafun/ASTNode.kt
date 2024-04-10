@@ -1,7 +1,7 @@
 package nl.w8mr.jafun
 
 import jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.ASTNode.Expression
+import jafun.compiler.LocalSymbolMap
 
 sealed interface ASTNode {
     fun compile(
@@ -105,14 +105,28 @@ sealed interface ASTNode {
         override fun type() = method.rtn
     }
 
-    data class When(val input: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
+    data class When(val subject: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
         override fun type() = matches.last().second.type() // TODO: find common type
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
             returnValue: Boolean,
         ) {
-            input?.let { compileAsExpression(it, builder) }
+            val variable =
+                subject?.let {
+                    when (it) {
+                        is ASTNode.Variable -> it.variableSymbol
+                        is ASTNode.ValAssignment -> {
+                            compileAsStatement(it, builder)
+                            it.variableSymbol
+                        }
+                        else -> {
+                            val tmpVariable = IR.JFVariableSymbol("subject", it.type(), LocalSymbolMap(IdentifierCache))
+                            compileAsStatement(ASTNode.ValAssignment(tmpVariable, it), builder)
+                            tmpVariable
+                        }
+                    }
+                }
             val after = builder.newCodeBlock()
             val lastIndex = matches.size - 1
             matches.forEachIndexed { index, (condition, expression) ->
@@ -124,7 +138,7 @@ sealed interface ASTNode {
                         builder.goto(after)
                     }
                     else -> {
-                        compileAsExpression(condition, builder)
+                        condition(variable, condition, builder)
                         builder.iffalse(nextBlock)
                         builder.addCodeBlock(builder.newCodeBlock())
                         compileAsExpression(expression, builder)
@@ -135,6 +149,23 @@ sealed interface ASTNode {
             }
             if ((matches.last().second == BooleanLiteral(true))) builder.pop() // throw Exception
             builder.addCodeBlock(after)
+        }
+
+        private fun condition(
+            variable: IR.JFVariableSymbol?,
+            condition: Expression,
+            builder: IRBuilder.CodeBlockDSL,
+        ) {
+            variable?.let {
+                compileAsExpression(
+                    Invocation(
+                        IdentifierCache.find("==") as IR.JFMethod,
+                        null,
+                        listOf(Variable(variable), condition),
+                    ),
+                    builder,
+                )
+            } ?: compileAsExpression(condition, builder)
         }
     }
 

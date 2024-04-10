@@ -131,7 +131,8 @@ object Parser {
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
 
     private val curlBlock =
-        seq(lCurlTerm.map(::pushSymbolMap), ref(::block), rCurlTerm.map(::popSymbolMap)) { _, b, _ -> ASTNode.ExpressionList(b, true) }
+        (lCurlTerm.map(::pushSymbolMap) prefixLiteral ref(::block) postfixLiteral rCurlTerm.map(::popSymbolMap))
+            .map { ASTNode.ExpressionList(it, true) }
 
     private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
 
@@ -166,7 +167,7 @@ object Parser {
             whenTerm.map(::pushSymbolMap),
             optional(lParenTerm prefixLiteral expression postfixLiteral rParenTerm),
             lCurlTerm prefixLiteral zeroOrMore(whenMatch) postfixLiteral rCurlTerm,
-        ) { _, input, matches -> ASTNode.When(input, matches) }
+        ) { _, subject, matches -> ASTNode.When(subject, matches) }
 
     private val block =
         zeroOrMore(
@@ -245,7 +246,7 @@ object Parser {
                     is Success ->
                         when (
                             val methodVariable =
-                                currentSymbolMap.find(identifier.value.joinToString(".") { it.value }.replace('/', '∕'))
+                                currentSymbolMap.find(identifier.value.joinToString(".") { it.value })
                         ) {
                             is IR.JFMethod ->
                                 method(

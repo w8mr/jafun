@@ -1,20 +1,7 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.Token
-import nl.w8mr.jafun.Token.Assignment
-import nl.w8mr.jafun.Token.Colon
-import nl.w8mr.jafun.Token.Comma
-import nl.w8mr.jafun.Token.Dot
-import nl.w8mr.jafun.Token.Fun
-import nl.w8mr.jafun.Token.Identifier
-import nl.w8mr.jafun.Token.IntegerLiteral
-import nl.w8mr.jafun.Token.LCurl
-import nl.w8mr.jafun.Token.LParen
-import nl.w8mr.jafun.Token.Newline
-import nl.w8mr.jafun.Token.RCurl
-import nl.w8mr.jafun.Token.RParen
-import nl.w8mr.jafun.Token.StringLiteral
-import nl.w8mr.jafun.Token.WS
+import nl.w8mr.jafun.Token.*
 import nl.w8mr.jafun.lexer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -79,6 +66,33 @@ class LexerTest {
             WS, Identifier("int"), Dot, Identifier("toString"), WS, Identifier("+", true),
             WS, Identifier("string"), Newline,
             RCurl,
+        )
+    }
+
+    @Test
+    fun equality() {
+        test(
+            """|val b = 1==2
+            """.trimMargin(),
+            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier("==", true), IntegerLiteral(2),
+        )
+    }
+
+    @Test
+    fun lteq() {
+        test(
+            """|val b = 1<=2
+            """.trimMargin(),
+            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier("<=", true), IntegerLiteral(2),
+        )
+    }
+
+    @Test
+    fun gtew() {
+        test(
+            """|val b = 1>=2
+            """.trimMargin(),
+            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier(">=", true), IntegerLiteral(2),
         )
     }
 

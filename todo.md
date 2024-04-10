@@ -1,11 +1,11 @@
 # Things still to do
 
 ## Operations
-- method call precedence
+- method call precedence &#x2611;
 
 ## When expression
 - else
-- input values
+- input values &#x2611;
 - pattern matching
 
 ## Parser

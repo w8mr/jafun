@@ -22,19 +22,24 @@ interface SymbolMap {
     fun incSymbolMapCount(): Int
 
     val symbolMapId: Int
+
+    fun String.replaceIllegalCharacters() =
+        this.replace('<', '﹤')
+            .replace('>', '﹥')
+            .replace('/', '∕')
 }
 
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
     private val identifierMap = mutableMapOf<String, IR.OperandType<*>?>()
 
-    override fun find(path: String): IR.OperandType<*>? = identifierMap[path] ?: parent.find(path)
+    override fun find(path: String): IR.OperandType<*>? = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
 
     override fun add(
         path: String,
         typeSig: IR.OperandType<*>,
     ) {
         // TODO: Add shadow check
-        identifierMap[path] = typeSig
+        identifierMap[path.replaceIllegalCharacters()] = typeSig
     }
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
@@ -124,7 +129,7 @@ object IdentifierCache : SymbolMap {
                     val typeSigs =
                         listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt").map {
                             val jClass = Class.forName(it)
-                            findInClass(jClass, name)
+                            findInClass(jClass, name.replaceIllegalCharacters())
                         }.firstOrNull { it != null }
                     typeSigs
                 }
