@@ -1,7 +1,21 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.Token
-import nl.w8mr.jafun.Token.*
+import nl.w8mr.jafun.Token.Assignment
+import nl.w8mr.jafun.Token.Colon
+import nl.w8mr.jafun.Token.Comma
+import nl.w8mr.jafun.Token.Dot
+import nl.w8mr.jafun.Token.Fun
+import nl.w8mr.jafun.Token.Identifier
+import nl.w8mr.jafun.Token.IntegerLiteral
+import nl.w8mr.jafun.Token.LCurl
+import nl.w8mr.jafun.Token.LParen
+import nl.w8mr.jafun.Token.Newline
+import nl.w8mr.jafun.Token.RCurl
+import nl.w8mr.jafun.Token.RParen
+import nl.w8mr.jafun.Token.StringLiteral
+import nl.w8mr.jafun.Token.Val
+import nl.w8mr.jafun.Token.WS
 import nl.w8mr.jafun.lexer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -33,7 +47,14 @@ class LexerTest {
     fun twoArgFunLexer() {
         test(
             "join(\"Hello\", \"World\")\r\n",
-            Identifier("join"), LParen, StringLiteral("Hello"), Comma, WS, StringLiteral("World"), RParen, Newline,
+            Identifier("join"),
+            LParen,
+            StringLiteral("Hello"),
+            Comma,
+            WS,
+            StringLiteral("World"),
+            RParen,
+            Newline,
         )
     }
 
@@ -41,7 +62,15 @@ class LexerTest {
     fun simpleFunDeclaration() {
         test(
             "fun test() {}\r\n",
-            Fun, WS, Identifier("test"), LParen, RParen, WS, LCurl, RCurl, Newline,
+            Fun,
+            WS,
+            Identifier("test"),
+            LParen,
+            RParen,
+            WS,
+            LCurl,
+            RCurl,
+            Newline,
         )
     }
 
@@ -49,7 +78,16 @@ class LexerTest {
     fun simpleFunDeclarationWithExpression() {
         test(
             "fun test() = 1\r\n",
-            Fun, WS, Identifier("test"), LParen, RParen, WS, Assignment, WS, IntegerLiteral(1), Newline,
+            Fun,
+            WS,
+            Identifier("test"),
+            LParen,
+            RParen,
+            WS,
+            Assignment,
+            WS,
+            IntegerLiteral(1),
+            Newline,
         )
     }
 
@@ -60,11 +98,36 @@ class LexerTest {
                 |  int.toString + string
                 |}
             """.trimMargin(),
-            Fun, WS, Identifier("test"), LParen, Identifier("int"), Colon, WS, Identifier("Int"), Comma, WS,
-            Identifier("string"), Colon, WS, Identifier("String"), RParen,
-            Colon, WS, Identifier("String"), WS, LCurl, Newline,
-            WS, Identifier("int"), Dot, Identifier("toString"), WS, Identifier("+", true),
-            WS, Identifier("string"), Newline,
+            Fun,
+            WS,
+            Identifier("test"),
+            LParen,
+            Identifier("int"),
+            Colon,
+            WS,
+            Identifier("Int"),
+            Comma,
+            WS,
+            Identifier("string"),
+            Colon,
+            WS,
+            Identifier("String"),
+            RParen,
+            Colon,
+            WS,
+            Identifier("String"),
+            WS,
+            LCurl,
+            Newline,
+            WS,
+            Identifier("int"),
+            Dot,
+            Identifier("toString"),
+            WS,
+            Identifier("+", true),
+            WS,
+            Identifier("string"),
+            Newline,
             RCurl,
         )
     }
@@ -74,7 +137,15 @@ class LexerTest {
         test(
             """|val b = 1==2
             """.trimMargin(),
-            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier("==", true), IntegerLiteral(2),
+            Val,
+            WS,
+            Identifier("b"),
+            WS,
+            Assignment,
+            WS,
+            IntegerLiteral(1),
+            Identifier("==", true),
+            IntegerLiteral(2),
         )
     }
 
@@ -83,7 +154,15 @@ class LexerTest {
         test(
             """|val b = 1<=2
             """.trimMargin(),
-            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier("<=", true), IntegerLiteral(2),
+            Val,
+            WS,
+            Identifier("b"),
+            WS,
+            Assignment,
+            WS,
+            IntegerLiteral(1),
+            Identifier("<=", true),
+            IntegerLiteral(2),
         )
     }
 
@@ -92,7 +171,15 @@ class LexerTest {
         test(
             """|val b = 1>=2
             """.trimMargin(),
-            Val, WS, Identifier("b"), WS, Assignment, WS, IntegerLiteral(1), Identifier(">=", true), IntegerLiteral(2),
+            Val,
+            WS,
+            Identifier("b"),
+            WS,
+            Assignment,
+            WS,
+            IntegerLiteral(1),
+            Identifier(">=", true),
+            IntegerLiteral(2),
         )
     }
 

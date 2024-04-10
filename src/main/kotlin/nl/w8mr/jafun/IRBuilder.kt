@@ -26,6 +26,7 @@ object IRBuilder {
     }
 
     class BuilderDSL(val context: BuilderContext) {
+        @Suppress("ktlint:standard:function-naming")
         fun `class`(
             name: String,
             init: ClassDSL.() -> Unit,
@@ -109,6 +110,7 @@ object IRBuilder {
             context.instructions.add(IR.Dup)
         }
 
+        @Suppress("ktlint:standard:function-naming")
         fun <J> `return`(type: IR.OperandType<J>) {
             context.instructions.add(IR.Return(type))
         }

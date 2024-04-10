@@ -34,3 +34,7 @@ kotlin {
 application {
     mainClass.set("MainKt")
 }
+
+ktlint {
+    version.set("1.2.1")
+}
