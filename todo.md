@@ -6,6 +6,7 @@
 ## When expression
 - else
 - input values &#x2611;
+- method on input values
 - pattern matching
 
 ## Parser

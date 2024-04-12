@@ -19,7 +19,6 @@ import nl.w8mr.jafun.Token.Val
 import nl.w8mr.jafun.Token.When
 import nl.w8mr.parsek.Context
 import nl.w8mr.parsek.Parser
-import nl.w8mr.parsek.eof
 import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.iLiteral
 import nl.w8mr.parsek.literal
@@ -129,7 +128,6 @@ object Parser {
 
     private val complexIdentifier = identifierTerm sepBy dotTerm
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
-
     private val curlBlock =
         (lCurlTerm.map(::pushSymbolMap) prefixLiteral ref(::block) postfixLiteral rCurlTerm.map(::popSymbolMap))
             .map { ASTNode.ExpressionList(it, true) }
@@ -153,28 +151,33 @@ object Parser {
     private val pratt = PrattParser()
 
     val expression =
-        seq(
-            zeroOrMore(oneOf(newlineTerm, semicolonTerm)),
-            pratt,
-            zeroOrMore(oneOf(newlineTerm, eof(), semicolonTerm)),
-        ) { _, i, _ -> i }
+        PrattParser(stopTerm = oneOf(newlineTerm, semicolonTerm))
 
     private val whenArrow = identifierTerm.filter { it.value == "->" }.map {}
     private val whenMatch =
-        seq(expression postfixLiteral whenArrow, expression)
+        seq(
+            PrattParser(stopTerm = whenArrow) postfixLiteral whenArrow,
+            PrattParser(stopTerm = oneOf(newlineTerm, semicolonTerm, rCurlTerm)),
+        )
     private val whenExpression: Parser<ASTNode.Expression> =
         seq(
             whenTerm.map(::pushSymbolMap),
-            optional(lParenTerm prefixLiteral expression postfixLiteral rParenTerm),
-            lCurlTerm prefixLiteral zeroOrMore(whenMatch) postfixLiteral rCurlTerm,
+            optional(lParenTerm prefixLiteral PrattParser(stopTerm = rParenTerm) postfixLiteral rParenTerm),
+            lCurlTerm prefixLiteral zeroOrMore(whenMatch) postfixLiteral
+                seq(
+                    zeroOrMore(newlineTerm),
+                    rCurlTerm,
+                ).map { Unit },
         ) { _, subject, matches -> ASTNode.When(subject, matches) }
 
     private val block =
         zeroOrMore(
-            expression,
+            pratt postfixLiteral zeroOrMore(newlineTerm).map { Unit },
         )
 
     private val betweenParentheses = lParenTerm prefixLiteral expression postfixLiteral rParenTerm
+
+    private val initValAssignment: Parser<ASTNode.Expression> = seq(initVal, expression, ::assignment)
 
     private val parser = block
 
@@ -207,210 +210,140 @@ object Parser {
         return lhsToken
     }
 
-    class PrattParser(val minPrecedence: Int = 0) : Parser<ASTNode.Expression>() {
-        interface PrefixHandler {
-            fun handle(
-                context: Context,
-                lhsExpression: ASTNode.Expression?,
-                minPrecedence: Int,
-            ): Result<ASTNode.Expression>
-        }
-
-        open class ParserHandler(val parser: Parser<ASTNode.Expression>) : PrefixHandler {
-            override fun handle(
-                context: Context,
-                lhsExpression: ASTNode.Expression?,
-                minPrecedence: Int,
-            ): Result<ASTNode.Expression> = parser.apply(context)
-        }
-
-        object LiteralHandler : ParserHandler(oneOf(integerLiteral_term, stringLiteral_term, booleanLiteral_term))
-
-        object ParenthesesHandler : ParserHandler(betweenParentheses)
-
-        object BlockHandler : ParserHandler(curlBlock.map { ASTNode.ExpressionList(it.expressions, true) })
-
-        object ValAssignmentHandler : ParserHandler(seq(initVal, pratt, ::assignment))
-
-        object FunctionDefHandler : ParserHandler(function)
-
-        object WhenHandler : ParserHandler(whenExpression)
-
-        object IdentifierHandler : PrefixHandler {
-            override fun handle(
-                context: Context,
-                lhsExpression: ASTNode.Expression?,
-                minPrecedence: Int,
-            ): Result<ASTNode.Expression> =
-                when (val identifier = complexIdentifier.apply(context)) {
-                    is Success ->
-                        when (
-                            val methodVariable =
-                                currentSymbolMap.find(identifier.value.joinToString(".") { it.value })
-                        ) {
-                            is IR.JFMethod ->
-                                method(
-                                    methodVariable,
-                                    lhsExpression,
-                                    context,
-                                    identifier.value,
-                                    minPrecedence,
-                                )
-
-                            is IR.JFVariableSymbol ->
-                                context.success(ASTNode.Variable(methodVariable), 0)
-                            else -> context.error("Identifier expected")
-                        }
-
-                    else -> context.error("Identifier expected")
-                }
-
-            private fun method(
-                methodVariable: IR.JFMethod,
-                lhsExpression: ASTNode.Expression?,
-                context: Context,
-                identifier: List<Identifier>,
-                minPrecedence: Int,
-            ): Result<ASTNode.Expression> {
-                val rightAssociate = if (methodVariable.associativity in listOf(Associativity.INFIXR, Associativity.PREFIX)) 1 else 0
-
-                val arguments = lhsExpression?.let { (mutableListOf(it)) } ?: mutableListOf()
-                return when (methodVariable.associativity) {
-                    Associativity.POSTFIX -> return context.success(methodInvocation(methodVariable, arguments), 0)
-                    Associativity.SOLO -> return context.success(methodInvocation(methodVariable, arguments), 0)
-                    else -> {
-                        val cur = context.index
-                        if (!identifier.last().operator) {
-                            val argumentsParser =
-                                lParenTerm prefixLiteral (
-                                    PrattParser(
-                                        methodVariable.precedence - rightAssociate,
-                                    ) sepByAllowEmpty commaTerm
-                                ) postfixLiteral rParenTerm
-                            val arguments = argumentsParser.apply(context)
-                            if (arguments is Success) {
-                                val list =
-                                    lhsExpression?.let { listOf(it) }
-                                        ?: emptyList<ASTNode.Expression>() + arguments.value
-                                return context.success(methodInvocation(methodVariable, list), 0)
-                            }
-                        }
-                        context.index = cur
-                        if (methodVariable.precedence <= minPrecedence) {
-                            return context.error("Lower precedence")
-                        }
-
-                        return when (
-                            val rhs =
-                                PrattParser(methodVariable.precedence - rightAssociate).apply(context)
-                        ) {
-                            is Success ->
-                                context.success(
-                                    methodInvocation(
-                                        methodVariable,
-                                        lhsExpression?.let { listOf(it, rhs.value) } ?: listOf(rhs.value),
-                                    ),
-                                    0,
-                                )
-
-                            is Error ->
-                                lhsExpression?.let {
-                                    context.index = cur
-                                    context.success(it, 0)
-                                } ?: context.error("LHS expected")
-                        }
-                    }
-                }
-            }
-
-            private fun methodInvocation(
-                method: IR.JFMethod,
-                arguments: List<ASTNode.Expression>,
-            ) = when {
-                method.static -> ASTNode.Invocation(method, null, arguments)
-                method.parent is IR.JFField -> ASTNode.Invocation(method, method.parent, arguments)
-                else -> TODO()
-            }
-        }
-
+    class PrattParser(val stopTerm: Parser<*> = newlineTerm, val minPrecedence: Int = 0) : Parser<ASTNode.Expression>() {
         override fun apply(context: Context): Result<ASTNode.Expression> {
             // println("===> ${context.peek()} $minP")
 
-            var lhsToken = context.peekSkipNewLine()
-            if (lhsToken == null) return context.error("Expected token")
-            val lhsHandler = findPrefixLiteralHandler(lhsToken)
-            val lhs =
-                lhsHandler?.let {
-                    lhsHandler.handle(context, null, minPrecedence)
-                } ?: context.error("No prefix / literal handler found")
-            var current = lhs
-            val stop = context.error<ASTNode.Expression>("break")
+            context.peekSkipNewLine() // TODO: check which parser isn't able to eat newlines
+            var current =
+                oneOf(
+                    IdentifierParser(null, minPrecedence),
+                    betweenParentheses,
+                    curlBlock,
+                    integerLiteral_term,
+                    stringLiteral_term,
+                    booleanLiteral_term,
+                    initValAssignment,
+                    function,
+                    whenExpression,
+                ).apply(context)
 
             while (current is Success) {
                 val cur = context.index
-                val rhs =
-                    when (val rhsToken = context.tokenOrNull()) {
-                        is RParen -> stop
-                        is RCurl -> stop
-                        is Comma -> stop
-                        is Newline -> stop
-                        null -> stop
-                        else -> {
-                            val rhsHandler = findInfixPostFixHandler(rhsToken)
-                            rhsHandler?.let {
-                                rhsHandler.handle(context, (current as Success).value, minPrecedence)
-                            } ?: current
-                        }
+                when (stopTerm.apply(context)) {
+                    is Success -> {
+                        context.index = cur
+                        break
                     }
-                if (rhs == current) {
-                    context.index = cur
-                    break
-                }
-                if (rhs is Error) {
-                    context.index = cur
-                    break
-                }
 
-                if (rhs == stop) {
-                    context.index = cur
-                    break
+                    is Error -> {
+                        context.index = cur
+                        val rhs = IdentifierParser(current.value, minPrecedence).apply(context)
+                        if (rhs is Error) {
+                            context.index = cur // TODO: check which parser is not resetting cursor
+                            break
+                        }
+                        current = rhs
+                    }
                 }
-                current = rhs
             }
             // println("<=== ${context.tokenOrNull()} $minP $current")
-
             return current
         }
+    }
 
-        private fun Context.tokenOrNull() = if (hasNext()) peek() as Token else null
+    class IdentifierParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) : Parser<ASTNode.Expression>() {
+        override fun apply(context: Context): Result<ASTNode.Expression> =
+            when (val identifier = complexIdentifier.apply(context)) {
+                is Success ->
+                    when (
+                        val methodVariable =
+                            currentSymbolMap.find(identifier.value.joinToString(".") { it.value })
+                    ) {
+                        is IR.JFMethod ->
+                            method(
+                                methodVariable,
+                                lhsExpression,
+                                context,
+                                identifier.value,
+                                minPrecedence,
+                            )
 
-        private fun findPrefixLiteralHandler(token: Token): PrefixHandler? =
-            when (token) {
-                is Identifier -> IdentifierHandler
-                is LParen -> ParenthesesHandler
-                is LCurl -> BlockHandler
-                is Token.IntegerLiteral -> LiteralHandler
-                is Token.StringLiteral -> LiteralHandler
-                is Token.True -> LiteralHandler
-                is Token.False -> LiteralHandler
-                is Val -> ValAssignmentHandler
-                is Fun -> FunctionDefHandler
-                is When -> WhenHandler
-                else -> null
+                        is IR.JFVariableSymbol ->
+                            context.success(ASTNode.Variable(methodVariable), 0)
+
+                        else -> context.error("Identifier expected")
+                    }
+
+                else -> context.error("Identifier expected")
             }
 
-        private fun findInfixPostFixHandler(token: Token): PrefixHandler? =
-            when (token) {
-                is Identifier -> IdentifierHandler
-                is LParen -> ParenthesesHandler
-                is LCurl -> BlockHandler
-                is Token.IntegerLiteral -> LiteralHandler
-                is Token.StringLiteral -> LiteralHandler
-                is Token.True -> LiteralHandler
-                is Token.False -> LiteralHandler
-                is Val -> ValAssignmentHandler
-                is When -> WhenHandler
-                else -> null
+        private fun method(
+            methodVariable: IR.JFMethod,
+            lhsExpression: ASTNode.Expression?,
+            context: Context,
+            identifier: List<Identifier>,
+            minPrecedence: Int,
+        ): Result<ASTNode.Expression> {
+            val rightAssociate = if (methodVariable.associativity in listOf(Associativity.INFIXR, Associativity.PREFIX)) 1 else 0
+
+            val arguments = lhsExpression?.let { (mutableListOf(it)) } ?: mutableListOf()
+            return when (methodVariable.associativity) {
+                Associativity.POSTFIX -> return context.success(methodInvocation(methodVariable, arguments), 0)
+                Associativity.SOLO -> return context.success(methodInvocation(methodVariable, arguments), 0)
+                else -> {
+                    val cur = context.index
+                    if (!identifier.last().operator) {
+                        val argumentsParser =
+                            lParenTerm prefixLiteral (
+                                PrattParser(
+                                    stopTerm = oneOf(commaTerm, rParenTerm),
+                                    minPrecedence = methodVariable.precedence - rightAssociate,
+                                ) sepByAllowEmpty commaTerm
+                            ) postfixLiteral rParenTerm
+                        val arguments = argumentsParser.apply(context)
+                        if (arguments is Success) {
+                            val list =
+                                lhsExpression?.let { listOf(it) }
+                                    ?: emptyList<ASTNode.Expression>() + arguments.value
+                            return context.success(methodInvocation(methodVariable, list), 0)
+                        }
+                    }
+                    context.index = cur
+                    if (methodVariable.precedence <= minPrecedence) {
+                        return context.error("Lower precedence")
+                    }
+
+                    return when (
+                        val rhs =
+                            PrattParser(minPrecedence = methodVariable.precedence - rightAssociate).apply(context)
+                    ) {
+                        is Success ->
+                            context.success(
+                                methodInvocation(
+                                    methodVariable,
+                                    lhsExpression?.let { listOf(it, rhs.value) } ?: listOf(rhs.value),
+                                ),
+                                0,
+                            )
+
+                        is Error ->
+                            lhsExpression?.let {
+                                context.index = cur
+                                context.success(it, 0)
+                            } ?: context.error("LHS expected")
+                    }
+                }
             }
+        }
+
+        private fun methodInvocation(
+            method: IR.JFMethod,
+            arguments: List<ASTNode.Expression>,
+        ) = when {
+            method.static -> ASTNode.Invocation(method, null, arguments)
+            method.parent is IR.JFField -> ASTNode.Invocation(method, method.parent, arguments)
+            else -> TODO()
+        }
     }
 }
