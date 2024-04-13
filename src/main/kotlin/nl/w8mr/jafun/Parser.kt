@@ -23,6 +23,7 @@ import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.iLiteral
 import nl.w8mr.parsek.literal
 import nl.w8mr.parsek.map
+import nl.w8mr.parsek.mapResult
 import nl.w8mr.parsek.oneOf
 import nl.w8mr.parsek.optional
 import nl.w8mr.parsek.postfixLiteral
@@ -34,6 +35,19 @@ import nl.w8mr.parsek.seq
 import nl.w8mr.parsek.zeroOrMore
 
 object Parser {
+    private fun isVariableIdentifier(result: Parser.Result<List<Identifier>>): Parser.Result<ASTNode.Variable> {
+        return when (result) {
+            is Parser.Success<List<Identifier>> -> {
+                val name = result.value.last().value
+                when (val symbol = currentSymbolMap.find(name)) {
+                    is IR.JFVariableSymbol -> Parser.Success(ASTNode.Variable(symbol), emptyList())
+                    else -> Parser.Error("no variable identifier")
+                }
+            }
+            is Parser.Error<*> -> Parser.Error("no identifier")
+        }
+    }
+
     private fun assignment(
         identifier: Identifier,
         expression: ASTNode.Expression,
@@ -127,6 +141,8 @@ object Parser {
         )
 
     private val complexIdentifier = identifierTerm sepBy dotTerm
+    private val variableIdentifier: Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
+
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
     private val curlBlock =
         (lCurlTerm.map(::pushSymbolMap) prefixLiteral ref(::block) postfixLiteral rCurlTerm.map(::popSymbolMap))
@@ -217,7 +233,8 @@ object Parser {
             context.peekSkipNewLine() // TODO: check which parser isn't able to eat newlines
             var current =
                 oneOf(
-                    IdentifierParser(null, minPrecedence),
+                    variableIdentifier,
+                    MethodParser(null, minPrecedence),
                     betweenParentheses,
                     curlBlock,
                     integerLiteral_term,
@@ -238,7 +255,7 @@ object Parser {
 
                     is Error -> {
                         context.index = cur
-                        val rhs = IdentifierParser(current.value, minPrecedence).apply(context)
+                        val rhs = MethodParser(current.value, minPrecedence).apply(context)
                         if (rhs is Error) {
                             context.index = cur // TODO: check which parser is not resetting cursor
                             break
@@ -252,7 +269,7 @@ object Parser {
         }
     }
 
-    class IdentifierParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) : Parser<ASTNode.Expression>() {
+    class MethodParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) : Parser<ASTNode.Expression>() {
         override fun apply(context: Context): Result<ASTNode.Expression> =
             when (val identifier = complexIdentifier.apply(context)) {
                 is Success ->
@@ -268,13 +285,8 @@ object Parser {
                                 identifier.value,
                                 minPrecedence,
                             )
-
-                        is IR.JFVariableSymbol ->
-                            context.success(ASTNode.Variable(methodVariable), 0)
-
-                        else -> context.error("Identifier expected")
+                        else -> context.error("Method expected")
                     }
-
                 else -> context.error("Identifier expected")
             }
 
@@ -285,54 +297,39 @@ object Parser {
             identifier: List<Identifier>,
             minPrecedence: Int,
         ): Result<ASTNode.Expression> {
-            val rightAssociate = if (methodVariable.associativity in listOf(Associativity.INFIXR, Associativity.PREFIX)) 1 else 0
-
-            val arguments = lhsExpression?.let { (mutableListOf(it)) } ?: mutableListOf()
+            val lhsArguments = lhsExpression?.let { (mutableListOf(it)) } ?: mutableListOf()
             return when (methodVariable.associativity) {
-                Associativity.POSTFIX -> return context.success(methodInvocation(methodVariable, arguments), 0)
-                Associativity.SOLO -> return context.success(methodInvocation(methodVariable, arguments), 0)
+                Associativity.POSTFIX -> return context.success(methodInvocation(methodVariable, lhsArguments), 0)
+                Associativity.SOLO -> return context.success(methodInvocation(methodVariable, emptyList()), 0)
                 else -> {
-                    val cur = context.index
+                    val newPrecedence =
+                        if (methodVariable.associativity == Associativity.INFIXL) {
+                            methodVariable.precedence
+                        } else {
+                            methodVariable.precedence - 1
+                        }
                     if (!identifier.last().operator) {
                         val argumentsParser =
                             lParenTerm prefixLiteral (
                                 PrattParser(
                                     stopTerm = oneOf(commaTerm, rParenTerm),
-                                    minPrecedence = methodVariable.precedence - rightAssociate,
+                                    minPrecedence = newPrecedence,
                                 ) sepByAllowEmpty commaTerm
                             ) postfixLiteral rParenTerm
-                        val arguments = argumentsParser.apply(context)
-                        if (arguments is Success) {
-                            val list =
-                                lhsExpression?.let { listOf(it) }
-                                    ?: emptyList<ASTNode.Expression>() + arguments.value
-                            return context.success(methodInvocation(methodVariable, list), 0)
+                        val invocation = (argumentsParser.map { methodInvocation(methodVariable, lhsArguments + it) }).apply(context)
+                        if (invocation is Success) {
+                            return invocation
                         }
                     }
-                    context.index = cur
                     if (methodVariable.precedence <= minPrecedence) {
                         return context.error("Lower precedence")
                     }
 
-                    return when (
-                        val rhs =
-                            PrattParser(minPrecedence = methodVariable.precedence - rightAssociate).apply(context)
-                    ) {
-                        is Success ->
-                            context.success(
-                                methodInvocation(
-                                    methodVariable,
-                                    lhsExpression?.let { listOf(it, rhs.value) } ?: listOf(rhs.value),
-                                ),
-                                0,
-                            )
-
-                        is Error ->
-                            lhsExpression?.let {
-                                context.index = cur
-                                context.success(it, 0)
-                            } ?: context.error("LHS expected")
-                    }
+                    return (
+                        PrattParser(minPrecedence = newPrecedence).map { rhs ->
+                            methodInvocation(methodVariable, lhsArguments + listOf(rhs))
+                        }
+                    ).apply(context)
                 }
             }
         }
@@ -340,10 +337,11 @@ object Parser {
         private fun methodInvocation(
             method: IR.JFMethod,
             arguments: List<ASTNode.Expression>,
-        ) = when {
-            method.static -> ASTNode.Invocation(method, null, arguments)
-            method.parent is IR.JFField -> ASTNode.Invocation(method, method.parent, arguments)
-            else -> TODO()
-        }
+        ): ASTNode.Expression =
+            when {
+                method.static -> ASTNode.Invocation(method, null, arguments)
+                method.parent is IR.JFField -> ASTNode.Invocation(method, method.parent, arguments)
+                else -> TODO()
+            }
     }
 }
