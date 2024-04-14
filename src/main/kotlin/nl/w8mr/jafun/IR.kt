@@ -61,6 +61,7 @@ class IR {
         val name: String,
         val rtn: OperandType<*>,
         val static: Boolean = false,
+        val operator: Boolean = false,
         val associativity: Associativity = Associativity.PREFIX,
         val precedence: Int = 10,
     ) : OperandType<Any?>

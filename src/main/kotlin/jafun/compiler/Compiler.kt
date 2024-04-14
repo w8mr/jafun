@@ -2,6 +2,7 @@ package jafun.compiler
 
 import jafun.compiler.IdentifierCache.incSymbolMapCount
 import nl.w8mr.jafun.IR
+import nl.w8mr.jafun.operatorSymbols
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
@@ -179,6 +180,7 @@ object IdentifierCache : SymbolMap {
                     name,
                     rtn,
                     true,
+                    jMethod.name.all(operatorSymbols::contains),
                     associativity,
                     precedence,
                 )

@@ -92,7 +92,7 @@ class ParserTest {
         test(
             """fun test() { }""",
             function(
-                method("test", IR.Unit),
+                method("test", IR.Unit, operator = false),
             ),
         )
     }
@@ -102,7 +102,7 @@ class ParserTest {
         test(
             "fun test() { println 1 + 2 }",
             function(
-                method("test", IR.Unit),
+                method("test", IR.Unit, operator = false),
                 invocation(
                     println,
                     null,
@@ -132,7 +132,7 @@ class ParserTest {
         test(
             "fun test() { 1 + 2 }",
             function(
-                method("test", IR.SInt32),
+                method("test", IR.SInt32, operator = false),
                 invocation(plus, null, i(1), i(2)),
             ),
         )
@@ -143,9 +143,9 @@ class ParserTest {
         test(
             "fun test() { fun inner() { println 1 + 2 } }",
             function(
-                method("test", IR.Unit),
+                method("test", IR.Unit, operator = false),
                 function(
-                    method("inner", IR.Unit),
+                    method("inner", IR.Unit, operator = false),
                     invocation(
                         println,
                         null,
@@ -163,14 +163,14 @@ class ParserTest {
             |fun test() { println 1 + 2 }
             |test""",
             function(
-                method("test", IR.Unit),
+                method("test", IR.Unit, operator = false),
                 invocation(
                     println,
                     null,
                     invocation(plus, null, i(1), i(2)),
                 ),
             ),
-            invocation(method("test", IR.Unit), null),
+            invocation(method("test", IR.Unit, operator = false), null),
         )
     }
 
@@ -236,6 +236,7 @@ class ParserTest {
             IR.StringType,
             IR.StringType,
             parent = IR.JFClass("jafun/io/ConsoleKt"),
+            operator = false,
         )
 
     private val println =
@@ -244,6 +245,7 @@ class ParserTest {
             IR.Unit,
             objectType,
             parent = IR.JFClass("jafun/io/ConsoleKt"),
+            operator = false,
         )
 
     private val plus =
@@ -255,6 +257,7 @@ class ParserTest {
             associativity = Associativity.INFIXL,
             precedence = 100,
             parent = IR.JFClass("jafun/lang/IntKt"),
+            operator = true,
         )
 
     private val equals =
@@ -266,6 +269,7 @@ class ParserTest {
             associativity = Associativity.INFIXL,
             precedence = 40,
             parent = IR.JFClass("jafun/lang/IntKt"),
+            operator = false, // TODO: check
         )
 
     private fun method(
@@ -282,6 +286,7 @@ class ParserTest {
         name,
         returnType,
         static,
+        false,
         associativity,
         precedence,
     )
@@ -294,12 +299,14 @@ class ParserTest {
         associativity: Associativity = if (parameters.isEmpty()) Associativity.SOLO else Associativity.PREFIX,
         precedence: Int = 10,
         parent: HasPath = IR.JFClass("Script"),
+        operator: Boolean,
     ) = IR.JFMethod(
         parameters.toList().mapIndexed { i, type -> IR.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
         parent,
         name,
         returnType,
         static,
+        operator,
         associativity,
         precedence,
     )
@@ -311,12 +318,14 @@ class ParserTest {
         associativity: Associativity = Associativity.SOLO,
         precedence: Int = 10,
         parent: HasPath = IR.JFClass("Script"),
+        operator: Boolean,
     ) = IR.JFMethod(
         emptyList(),
         parent,
         name,
         returnType,
         static,
+        operator,
         associativity,
         precedence,
     )
