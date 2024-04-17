@@ -150,8 +150,13 @@ object Parser {
     private val variableIdentifier: Parser<ASTNode.Variable> = complexIdentifier.mapResult(::isVariableIdentifier)
 
     private val initVal = (valTerm prefixLiteral identifierTerm postfixLiteral assignmentTerm)
+    val blockOpen = seq(lCurlTerm, zeroOrMore(newlineTerm)) { _, _ -> }
+    val blockClose = seq(zeroOrMore(newlineTerm), rCurlTerm) { _, _ -> }
+
     private val curlBlock =
-        (lCurlTerm.map(::pushSymbolMap) prefixLiteral ref(::block) postfixLiteral rCurlTerm.map(::popSymbolMap))
+        (
+            blockOpen.map(::pushSymbolMap) prefixLiteral ref(::block) postfixLiteral blockClose.map(::popSymbolMap)
+        )
             .map { ASTNode.ExpressionList(it, true) }
 
     private val parameter = seq(identifierTerm, colonTerm, complexIdentifier) { i, _, t -> newParameterDef(i, t) }
@@ -180,22 +185,17 @@ object Parser {
         seq(
             PrattParser(stopTerm = whenArrow) postfixLiteral whenArrow,
             PrattParser(stopTerm = oneOf(newlineTerm, semicolonTerm, rCurlTerm)),
-        )
+        ) postfixLiteral newlineTerm
     private val whenExpression: Parser<ASTNode.Expression> =
         seq(
             whenTerm.map(::pushSymbolMap),
             optional(lParenTerm prefixLiteral PrattParser(stopTerm = rParenTerm) postfixLiteral rParenTerm),
-            lCurlTerm prefixLiteral zeroOrMore(whenMatch) postfixLiteral
-                seq(
-                    zeroOrMore(newlineTerm),
-                    rCurlTerm,
-                ).map { Unit },
+            blockOpen prefixLiteral zeroOrMore(whenMatch) postfixLiteral
+                blockClose.map(::popSymbolMap),
         ) { _, subject, matches -> ASTNode.When(subject, matches) }
 
     private val block =
-        zeroOrMore(
-            pratt postfixLiteral zeroOrMore(newlineTerm).map { Unit },
-        )
+        pratt sepByAllowEmpty zeroOrMore(newlineTerm)
 
     private val betweenParentheses = lParenTerm prefixLiteral expression postfixLiteral rParenTerm
 
@@ -223,26 +223,16 @@ object Parser {
         return parser.parse(tokens)
     }
 
-    fun Context.peekSkipNewLine(): Token? {
-        var lhsToken = if (hasNext()) peek() as Token else null
-        while (lhsToken == Newline) {
-            index += 1
-            lhsToken = if (hasNext()) peek() as Token else null
-        }
-        return lhsToken
-    }
-
     class PrattParser(val stopTerm: Parser<*> = newlineTerm, val minPrecedence: Int = 0) : Parser<ASTNode.Expression>() {
         override fun apply(context: Context): Result<ASTNode.Expression> {
             // println("===> ${context.peek()} $minP")
 
-            context.peekSkipNewLine() // TODO: check which parser isn't able to eat newlines
             var current =
                 oneOf(
                     variableIdentifier,
                     soloMethod,
                     methodWithParameterArguments(null),
-                    MethodParser(null, minPrecedence),
+                    methodWithPrecedence(null, minPrecedence),
                     betweenParentheses,
                     curlBlock,
                     integerLiteral_term,
@@ -266,12 +256,11 @@ object Parser {
                         val rhs =
                             oneOf(
                                 postfixMethod(current.value),
+                                methodWithParameterArguments(current.value),
+                                // methodWithPrecedence(current.value, minPrecedence),
                                 MethodParser(current.value, minPrecedence),
                             ).apply(context)
-                        if (rhs is Error) {
-                            context.index = cur // TODO: check which parser is not resetting cursor
-                            break
-                        }
+                        if (rhs is Error) break
                         current = rhs
                     }
                 }
@@ -297,9 +286,7 @@ object Parser {
             .filter { it.associativity == SOLO }
             .map { methodInvocation(it, emptyList()) }
 
-    fun methodWithParameterArguments(
-        lhsExpression: ASTNode.Expression?,
-    ): Parser<ASTNode.Expression> {
+    fun methodWithParameterArguments(lhsExpression: ASTNode.Expression?): Parser<ASTNode.Expression> {
         val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
         return seq(
             complexIdentifier
@@ -318,19 +305,22 @@ object Parser {
 
     fun methodWithPrecedence(
         lhsExpression: ASTNode.Expression?,
-        minPrecedence: Int
+        minPrecedence: Int,
     ): Parser<ASTNode.Expression> {
         val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
+        var newPrecedence = 0
         return seq(
             complexIdentifier
                 .map { identifier -> currentSymbolMap.find(identifier.joinToString(".") { it.value }) }
                 .filter { it is IR.JFMethod }
                 .map { it as IR.JFMethod }
-                .filter { it.precedence <= minPrecedence }
-            ),
-            PrattParser(minPrecedence = newPrecedence)
-
-        { m, a -> methodInvocation(m, lhsArguments + a) }
+                .filter { it.precedence > minPrecedence }
+                .map {
+                    newPrecedence = it.precedence - if (it.associativity == INFIXR) 1 else 0
+                    it
+                },
+            PrattParser(minPrecedence = newPrecedence),
+        ) { m, a -> methodInvocation(m, lhsArguments + listOf(a)) }
     }
 
     class MethodParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) : Parser<ASTNode.Expression>() {
