@@ -17,8 +17,6 @@ import nl.w8mr.jafun.lexer
 import nl.w8mr.parsek.ListSource
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.text.parse
-import nl.w8mr.parsek.parse
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -30,7 +28,7 @@ class ParserTest {
         testSingleParser(
             ParserJafun.complexIdentifier,
             "println()".trimMargin(),
-            listOf(Token.Identifier("println", false))
+            listOf(Token.Identifier("println", false)),
         )
     }
 
@@ -46,7 +44,7 @@ class ParserTest {
                 Token.Identifier("out", false),
                 Token.Identifier("println", false),
             ),
-            9
+            9,
         )
     }
 
@@ -248,7 +246,7 @@ class ParserTest {
         parser: Parser<Token, R>,
         input: String,
         expected: R,
-        afterIndex: Int = 1
+        afterIndex: Int = 1,
     ) {
         val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = ListSource(lexed)

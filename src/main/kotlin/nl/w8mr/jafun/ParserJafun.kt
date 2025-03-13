@@ -21,8 +21,25 @@ import nl.w8mr.jafun.Token.RParen
 import nl.w8mr.jafun.Token.Semicolon
 import nl.w8mr.jafun.Token.Val
 import nl.w8mr.jafun.Token.When
-import nl.w8mr.parsek.*
+import nl.w8mr.parsek.LiteralParser
+import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.Parser.Success
+import nl.w8mr.parsek.ParserSource
+import nl.w8mr.parsek.and
+import nl.w8mr.parsek.any
+import nl.w8mr.parsek.asLiteral
+import nl.w8mr.parsek.effect
+import nl.w8mr.parsek.filter
+import nl.w8mr.parsek.map
+import nl.w8mr.parsek.mapResult
+import nl.w8mr.parsek.oneOf
+import nl.w8mr.parsek.optional
+import nl.w8mr.parsek.parse
+import nl.w8mr.parsek.ref
+import nl.w8mr.parsek.sepBy
+import nl.w8mr.parsek.sepByAllowEmpty
+import nl.w8mr.parsek.seq
+import nl.w8mr.parsek.zeroOrMore
 import kotlin.reflect.KClass
 
 object ParserJafun {
@@ -109,40 +126,42 @@ object ParserJafun {
             it
         }
 
-    fun <R: Any> token(kClass: KClass<R>) = object : Parser<Token, R> {
-        override fun applyImpl(source: ParserSource<Token>): Parser.Result<R> {
-            val mark = source.mark()
-            val match = source.next()
-            return when (kClass.isInstance(match)) {
-                false -> {
-                    source.reset(mark)
-                    failure("token is not instance of ${kClass.simpleName}")
-                }
+    fun <R : Any> token(kClass: KClass<R>) =
+        object : Parser<Token, R> {
+            override fun applyImpl(source: ParserSource<Token>): Parser.Result<R> {
+                val mark = source.mark()
+                val match = source.next()
+                return when (kClass.isInstance(match)) {
+                    false -> {
+                        source.reset(mark)
+                        failure("token is not instance of ${kClass.simpleName}")
+                    }
 
-                true -> {
-                    source.release(mark)
-                    success(match as R)
+                    true -> {
+                        source.release(mark)
+                        success(match as R)
+                    }
                 }
             }
         }
-    }
 
-    fun <R: Any> literal(kClass: KClass<R>) = object : LiteralParser<Token> {
-        override fun applyImpl(source: ParserSource<Token>): Parser.Result<Unit> {
-            val mark = source.mark()
-            return when (kClass.isInstance(source.next())) {
-                false -> {
-                    source.reset(mark)
-                    failure("token is not instance of ${kClass.simpleName}")
-                }
+    fun <R : Any> literal(kClass: KClass<R>) =
+        object : LiteralParser<Token> {
+            override fun applyImpl(source: ParserSource<Token>): Parser.Result<Unit> {
+                val mark = source.mark()
+                return when (kClass.isInstance(source.next())) {
+                    false -> {
+                        source.reset(mark)
+                        failure("token is not instance of ${kClass.simpleName}")
+                    }
 
-                true -> {
-                    source.release(mark)
-                    success(Unit)
+                    true -> {
+                        source.release(mark)
+                        success(Unit)
+                    }
                 }
             }
         }
-    }
 
     private val identifierTerm = token(Identifier::class)
     private val newlineTerm = literal(Newline::class)
@@ -175,7 +194,8 @@ object ParserJafun {
     val blockOpen = (lCurlTerm) and any(newlineTerm)
     val blockClose = any(newlineTerm) and rCurlTerm
 
-    private val curlBlock = blockOpen.effect(::pushSymbolMap) and
+    private val curlBlock =
+        blockOpen.effect(::pushSymbolMap) and
             ref(::block) and
             (blockClose.effect(::popSymbolMap)) map
             { ASTNode.ExpressionList(it, true) }
@@ -187,7 +207,8 @@ object ParserJafun {
             funTerm.effect(::pushSymbolMap) and identifierTerm and lParenTerm,
             parameter sepByAllowEmpty commaTerm and rParenTerm,
             optional(colonTerm and identifierTerm),
-            ::defineFunction)
+            ::defineFunction,
+        )
 
     private val function: Parser<Token, ASTNode.Expression> =
         functionDefinition and curlBlock map (::newFunction)
@@ -208,16 +229,16 @@ object ParserJafun {
     val whenMatches = blockOpen and zeroOrMore(whenMatch) and blockClose.effect(::popSymbolMap)
     private val whenExpression: Parser<Token, ASTNode.Expression> =
         whenTerm.effect(::pushSymbolMap) and
-                whenSubject and
-                whenMatches map
-                (ASTNode::When)
+            whenSubject and
+            whenMatches map
+            (ASTNode::When)
 
     private val block: Parser<Token, List<ASTNode.Expression>> =
         pratt sepByAllowEmpty zeroOrMore(newlineTerm)
 
     private val betweenParentheses = lParenTerm and expression and rParenTerm
 
-    private val initValAssignment: Parser<Token, ASTNode.Expression> = initVal and expression map(::assignment)
+    private val initValAssignment: Parser<Token, ASTNode.Expression> = initVal and expression map (::assignment)
 
     private val parser = block
 
@@ -243,7 +264,7 @@ object ParserJafun {
 
     class PrattParser(val stopTerm: Parser<Token, *> = newlineTerm, val minPrecedence: Int = 0) : Parser<Token, ASTNode.Expression> {
         override fun applyImpl(context: ParserSource<Token>): Parser.Result<ASTNode.Expression> {
-             println("===> $minPrecedence ${context.index}")
+            //println("===> $minPrecedence ${context.index}")
 
             var current =
                 oneOf(

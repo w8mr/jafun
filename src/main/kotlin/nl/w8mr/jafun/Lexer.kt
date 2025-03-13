@@ -19,21 +19,24 @@ import nl.w8mr.jafun.Token.True
 import nl.w8mr.jafun.Token.Val
 import nl.w8mr.jafun.Token.WS
 import nl.w8mr.jafun.Token.When
-import nl.w8mr.parsek.text.char
-import nl.w8mr.parsek.text.oneOrMore
-import nl.w8mr.parsek.text.zeroOrMore
+import nl.w8mr.parsek.map
+import nl.w8mr.parsek.oneOf
+import nl.w8mr.parsek.or
 import nl.w8mr.parsek.text.and
 import nl.w8mr.parsek.text.any
+import nl.w8mr.parsek.text.char
+import nl.w8mr.parsek.text.letter
 import nl.w8mr.parsek.text.literal
-import nl.w8mr.parsek.*
-import java.lang.Character.isLetter
+import nl.w8mr.parsek.text.oneOrMore
+import nl.w8mr.parsek.text.or
+import nl.w8mr.parsek.text.zeroOrMore
+import nl.w8mr.parsek.zeroOrMore
 
 val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~')
 
 val underscore = char('_')
 val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
 
-val letter = char(" is not Unicode Letter", ::isLetter)
 val normalIdentifier = ((letter or underscore) and any(oneOf(letter, underscore, unicode_digit))).map(::Identifier)
 val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
 val identifier = normalIdentifier or operatorIdentifier
@@ -67,7 +70,7 @@ val lineStringContent = zeroOrMore(char(" is not valid string Char") { it != '"'
 val lineStringLiteral = ('"' and lineStringContent and '"').map(::StringLiteral)
 
 val ws = oneOrMore(char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }).map { WS }
-val newline = oneOf(seq(char('\n')), seq(char('\r'), char(('\n')))).map { Newline }
+val newline = ('\n' or ('\r' and '\n')).map { Newline }
 
 val lexer =
     zeroOrMore(
