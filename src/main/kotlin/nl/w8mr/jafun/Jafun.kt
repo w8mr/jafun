@@ -1,6 +1,7 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.kasmine.DynamicClassLoader
+import nl.w8mr.parsek.text.parse
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -15,7 +16,7 @@ fun compile(
 ): ByteArray {
     val lexed = lexer.parse(code).filter { it !is Token.WS }
     println("LEXED: $lexed")
-    val parsed = Parser.parse(lexed)
+    val parsed = ParserJafun.parse(lexed)
     println("PARSED: $parsed")
     println()
     return compile(parsed, className, methodName, returnType, parameterTypes)

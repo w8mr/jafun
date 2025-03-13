@@ -17,6 +17,7 @@ import nl.w8mr.jafun.Token.StringLiteral
 import nl.w8mr.jafun.Token.Val
 import nl.w8mr.jafun.Token.WS
 import nl.w8mr.jafun.lexer
+import nl.w8mr.parsek.text.parse
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 

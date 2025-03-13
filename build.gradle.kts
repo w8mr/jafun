@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
+    kotlin("jvm") version "2.1.10"
     application
     `maven-publish`
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
@@ -10,10 +10,11 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    mavenLocal()
 }
 
 dependencies {
-    implementation(project(":parsek"))
+    implementation("nl.w8mr.parsek:core:0.0.3-SNAPSHOT")
     implementation(project(":kasmine"))
     implementation(kotlin("reflect"))
     testImplementation(kotlin("test"))

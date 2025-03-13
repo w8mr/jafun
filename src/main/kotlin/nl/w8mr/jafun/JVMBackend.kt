@@ -141,7 +141,7 @@ fun byteSize(instruction: IR.Instruction) =
             when (instruction.type) {
                 is IR.StringType -> 3
                 is IR.SInt32 ->
-                    when (instruction.type.operand1(instruction)) {
+                    when (instruction.type.operand1(instruction) as Int) {
                         in -1..5 -> 1
                         in -128..-2 -> 2
                         in 6..127 -> 2
