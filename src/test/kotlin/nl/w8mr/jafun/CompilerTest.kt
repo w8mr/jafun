@@ -1,7 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.IR
-import nl.w8mr.jafun.test
 import nl.w8mr.jafun.testBytes
 import nl.w8mr.jafun.writeFile
 import nl.w8mr.kasmine.ClassBuilder
@@ -80,7 +79,7 @@ class CompilerTest {
     fun helloWorldParensCompile() {
         test(
             """
-            println(join("Hello","World"))""",
+            println(join("Hello", "World"))""",
             "Hello World\n",
         ) {
             name = "Script"
@@ -250,6 +249,49 @@ class CompilerTest {
     }
 
     @Test
+    fun simpleInfix() {
+        test(
+            """
+            1 + 2"""",
+            "",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                pop()
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun simpleAssociativity() {
+        test(
+            """
+            1 + 2 * 3"""",
+            "",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(2)
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                pop()
+                `return`()
+            }
+        }
+    }
+
+
+    @Test
     fun assignmentSimple() {
         test(
             """
@@ -342,6 +384,33 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun `assignment with plus`() {
+        test(
+            """val i = 2 + 3
+               println i 
+            """.trimMargin(),
+            "5\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(2)
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("i")
+                iload("i")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+
+                `return`()
+            }
+        }
+    }
+
+
 
     @Test
     fun plus() {
@@ -509,7 +578,7 @@ class CompilerTest {
     fun infixl() {
         test(
             """
-            println 10-4-2""",
+            println 10 - 4 - 2""",
             "4\n",
         ) {
             name = "Script"
@@ -532,7 +601,7 @@ class CompilerTest {
     fun infixr() {
         test(
             """
-            println 4**3**2""",
+            println 4 ** 3 ** 2""",
             "262144\n",
         ) {
             name = "Script"
@@ -958,6 +1027,54 @@ class CompilerTest {
     }
 
     @Test
+    fun veryBasicwhen() {
+        test(
+            """
+                when {
+                    1 == 1 -> "One"
+                    true -> "Else"
+                }""",
+            "",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                ifequal(9)
+                loadConstant("One")
+                goto(9)
+                loadConstant("Else")
+                goto(3)
+                `return`()
+            }
+        }
+    }
+
+
+    @Test
+    fun basicEquality() {
+        test(
+            """1 == 1""",
+            "",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                pop()
+                `return`()
+            }
+        }
+    }
+
+
+    @Test
     fun basicWhen() {
         test(
             """
@@ -1097,7 +1214,7 @@ class CompilerTest {
     fun basicWhenWithSubjectValExpression() {
         test(
             """
-                println when (val a = 1+1) {
+                println when (val a = 1 + 1) {
                     1 -> "One"
                     2 -> "Two"
                     3 -> "Three"

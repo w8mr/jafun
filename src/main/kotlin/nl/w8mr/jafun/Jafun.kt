@@ -14,10 +14,8 @@ fun compile(
     returnType: IR.OperandType<*> = IR.Unit,
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
-    val lexed = lexer.parse(code).filter { it !is Token.WS }
-    println("LEXED: $lexed")
-    val parsed = ParserJafun.parse(lexed)
-    println("PARSED: $parsed")
+    val parsed = ParserJafun.parse(code)
+    println("PARSED: ${parsed.joinToString("\n\n")}")
     println()
     return compile(parsed, className, methodName, returnType, parameterTypes)
 }

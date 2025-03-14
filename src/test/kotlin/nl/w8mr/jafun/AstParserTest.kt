@@ -12,42 +12,10 @@ import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
-import nl.w8mr.jafun.Token
-import nl.w8mr.jafun.lexer
-import nl.w8mr.parsek.ListSource
-import nl.w8mr.parsek.Parser
-import nl.w8mr.parsek.text.parse
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.fail
 
-class ParserTest {
-    @Test
-    fun simpleIdentifier() {
-        testSingleParser(
-            ParserJafun.complexIdentifier,
-            "println()".trimMargin(),
-            listOf(Token.Identifier("println", false)),
-        )
-    }
-
-    @Test
-    fun complexIdentifier() {
-        testSingleParser(
-            ParserJafun.complexIdentifier,
-            "java.lang.System.out.println()".trimMargin(),
-            listOf(
-                Token.Identifier("java", false),
-                Token.Identifier("lang", false),
-                Token.Identifier("System", false),
-                Token.Identifier("out", false),
-                Token.Identifier("println", false),
-            ),
-            9,
-        )
-    }
-
+class AstParserTest {
     @Test
     fun helloWorldParser() {
         test(
@@ -105,6 +73,16 @@ class ParserTest {
             ),
         )
     }
+
+    @Test
+    fun `Assignment with plus`() {
+        test(
+            """
+            |val num=1""",
+            ValAssignment(IR.JFVariableSymbol("num", IR.SInt32, IdentifierCache), i(1)),
+        )
+    }
+
 
     @Test
     fun assignment() {
@@ -242,32 +220,12 @@ class ParserTest {
         )
     }
 
-    private fun <R> testSingleParser(
-        parser: Parser<Token, R>,
-        input: String,
-        expected: R,
-        afterIndex: Int = 1,
-    ) {
-        val lexed = lexer.parse(input).filter { it !is Token.WS }
-        val source = ListSource(lexed)
-        val parsed = (parser.apply(source) as? Parser.Success ?: fail("Parse not successful")).value
-        println(parsed)
-        assertEquals(
-            expected,
-            parsed,
-        )
-        assertEquals(source.index, afterIndex)
-    }
-
     private fun test(
         code: String,
         vararg expressions: Expression,
     ) {
-        val input = code.trimMargin()
-        val lexed = lexer.parse(input).filter { it !is Token.WS }
-        println(lexed)
-        val parsed = ParserJafun.parse(lexed)
-        println(parsed)
+        val parsed = ParserJafun.parse(code.trimMargin())
+        println(parsed.joinToString("\n\n"))
         assertContentEquals(
             expressions.toList(),
             parsed,
@@ -316,7 +274,7 @@ class ParserTest {
             associativity = Associativity.INFIXL,
             precedence = 40,
             parent = IR.JFClass("jafun/lang/IntKt"),
-            operator = false, // TODO: check
+            operator = true,
         )
 
     private fun method(

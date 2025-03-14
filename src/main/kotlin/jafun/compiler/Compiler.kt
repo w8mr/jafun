@@ -2,7 +2,7 @@ package jafun.compiler
 
 import jafun.compiler.IdentifierCache.incSymbolMapCount
 import nl.w8mr.jafun.IR
-import nl.w8mr.jafun.operatorSymbols
+import nl.w8mr.jafun.ParserJafun.operatorSymbols
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

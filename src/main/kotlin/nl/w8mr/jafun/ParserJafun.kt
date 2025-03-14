@@ -8,39 +8,35 @@ import jafun.compiler.Associativity.SOLO
 import jafun.compiler.IdentifierCache
 import jafun.compiler.LocalSymbolMap
 import jafun.compiler.SymbolMap
-import nl.w8mr.jafun.Token.Colon
-import nl.w8mr.jafun.Token.Comma
-import nl.w8mr.jafun.Token.Dot
-import nl.w8mr.jafun.Token.Fun
 import nl.w8mr.jafun.Token.Identifier
-import nl.w8mr.jafun.Token.LCurl
-import nl.w8mr.jafun.Token.LParen
-import nl.w8mr.jafun.Token.Newline
-import nl.w8mr.jafun.Token.RCurl
-import nl.w8mr.jafun.Token.RParen
-import nl.w8mr.jafun.Token.Semicolon
-import nl.w8mr.jafun.Token.Val
-import nl.w8mr.jafun.Token.When
-import nl.w8mr.parsek.LiteralParser
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.Parser.Success
 import nl.w8mr.parsek.ParserSource
 import nl.w8mr.parsek.and
-import nl.w8mr.parsek.any
 import nl.w8mr.parsek.asLiteral
+import nl.w8mr.parsek.combi
 import nl.w8mr.parsek.effect
 import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.mapResult
 import nl.w8mr.parsek.oneOf
 import nl.w8mr.parsek.optional
-import nl.w8mr.parsek.parse
+import nl.w8mr.parsek.or
 import nl.w8mr.parsek.ref
-import nl.w8mr.parsek.sepBy
 import nl.w8mr.parsek.sepByAllowEmpty
 import nl.w8mr.parsek.seq
+import nl.w8mr.parsek.text.CharSequenceSource
+import nl.w8mr.parsek.text.and
+import nl.w8mr.parsek.text.any
+import nl.w8mr.parsek.text.char
+import nl.w8mr.parsek.text.letter
+import nl.w8mr.parsek.text.literal
+import nl.w8mr.parsek.text.oneOrMore
+import nl.w8mr.parsek.text.zeroOrMore
+import nl.w8mr.parsek.text.or
+import nl.w8mr.parsek.text.sepBy
 import nl.w8mr.parsek.zeroOrMore
-import kotlin.reflect.KClass
+import nl.w8mr.parsek.value
 
 object ParserJafun {
     private fun isVariableIdentifier(result: Parser.Result<List<Identifier>>): Parser.Result<ASTNode.Variable> {
@@ -52,6 +48,7 @@ object ParserJafun {
                     else -> Parser.Failure("no variable identifier")
                 }
             }
+
             is Parser.Failure<*> -> Parser.Failure("no identifier")
         }
     }
@@ -99,7 +96,11 @@ object ParserJafun {
         return ASTNode.Function(symbol, block.expressions)
     }
 
-    data class FunctionDef(val identifier: Identifier, val parameters: List<IR.JFVariableSymbol>, val returnType: Identifier?)
+    data class FunctionDef(
+        val identifier: Identifier,
+        val parameters: List<IR.JFVariableSymbol>,
+        val returnType: Identifier?
+    )
 
     private fun defineFunction(
         identifier: Identifier,
@@ -120,129 +121,126 @@ object ParserJafun {
         return FunctionDef(identifier, parameters, returnType)
     }
 
-    fun <R> Parser<Token, R>.debug(f: (R) -> String) =
-        this.map {
-            println(f.invoke(it))
-            it
+    val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
+    val normalIdentifier = (letter or char('_')) and
+            any(letter or char('_') or unicode_digit) map (::Identifier)
+
+    val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
+    val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
+
+    val identifier = normalIdentifier or operatorIdentifier
+
+    val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.asLiteral()
+    val ws = oneOrMore(whitespace)
+    val ows = zeroOrMore(whitespace)
+
+    private val newline = '\n' or ('\r' and '\n')
+    val nl = oneOrMore(newline)
+    val onl = zeroOrMore(newline)
+    val wsnl = oneOrMore(oneOf(whitespace, newline))
+    val owsnl = zeroOrMore(oneOf(whitespace, newline))
+
+    private val commaTerm = ',' and owsnl
+    private val lParenTerm = '(' and owsnl
+    private val rParenTerm = ')' and ows
+
+    //TODO: Escape characters
+    val lineStringContent =
+        zeroOrMore(char(" is not valid string Char") { it != '"' && it != '\\' })
+    private val stringLiteral_term = ('"' and lineStringContent and '"').map(ASTNode::StringLiteral)
+
+    val decimalDigit = char { it in '0'..'9' }
+    val decimalDigitNoZero = char { it in '1'..'9' }
+    val decimalDigitOrSeparator = decimalDigit or char('_')
+    val integerLiteral_term =
+        ((decimalDigitNoZero and any(decimalDigitOrSeparator)) or decimalDigit).map {
+            ASTNode.IntegerLiteral(it.replace("_", "").toInt())
         }
 
-    fun <R : Any> token(kClass: KClass<R>) =
-        object : Parser<Token, R> {
-            override fun applyImpl(source: ParserSource<Token>): Parser.Result<R> {
-                val mark = source.mark()
-                val match = source.next()
-                return when (kClass.isInstance(match)) {
-                    false -> {
-                        source.reset(mark)
-                        failure("token is not instance of ${kClass.simpleName}")
-                    }
-
-                    true -> {
-                        source.release(mark)
-                        success(match as R)
-                    }
-                }
-            }
-        }
-
-    fun <R : Any> literal(kClass: KClass<R>) =
-        object : LiteralParser<Token> {
-            override fun applyImpl(source: ParserSource<Token>): Parser.Result<Unit> {
-                val mark = source.mark()
-                return when (kClass.isInstance(source.next())) {
-                    false -> {
-                        source.reset(mark)
-                        failure("token is not instance of ${kClass.simpleName}")
-                    }
-
-                    true -> {
-                        source.release(mark)
-                        success(Unit)
-                    }
-                }
-            }
-        }
-
-    private val identifierTerm = token(Identifier::class)
-    private val newlineTerm = literal(Newline::class)
-    private val dotTerm = literal(Dot::class)
-    private val colonTerm = literal(Colon::class)
-    private val commaTerm = literal(Comma::class)
-    private val semicolonTerm = literal(Semicolon::class)
-    private val lParenTerm = literal(LParen::class)
-    private val rParenTerm = literal(RParen::class)
-    private val lCurlTerm = literal(LCurl::class)
-    private val rCurlTerm = literal(RCurl::class)
-    private val valTerm = literal(Val::class)
-    private val funTerm = literal(Fun::class)
-    private val whenTerm = literal(When::class)
-
-    private val assignmentTerm = literal(Token.Assignment::class)
-
-    private val stringLiteral_term = token(Token.StringLiteral::class) map { ASTNode.StringLiteral(it.value) }
-    private val integerLiteral_term = (token(Token.IntegerLiteral::class) map { ASTNode.IntegerLiteral(it.value) })
     private val booleanLiteral_term =
         oneOf(
-            token(Token.True::class).map { ASTNode.BooleanLiteral(true) },
-            token(Token.False::class).map { ASTNode.BooleanLiteral(false) },
+            literal("true") value (ASTNode.BooleanLiteral(true)),
+            literal("false") value (ASTNode.BooleanLiteral(false))
         )
 
-    val complexIdentifier = identifierTerm sepBy dotTerm
-    private val variableIdentifier: Parser<Token, ASTNode.Variable> = complexIdentifier.mapResult(func = ::isVariableIdentifier)
+    val complexIdentifier = identifier sepBy '.'
+    val variableIdentifier: Parser<Char, ASTNode.Variable> = complexIdentifier.mapResult(func = ::isVariableIdentifier)
 
-    private val initVal = (valTerm and identifierTerm and assignmentTerm)
-    val blockOpen = (lCurlTerm) and any(newlineTerm)
-    val blockClose = any(newlineTerm) and rCurlTerm
+    val blockOpen = '{' and owsnl
+    val blockClose = owsnl and '}'
 
-    private val curlBlock =
-        blockOpen.effect(::pushSymbolMap) and
-            ref(::block) and
-            (blockClose.effect(::popSymbolMap)) map
-            { ASTNode.ExpressionList(it, true) }
+    val curlBlock = combi {
+        -blockOpen
+        pushSymbolMap()
+        val expressions = ref(::block).bind()
+        -blockClose
+        popSymbolMap()
+        ASTNode.ExpressionList(expressions, true)
+    }
 
-    private val parameter = identifierTerm and colonTerm and complexIdentifier map (::newParameterDef)
+    private val parameter = identifier and owsnl and ':' and owsnl and complexIdentifier map (::newParameterDef)
 
-    private val functionDefinition =
-        seq(
-            funTerm.effect(::pushSymbolMap) and identifierTerm and lParenTerm,
-            parameter sepByAllowEmpty commaTerm and rParenTerm,
-            optional(colonTerm and identifierTerm),
-            ::defineFunction,
-        )
+    val functionDefinition = combi {
+        -literal("fun")
+        -wsnl
+        pushSymbolMap()
+        val name = identifier.bind()
+        -owsnl
+        -lParenTerm
+        val parameters = (parameter sepByAllowEmpty commaTerm).bind()
+        -rParenTerm
+        val returnType = optional(':' and owsnl and identifier).bind()
+        -owsnl
+        defineFunction(name, parameters, returnType)
+    }
 
-    private val function: Parser<Token, ASTNode.Expression> =
+    val function: Parser<Char, ASTNode.Expression> =
         functionDefinition and curlBlock map (::newFunction)
 
     private val pratt = PrattParser()
 
     val expression =
-        PrattParser(stopTerm = oneOf(newlineTerm, semicolonTerm))
+        PrattParser(stopTerm = newline or ';')
 
-    private val whenArrow = identifierTerm.filter { it.value == "->" }.asLiteral()
+    private val whenArrow = identifier.filter { it.value == "->" }.asLiteral()
     private val whenMatch =
         seq(
-            PrattParser(stopTerm = whenArrow) and whenArrow,
-            PrattParser(stopTerm = oneOf(newlineTerm, semicolonTerm, rCurlTerm)),
-        ) and newlineTerm
+            PrattParser(stopTerm = whenArrow) and whenArrow and owsnl,
+            PrattParser(stopTerm = nl or ';' or ';'),
+        ) and wsnl
 
-    private val whenSubject = optional(lParenTerm and PrattParser(stopTerm = rParenTerm) and rParenTerm)
-    val whenMatches = blockOpen and zeroOrMore(whenMatch) and blockClose.effect(::popSymbolMap)
-    private val whenExpression: Parser<Token, ASTNode.Expression> =
-        whenTerm.effect(::pushSymbolMap) and
-            whenSubject and
-            whenMatches map
-            (ASTNode::When)
+    private val whenExpression: Parser<Char, ASTNode.Expression> =
+        combi {
+            -("when" and owsnl)
+            pushSymbolMap()
+            val subject = optional(lParenTerm and PrattParser(stopTerm = rParenTerm) and rParenTerm).bind()
+            -blockOpen
+            val matches = zeroOrMore(whenMatch).bind()
+            -blockClose
+            popSymbolMap()
+            ASTNode.When(subject, matches)
+        }
 
-    private val block: Parser<Token, List<ASTNode.Expression>> =
-        pratt sepByAllowEmpty zeroOrMore(newlineTerm)
+    private val block: Parser<Char, List<ASTNode.Expression>> =
+        zeroOrMore(owsnl and pratt)
 
     private val betweenParentheses = lParenTerm and expression and rParenTerm
 
-    private val initValAssignment: Parser<Token, ASTNode.Expression> = initVal and expression map (::assignment)
+    val initValAssignment: Parser<Char, ASTNode.Expression> =
+        combi {
+            -("val" and wsnl)
+            val identifier = identifier.bind()
+            -owsnl
+            -literal('=')
+            -owsnl
+            val expression = expression.bind()
+
+            assignment(identifier, expression)
+        }
 
     private val parser = block
 
-    private var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset())
+    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset())
 
     private fun pushSymbolMap() {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
@@ -258,16 +256,18 @@ object ParserJafun {
             }
     }
 
-    fun parse(tokens: List<Token>): List<ASTNode.Expression> {
-        return parser.parse(tokens)
+    fun parse(input: String): List<ASTNode.Expression> {
+        val source = CharSequenceSource(input)
+        return parser.parse(source)
     }
 
-    class PrattParser(val stopTerm: Parser<Token, *> = newlineTerm, val minPrecedence: Int = 0) : Parser<Token, ASTNode.Expression> {
-        override fun applyImpl(context: ParserSource<Token>): Parser.Result<ASTNode.Expression> {
-            //println("===> $minPrecedence ${context.index}")
+    class PrattParser(val stopTerm: Parser<Char, *> = newline, val minPrecedence: Int = 0) :
+        Parser<Char, ASTNode.Expression> {
+        override fun applyImpl(context: ParserSource<Char>): Parser.Result<ASTNode.Expression> {
+            //  println("===> $minPrecedence ${context.index}")
 
             var current =
-                oneOf(
+                (oneOf(
                     variableIdentifier,
                     soloMethod,
                     methodWithParameterArguments(null),
@@ -280,7 +280,7 @@ object ParserJafun {
                     initValAssignment,
                     function,
                     whenExpression,
-                ).apply(context)
+                ) and ows).apply(context)
 
             while (current is Success) {
                 val mark = context.mark()
@@ -293,12 +293,12 @@ object ParserJafun {
                     is Parser.Failure -> {
                         context.reset(mark)
                         val rhs =
-                            oneOf(
+                            (owsnl and oneOf(
                                 postfixMethod(current.value),
                                 methodWithParameterArguments(current.value),
                                 // methodWithPrecedence(current.value, minPrecedence),
                                 MethodParser(current.value, minPrecedence),
-                            ).apply(context)
+                            ) and ows).apply(context)
                         if (rhs is Parser.Failure) break
                         current = rhs
                     }
@@ -309,62 +309,68 @@ object ParserJafun {
         }
     }
 
+    fun ASTNode.Expression?.asList() = when (this) {
+        null -> emptyList()
+        else -> listOf(this)
+    }
+
     fun postfixMethod(lhsExpression: ASTNode.Expression?) =
-        complexIdentifier
-            .map { identifier -> currentSymbolMap.find(identifier.joinToString(".") { it.value }) }
-            .filter { it is IR.JFMethod }
-            .map { it as IR.JFMethod }
-            .filter { it.associativity == POSTFIX }
-            .map { methodInvocation(it, lhsExpression?.let { (listOf(it)) } ?: emptyList()) }
+        combi {
+            val complexIdentifier = (complexIdentifier).bind()
+            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            if ((method is IR.JFMethod) && (method.associativity == POSTFIX)) {
+                methodInvocation(method, lhsExpression.asList())
+            } else {
+                fail("Method ($complexIdentifier) not found or not of the right type")
+            }
 
-    val soloMethod =
-        complexIdentifier
-            .map { identifier -> currentSymbolMap.find(identifier.joinToString(".") { it.value }) }
-            .filter { it is IR.JFMethod }
-            .map { it as IR.JFMethod }
-            .filter { it.associativity == SOLO }
-            .map { methodInvocation(it, emptyList()) }
+        }
 
-    fun methodWithParameterArguments(lhsExpression: ASTNode.Expression?): Parser<Token, ASTNode.Expression> {
-        val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
-        return seq(
-            complexIdentifier
-                .map { identifier -> currentSymbolMap.find(identifier.joinToString(".") { it.value }) }
-                .filter { it is IR.JFMethod }
-                .map { it as IR.JFMethod }
-                .filter { it.associativity in listOf(PREFIX, INFIXL, INFIXR) }
-                .filter { !it.operator },
-            lParenTerm and (
-                PrattParser(
-                    stopTerm = oneOf(commaTerm, rParenTerm),
-                ) sepByAllowEmpty commaTerm
-            ) and rParenTerm,
-        ) { m, a -> methodInvocation(m, lhsArguments + a) }
+    val soloMethod = combi {
+        val complexIdentifier = (complexIdentifier).bind()
+        val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+        if ((method is IR.JFMethod) && (method.associativity == SOLO)) {
+            methodInvocation(method, emptyList())
+        } else {
+            fail("Method ($complexIdentifier) not found or not of the right type")
+        }
+    }
+
+    fun methodWithParameterArguments(lhsExpression: ASTNode.Expression?): Parser<Char, ASTNode.Expression> = combi {
+        val complexIdentifier = (complexIdentifier).bind()
+        val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+        if ((method is IR.JFMethod) && (method.associativity in listOf(PREFIX, INFIXL, INFIXR)) && (!method.operator)) {
+            val arguments = (lParenTerm and
+                    (PrattParser(stopTerm = ',' or ';') sepByAllowEmpty commaTerm) and
+                    rParenTerm).bind()
+            methodInvocation(method, lhsExpression.asList() + arguments)
+        } else {
+            fail("Method ($complexIdentifier) not found or not of the right type")
+        }
     }
 
     fun methodWithPrecedence(
         lhsExpression: ASTNode.Expression?,
         minPrecedence: Int,
-    ): Parser<Token, ASTNode.Expression> {
-        val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
-        var newPrecedence = 0
-        return seq(
-            complexIdentifier
-                .map { identifier -> currentSymbolMap.find(identifier.joinToString(".") { it.value }) }
-                .filter { it is IR.JFMethod }
-                .map { it as IR.JFMethod }
-                .filter { it.precedence > minPrecedence }
-                .map {
-                    newPrecedence = it.precedence - if (it.associativity == INFIXR) 1 else 0
-                    it
-                },
-            PrattParser(minPrecedence = newPrecedence),
-        ) { m, a -> methodInvocation(m, lhsArguments + listOf(a)) }
+    ): Parser<Char, ASTNode.Expression> = combi {
+        val complexIdentifier = (complexIdentifier and owsnl).bind()
+        val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+        if (method is IR.JFMethod) {
+            val newPrecedence = when {
+                method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
+                else -> 0
+            }
+            val argument = PrattParser(minPrecedence = newPrecedence).bind()
+            methodInvocation(method, lhsExpression.asList() + listOf(argument))
+        } else {
+            fail("Method ($complexIdentifier) not found")
+        }
     }
 
-    class MethodParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) : Parser<Token, ASTNode.Expression> {
-        override fun applyImpl(context: ParserSource<Token>): Parser.Result<ASTNode.Expression> =
-            when (val identifier = complexIdentifier.apply(context)) {
+    class MethodParser(val lhsExpression: ASTNode.Expression?, val minPrecedence: Int) :
+        Parser<Char, ASTNode.Expression> {
+        override fun applyImpl(context: ParserSource<Char>): Parser.Result<ASTNode.Expression> =
+            when (val identifier = (complexIdentifier and ows).apply(context)) {
                 is Success ->
                     when (
                         val methodVariable =
@@ -377,15 +383,17 @@ object ParserJafun {
                                 context,
                                 minPrecedence,
                             )
+
                         else -> Parser.Failure("Method expected")
                     }
+
                 else -> Parser.Failure("Identifier expected")
             }
 
         private fun method(
             methodVariable: IR.JFMethod,
             lhsExpression: ASTNode.Expression?,
-            context: ParserSource<Token>,
+            context: ParserSource<Char>,
             minPrecedence: Int,
         ): Parser.Result<ASTNode.Expression> {
             val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
@@ -404,10 +412,10 @@ object ParserJafun {
                     }
 
                     return (
-                        PrattParser(minPrecedence = newPrecedence).map { rhs ->
-                            methodInvocation(methodVariable, lhsArguments + listOf(rhs))
-                        }
-                    ).apply(context)
+                            PrattParser(minPrecedence = newPrecedence).map { rhs ->
+                                methodInvocation(methodVariable, lhsArguments + listOf(rhs))
+                            }
+                            ).apply(context)
                 }
             }
         }
