@@ -1,14 +1,12 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import jafun.compiler.Associativity
-import jafun.compiler.HasPath
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Token
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.text.CharSequenceSource
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -20,7 +18,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "==4",
             listOf(Token.Identifier("==", true)),
-            2
+            2,
         )
     }
 
@@ -30,10 +28,9 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "<=>4",
             listOf(Token.Identifier("<=>", true)),
-            3
+            3,
         )
     }
-
 
     @Test
     fun `Simple Identifier`() {
@@ -41,7 +38,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "println()",
             listOf(Token.Identifier("println", false)),
-            7
+            7,
         )
     }
 
@@ -69,7 +66,7 @@ class SimpleParserTest {
             ParserJafun.variableIdentifier,
             "abcd+3",
             ASTNode.Variable(varSymbol),
-            4
+            4,
         )
     }
 
@@ -80,8 +77,8 @@ class SimpleParserTest {
         testSingleParserFailed(
             ParserJafun.variableIdentifier,
             "bcd+3",
-            "no variable identifier",
-            0
+            "Combinator failed, parser number 1 with error: no variable identifier",
+            0,
         )
     }
 
@@ -91,7 +88,7 @@ class SimpleParserTest {
             ParserJafun.curlBlock,
             "{}",
             ASTNode.ExpressionList(emptyList(), true),
-            2
+            2,
         )
     }
 
@@ -103,7 +100,7 @@ class SimpleParserTest {
                |}
             """,
             ASTNode.ExpressionList(emptyList(), true),
-            5
+            5,
         )
     }
 
@@ -113,7 +110,7 @@ class SimpleParserTest {
             ParserJafun.initValAssignment,
             """|val abc=5""".trimMargin(),
             ASTNode.ValAssignment(IR.JFVariableSymbol("abc", IR.SInt32, ParserJafun.currentSymbolMap), ASTNode.IntegerLiteral(5)),
-            9
+            9,
         )
     }
 
@@ -123,9 +120,10 @@ class SimpleParserTest {
             ParserJafun.initValAssignment,
             """|val 
                |abc = 
-               |5""".trimMargin(),
+               |5
+            """.trimMargin(),
             ASTNode.ValAssignment(IR.JFVariableSymbol("abc", IR.SInt32, ParserJafun.currentSymbolMap), ASTNode.IntegerLiteral(5)),
-            13
+            13,
         )
     }
 
@@ -135,7 +133,7 @@ class SimpleParserTest {
             ParserJafun.functionDefinition,
             """|fun test(){ }""".trimMargin(),
             ParserJafun.FunctionDef(Token.Identifier("test"), emptyList(), null),
-            10
+            10,
         )
     }
 
@@ -144,8 +142,11 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.function,
             """|fun test(){}""".trimMargin(),
-            ASTNode.Function(IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10), emptyList()),
-            12
+            ASTNode.Function(
+                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10),
+                emptyList(),
+            ),
+            12,
         )
     }
 
@@ -158,12 +159,15 @@ class SimpleParserTest {
                 |( 
                 |) 
                 |{ 
-                |}""".trimMargin(),
-            ASTNode.Function(IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10), emptyList()),
-            21
+                |}
+            """.trimMargin(),
+            ASTNode.Function(
+                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10),
+                emptyList(),
+            ),
+            21,
         )
     }
-
 
     private fun <R> testSingleParser(
         parser: Parser<Char, R>,
@@ -171,7 +175,7 @@ class SimpleParserTest {
         expected: R,
         afterIndex: Int = 1,
     ) {
-        //val lexed = lexer.parse(input).filter { it !is Token.WS }
+        // val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = CharSequenceSource(input.trimMargin())
         val parsed = parser.apply(source)
         if (parsed is Parser.Failure) {
@@ -191,7 +195,7 @@ class SimpleParserTest {
         expected: String,
         afterIndex: Int = 1,
     ) {
-        //val lexed = lexer.parse(input).filter { it !is Token.WS }
+        // val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = CharSequenceSource(input)
         val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
         assertEquals(
@@ -200,5 +204,4 @@ class SimpleParserTest {
         )
         assertEquals(source.index, afterIndex)
     }
-
 }

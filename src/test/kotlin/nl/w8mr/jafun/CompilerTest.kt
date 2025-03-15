@@ -290,7 +290,6 @@ class CompilerTest {
         }
     }
 
-
     @Test
     fun assignmentSimple() {
         test(
@@ -409,8 +408,6 @@ class CompilerTest {
             }
         }
     }
-
-
 
     @Test
     fun plus() {
@@ -1053,7 +1050,6 @@ class CompilerTest {
         }
     }
 
-
     @Test
     fun basicEquality() {
         test(
@@ -1072,7 +1068,6 @@ class CompilerTest {
             }
         }
     }
-
 
     @Test
     fun basicWhen() {

@@ -83,7 +83,6 @@ class AstParserTest {
         )
     }
 
-
     @Test
     fun assignment() {
         test(
