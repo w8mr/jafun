@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    implementation("nl.w8mr.parsek:core:0.1.0")
+    implementation("nl.w8mr.parsek:core:0.1.1")
     implementation(project(":kasmine"))
     implementation(kotlin("reflect"))
     testImplementation(kotlin("test"))

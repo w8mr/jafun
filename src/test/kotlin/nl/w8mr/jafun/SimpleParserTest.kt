@@ -87,7 +87,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.curlBlock,
             "{}",
-            ASTNode.ExpressionList(emptyList(), true),
+            ASTNode.ExpressionList(emptyList()),
             2,
         )
     }
@@ -99,7 +99,7 @@ class SimpleParserTest {
             """|{  
                |}
             """,
-            ASTNode.ExpressionList(emptyList(), true),
+            ASTNode.ExpressionList(emptyList()),
             5,
         )
     }

@@ -9,6 +9,9 @@ sealed interface ASTNode {
         returnValue: Boolean = true,
     )
 
+    fun tree(indent: Int = 0): String =
+        "${" ".repeat(indent)}${this}"
+
     abstract class Expression : ASTNode {
         abstract fun type(): IR.OperandType<*>
 
@@ -27,6 +30,8 @@ sealed interface ASTNode {
         ) {
             builder.loadConstant(value, IR.StringType)
         }
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}StringLiteral(\"${value}\")"
     }
 
     data class IntegerLiteral(val value: Int) : Expression() {
@@ -38,6 +43,9 @@ sealed interface ASTNode {
         }
 
         override fun type() = IR.SInt32
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Int32Literal(${value})"
+
     }
 
     data class BooleanLiteral(val value: Boolean) : Expression() {
@@ -51,26 +59,29 @@ sealed interface ASTNode {
         override fun type() = IR.UInt1
     }
 
-    data class ExpressionList(val expressions: List<Expression>, val singleValue: Boolean = false) : Expression() {
+    data class ExpressionList(val expressions: List<Expression>) : Expression() {
         override fun type() = expressions.lastOrNull()?.type() ?: IR.Unit
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
             returnValue: Boolean,
         ) {
-            if (singleValue) {
-                val lastIndex = expressions.size - 1
-                expressions.forEachIndexed { index, statement ->
-                    if (returnValue && (lastIndex == index)) {
-                        compileAsExpression(statement, builder)
-                    } else {
-                        compileAsStatement(statement, builder)
-                    }
+            val lastIndex = expressions.size - 1
+            expressions.forEachIndexed { index, statement ->
+                if (returnValue && (lastIndex == index)) {
+                    compileAsExpression(statement, builder)
+                } else {
+                    compileAsStatement(statement, builder)
                 }
-            } else {
-                expressions.forEach { expression -> compileAsExpression(expression, builder) }
             }
         }
+
+        override fun tree(indent: Int): String = StringBuilder().apply {
+            append(expressions.map {
+                it.tree(indent+2)
+            }.joinToString("\n"))
+        }.toString()
+
     }
 
     data class Invocation(val method: IR.JFMethod, val field: IR.JFField?, val arguments: List<Expression>) : Expression() {
@@ -103,6 +114,15 @@ sealed interface ASTNode {
         }
 
         override fun type() = method.rtn
+
+        override fun tree(indent: Int): String = StringBuilder().apply {
+            append("${" ".repeat(indent)}${field?.name?:""}${method.name}(\n")
+            append(arguments.map {
+                it.tree(indent+2)
+
+            }.joinToString(",\n"))
+            append("\n${" ".repeat(indent)}): ${method.rtn}")
+        }.toString()
     }
 
     data class When(val subject: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
@@ -167,6 +187,19 @@ sealed interface ASTNode {
                 )
             } ?: compileAsExpression(condition, builder)
         }
+
+        override fun tree(indent: Int): String = StringBuilder().apply {
+            append("${" ".repeat(indent)}when")
+            if (subject != null) {
+                append("(${subject.tree()})")
+            }
+            append(" {\n")
+            append(matches.map {
+                (condition, code) -> "${condition.tree(indent+2)} -> ${code.tree()}"
+            }.joinToString("\n"))
+            append("\n${" ".repeat(indent)}}")
+        }.toString()
+
     }
 
     data class ValAssignment(val variableSymbol: IR.JFVariableSymbol, val expression: Expression) : Expression() {
@@ -184,6 +217,10 @@ sealed interface ASTNode {
                 this.variableSymbol.type,
             )
         }
+
+        override fun tree(indent: Int): String =
+            """|${" ".repeat(indent)}val ${variableSymbol.name}: ${variableSymbol.type} = 
+               |${expression.tree(indent+2)}""".trimMargin()
     }
 
     data class Variable(val variableSymbol: IR.JFVariableSymbol) : Expression() {
@@ -195,6 +232,9 @@ sealed interface ASTNode {
         }
 
         override fun type() = variableSymbol.type
+
+        override fun tree(indent: Int): String =
+            """|${" ".repeat(indent)}${variableSymbol.name}: ${variableSymbol.type}""".trimMargin()
     }
 
     data class Function(val symbol: IR.JFMethod, val block: List<Expression>) : Expression() {
@@ -212,6 +252,19 @@ sealed interface ASTNode {
                 symbol.parameters.map(IR.JFVariableSymbol::type),
             )
         }
+
+        override fun tree(indent: Int): String = StringBuilder().apply {
+            append("${" ".repeat(indent)}fun ${symbol}(\n")
+            append(symbol.parameters.map {
+                "${" ".repeat(indent+2)}${it.name}: ${it.type}"
+            }.joinToString(",\n"))
+            append("\n${" ".repeat(indent)}): ${symbol.rtn} {\n")
+            append(block.map {
+                it.tree(indent+2)
+            }.joinToString("\n"))
+            append("\n}")
+        }.toString()
+
     }
 
     data class MethodIdentifier(val method: IR.JFMethod, val field: IR.JFField?) : Expression() {

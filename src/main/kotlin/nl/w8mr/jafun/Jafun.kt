@@ -15,7 +15,7 @@ fun compile(
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val parsed = ParserJafun.parse(code)
-    println("PARSED: ${parsed.joinToString("\n\n")}")
+    println("PARSED: \n${parsed.map { it.tree() }.joinToString("\n\n")}")
     println()
     return compile(parsed, className, methodName, returnType, parameterTypes)
 }

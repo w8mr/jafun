@@ -174,7 +174,7 @@ object ParserJafun {
             val expressions = expressions.bind()
             -blockClose
             popSymbolMap()
-            ASTNode.ExpressionList(expressions, true)
+            ASTNode.ExpressionList(expressions)
         }
 
     val initValAssignment =

@@ -19,17 +19,17 @@ class IR {
         fun operand() = this.operand1
     }
 
-    object StringType : OperandType<String>
+    object StringType : OperandType<String> { override fun toString() = "StringType" }
 
     open class Reference<T>(val type: String) : OperandType<T>
 
     class Array<T>(val type: OperandType<T>) : OperandType<T>
 
-    object SInt32 : OperandType<Int>
+    object SInt32 : OperandType<Int> { override fun toString() = "Int32Type" }
 
-    object UInt1 : OperandType<Boolean>
+    object UInt1 : OperandType<Boolean> { override fun toString() = "BooleanType" }
 
-    object Unit : Reference<jafun.Unit>("jafun.Unit")
+    object Unit : Reference<jafun.Unit>("jafun.Unit") { override fun toString() = "UnitType" }
 
     data class LoadConstant<J, T : OperandType<J>>(override val operand1: J, override val type: T) : OneOperand<J, T>
 
@@ -51,9 +51,9 @@ class IR {
 
     data class Goto(val block: IRBuilder.CodeBlock) : Instruction
 
-    data class JFClass(override val path: String) : OperandType<Any?>, HasPath
+    data class JFClass(override val path: String) : OperandType<Any?>, HasPath { override fun toString() = path }
 
-    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath
+    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath { override fun toString() = path }
 
     data class JFMethod(
         val parameters: List<JFVariableSymbol>,
@@ -64,7 +64,10 @@ class IR {
         val operator: Boolean = false,
         val associativity: Associativity = Associativity.PREFIX,
         val precedence: Int = 10,
-    ) : OperandType<Any?>
+    ) : OperandType<Any?> {
+        override fun toString(): String = "${parent}.${name}"
+
+    }
 
     data class JFVariableSymbol(
         val name: String,
