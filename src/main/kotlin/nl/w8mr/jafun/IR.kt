@@ -51,9 +51,9 @@ class IR {
 
     data class Goto(val block: IRBuilder.CodeBlock) : Instruction
 
-    data class JFClass(override val path: String) : OperandType<Any?>, HasPath { override fun toString() = path }
+    data class JFClass(override val path: String) : OperandType<Any?>, HasPath
 
-    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath { override fun toString() = path }
+    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath
 
     data class JFMethod(
         val parameters: List<JFVariableSymbol>,
@@ -64,10 +64,7 @@ class IR {
         val operator: Boolean = false,
         val associativity: Associativity = Associativity.PREFIX,
         val precedence: Int = 10,
-    ) : OperandType<Any?> {
-        override fun toString(): String = "${parent}.${name}"
-
-    }
+    ) : OperandType<Any?>
 
     data class JFVariableSymbol(
         val name: String,

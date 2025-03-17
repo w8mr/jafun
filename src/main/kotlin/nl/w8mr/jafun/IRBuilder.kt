@@ -1,5 +1,7 @@
 package nl.w8mr.jafun
 
+import java.util.UUID
+
 object IRBuilder {
     fun define(init: BuilderDSL.() -> Unit): BuilderContext {
         val builderContext = BuilderContext()
@@ -9,7 +11,11 @@ object IRBuilder {
 
     data class BuilderContext(val classes: MutableMap<String, ClassContext> = mutableMapOf())
 
-    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext)
+    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext) {
+//        override fun toString(): String {
+//            return this.copy(parent = BuilderContext()).toString()
+//        }
+    }
 
     data class MethodContext(
         val name: String,
@@ -19,7 +25,7 @@ object IRBuilder {
         val parent: ClassContext,
     )
 
-    data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext) {
+    data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext, val uuid: UUID = UUID.randomUUID()) {
         val byteSize: Int by lazy {
             instructions.sumOf(::byteSize)
         }
