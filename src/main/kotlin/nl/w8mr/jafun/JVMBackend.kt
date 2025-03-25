@@ -10,77 +10,80 @@ class JVMBackend {
             instruction: IR.Instruction,
             index: Int,
             codeBlocks: MutableList<IRBuilder.CodeBlock>,
-        ) = when (instruction) {
-            is IR.LoadConstant<*, *> ->
-                when (instruction.type) {
-                    is IR.StringType -> method.loadConstant(instruction.type.operand1(instruction))
-                    is IR.SInt32 -> method.loadConstant(instruction.type.operand1(instruction))
-                    is IR.UInt1 ->
-                        method.loadConstant(
-                            when (instruction.type.operand1(instruction)) {
-                                false -> 0
-                                true -> 1
-                            },
-                        )
+        ) = with(method) {
+            when (instruction) {
+                is IR.LoadConstant<*, *> ->
+                    when (instruction.type) {
+                        is IR.StringType -> loadConstant(instruction.type.operand1(instruction))
+                        is IR.SInt32 -> loadConstant(instruction.type.operand1(instruction))
+                        is IR.UInt1 ->
+                            loadConstant(
+                                when (instruction.type.operand1(instruction)) {
+                                    false -> 0
+                                    true -> 1
+                                },
+                            )
 
-                    is IR.Reference -> TODO()
-                    is IR.Array -> TODO()
-                    is IR.JFClass -> TODO()
-                    is IR.JFMethod -> TODO()
-                    is IR.JFVariableSymbol -> TODO()
-                }
-            is IR.Invoke -> {
-                with(method) {
-                    val methodClassName = instruction.method.parent.path
-                    val methodSignature =
-                        "(${instruction.method.parameters.map { signature(it.type) }.joinToString("")})" +
-                            "${signature(instruction.method.rtn)}"
-                    when (instruction.field) {
-                        null -> invokeStatic(methodClassName, instruction.method.name, methodSignature)
-                        else -> invokeVirtual(methodClassName, instruction.method.name, methodSignature)
+                        is IR.Reference -> TODO()
+                        is IR.Array -> TODO()
+                        is IR.JFClass -> TODO()
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
+                    }
+                is IR.Invoke -> {
+                    with(method) {
+                        val methodClassName = instruction.method.parent.path
+                        val methodSignature =
+                            "(${instruction.method.parameters.map { signature(it.type) }.joinToString("")})" +
+                                    "${signature(instruction.method.rtn)}"
+                        when (instruction.field) {
+                            null -> invokeStatic(methodClassName, instruction.method.name, methodSignature)
+                            else -> invokeVirtual(methodClassName, instruction.method.name, methodSignature)
+                        }
                     }
                 }
-            }
-            is IR.Pop -> method.pop()
-            is IR.Dup -> method.dup()
-            is IR.Store<*> ->
-                when (instruction.type) {
-                    is IR.Reference -> method.astore(instruction.registerName)
-                    is IR.SInt32 -> method.istore(instruction.registerName)
-                    is IR.StringType -> method.astore(instruction.registerName)
-                    is IR.UInt1 -> method.istore(instruction.registerName)
-                    is IR.Array -> TODO()
-                    is IR.JFClass -> method.astore(instruction.registerName)
-                    is IR.JFMethod -> TODO()
-                    is IR.JFVariableSymbol -> TODO()
-                }
-            is IR.Load<*> ->
-                when (instruction.type) {
-                    is IR.Reference -> method.aload(instruction.registerName)
-                    is IR.SInt32 -> method.iload(instruction.registerName)
-                    is IR.StringType -> method.aload(instruction.registerName)
-                    is IR.UInt1 -> method.iload(instruction.registerName)
-                    is IR.Array -> TODO()
-                    is IR.JFClass -> method.aload(instruction.registerName)
-                    is IR.JFMethod -> TODO()
-                    is IR.JFVariableSymbol -> TODO()
-                }
-            is IR.Return<*> ->
-                when (instruction.type) {
-                    is IR.Unit -> method.`return`() // TODO: check how to handle unit.
-                    is IR.Reference -> method.areturn()
-                    is IR.SInt32 -> method.ireturn()
-                    is IR.StringType -> method.areturn()
-                    is IR.UInt1 -> method.ireturn()
-                    is IR.Array -> TODO()
-                    is IR.JFClass -> method.areturn()
-                    is IR.JFMethod -> TODO()
-                    is IR.JFVariableSymbol -> TODO()
-                }
+                is IR.Pop -> pop()
+                is IR.Dup -> dup()
+                is IR.Store<*> ->
+                    when (instruction.type) {
+                        is IR.Reference -> astore(instruction.registerName)
+                        is IR.SInt32 -> istore(instruction.registerName)
+                        is IR.StringType -> astore(instruction.registerName)
+                        is IR.UInt1 -> istore(instruction.registerName)
+                        is IR.Array -> TODO()
+                        is IR.JFClass -> astore(instruction.registerName)
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
+                    }
+                is IR.Load<*> ->
+                    when (instruction.type) {
+                        is IR.Reference -> aload(instruction.registerName)
+                        is IR.SInt32 -> iload(instruction.registerName)
+                        is IR.StringType -> aload(instruction.registerName)
+                        is IR.UInt1 -> iload(instruction.registerName)
+                        is IR.Array -> TODO()
+                        is IR.JFClass -> aload(instruction.registerName)
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
+                    }
+                is IR.Return<*> ->
+                    when (instruction.type) {
+                        is IR.Unit -> `return`() // TODO: check how to handle unit.
+                        is IR.Reference -> areturn()
+                        is IR.SInt32 -> ireturn()
+                        is IR.StringType -> areturn()
+                        is IR.UInt1 -> ireturn()
+                        is IR.Array -> TODO()
+                        is IR.JFClass -> areturn()
+                        is IR.JFMethod -> TODO()
+                        is IR.JFVariableSymbol -> TODO()
+                    }
 
-            is IR.GetStatic -> method.getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
-            is IR.IfFalse -> method.ifequal(calculateJump(codeBlocks, index, instruction.block))
-            is IR.Goto -> method.goto(calculateJump(codeBlocks, index, instruction.block))
+                is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
+                is IR.IfFalse -> ifequal(calculateJump(codeBlocks, index, instruction.block))
+                is IR.Goto -> goto(calculateJump(codeBlocks, index, instruction.block))
+                is IR.When -> TODO()
+            }
         }
 
         private fun calculateJump(
@@ -102,25 +105,19 @@ fun compileJVM(
 fun buildClass(
     className: String,
     builder: IRBuilder.BuilderContext
-): ClassBuilder {
-    val clazz =
-        classBuilder {
-            name = className
-            builder.classes[className]?.let {
-                it.methods.forEach { method ->
-                    method {
-                        name = method.name
-                        signature = "(${method.parameterTypes.map(::signature).joinToString(separator = "")})" +
-                                "${signature(method.returnType)}"
-                        method.codeBlocks.forEachIndexed { index, codeBlock ->
-                            val context = JVMBackend.Context(this)
-                            codeBlock.instructions.forEach { context.compile(it, index, method.codeBlocks) }
-                        }
-                    }
-                }
+): ClassBuilder = classBuilder {
+    name = className
+    builder.classes[className]?.methods?.forEach { m ->
+        method {
+            name = m.name
+            signature = "(${m.parameterTypes.map(::signature).joinToString(separator = "")})" +
+                    "${signature(m.returnType)}"
+            m.codeBlocks.forEachIndexed { index, codeBlock ->
+                val context = JVMBackend.Context(this)
+                codeBlock.instructions.forEach { context.compile(it, index, m.codeBlocks) }
             }
         }
-    return clazz
+    }
 }
 
 fun signature(type: IR.OperandType<*>): String =

@@ -9,6 +9,7 @@ sealed interface ASTNode {
         returnValue: Boolean = true,
     )
 
+    //TODO: extract to separate Printer class
     fun tree(indent: Int = 0): String =
         "${" ".repeat(indent)}${this}"
 

@@ -15,6 +15,7 @@ import nl.w8mr.kasmine.ConstantPoolType.ConstantString
 import nl.w8mr.kasmine.ConstantPoolType.FieldRef
 import nl.w8mr.kasmine.ConstantPoolType.MethodRef
 import nl.w8mr.kasmine.ConstantPoolType.UTF8String
+import nl.w8mr.kasmine.InstructionBlock
 import nl.w8mr.kasmine.MethodDef
 import nl.w8mr.kasmine.Opcode
 
@@ -116,6 +117,6 @@ fun Indenter.print(any: Any) = when (any) {
     is Short, is UShort -> -any
     is MethodRef -> print(any)
     is FieldRef -> print(any)
-
+    is InstructionBlock -> any.instructions.forEach { print(it) }
     else -> TODO("Implement for ${any.javaClass.simpleName}")
 }
