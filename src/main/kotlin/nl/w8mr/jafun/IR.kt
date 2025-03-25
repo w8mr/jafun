@@ -51,6 +51,13 @@ class IR {
 
     data class Goto(val block: IRBuilder.CodeBlock) : Instruction
 
+    data class When(val cases: List<WhenCase>) {
+        sealed interface WhenCase
+        data class WhenConditionCase(val condition: IR.Instruction, val execution: IR.Instruction): WhenCase
+        data class WhenElseCase(val execution: IR.Instruction): WhenCase
+
+    }
+
     data class JFClass(override val path: String) : OperandType<Any?>, HasPath
 
     data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath

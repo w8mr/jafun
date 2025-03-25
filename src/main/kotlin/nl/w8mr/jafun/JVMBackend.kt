@@ -95,6 +95,14 @@ fun compileJVM(
     className: String,
     builder: IRBuilder.BuilderContext,
 ): ByteArray {
+    val clazz = buildClass(className, builder)
+    return clazz.write()
+}
+
+fun buildClass(
+    className: String,
+    builder: IRBuilder.BuilderContext
+): ClassBuilder {
     val clazz =
         classBuilder {
             name = className
@@ -103,7 +111,7 @@ fun compileJVM(
                     method {
                         name = method.name
                         signature = "(${method.parameterTypes.map(::signature).joinToString(separator = "")})" +
-                            "${signature(method.returnType)}"
+                                "${signature(method.returnType)}"
                         method.codeBlocks.forEachIndexed { index, codeBlock ->
                             val context = JVMBackend.Context(this)
                             codeBlock.instructions.forEach { context.compile(it, index, method.codeBlocks) }
@@ -112,8 +120,7 @@ fun compileJVM(
                 }
             }
         }
-
-    return clazz.write()
+    return clazz
 }
 
 fun signature(type: IR.OperandType<*>): String =

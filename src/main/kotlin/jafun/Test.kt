@@ -1,5 +1,7 @@
 package jafun
 
+import kotlin.random.Random
+
 /*import kotlinx.coroutines.delay
 
 data class Employee(val name: String, val age: Int, val salary: Int)
@@ -131,9 +133,13 @@ fun main(args: Array<String>) {
 }
 
 fun whenTest(a: Int) {
+    val a: Int = Random.nextInt(a)
     println(
-        when (a) {
-            1 -> "true"
+
+        when  {
+            a==1 -> "true"
+            a==2 -> "false"
+            3==2 -> "true"
             else -> "false"
         },
     )
