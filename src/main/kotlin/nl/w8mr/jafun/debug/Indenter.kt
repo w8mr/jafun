@@ -3,20 +3,20 @@ package nl.w8mr.jafun.debug
 class Indenter(val size: Int = 2) {
     val buffer = StringBuilder()
 
-    fun writeln(text: Any = "") {
+    inline fun writeln(text: Any = "") {
         buffer.append(text.toString())
         buffer.append("\n")
     }
 
-    fun write(text: Any = "") {
+    inline fun write(text: Any = "") {
         buffer.append(text.toString())
     }
 
-    operator fun Any.unaryPlus() {
+    inline operator fun Any.unaryPlus() {
         writeln(this)
     }
 
-    operator fun Any.unaryMinus() {
+    inline operator fun Any.unaryMinus() {
         write(this)
     }
 

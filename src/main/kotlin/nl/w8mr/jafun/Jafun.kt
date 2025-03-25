@@ -1,6 +1,7 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.debug.IRPrintTree
+import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.DynamicClassLoader
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -52,7 +53,9 @@ fun testBytes(
         }
 
     println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
-    val bytes = compileJVM(className, builder)
+    val clazz = buildClass(className, builder)
+    println("Bytecode: \n${clazz.classDef.print()}")
+    val bytes = clazz.write()
 
     writeFile(className, bytes)
     val oldOut = System.out

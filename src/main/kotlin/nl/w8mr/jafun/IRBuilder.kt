@@ -11,11 +11,7 @@ object IRBuilder {
 
     data class BuilderContext(val classes: MutableMap<String, ClassContext> = mutableMapOf())
 
-    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext) {
-//        override fun toString(): String {
-//            return this.copy(parent = BuilderContext()).toString()
-//        }
-    }
+    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext)
 
     data class MethodContext(
         val name: String,
