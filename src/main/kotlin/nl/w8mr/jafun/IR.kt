@@ -73,6 +73,7 @@ class IR {
         val name: String,
         val type: OperandType<*>,
         val symbolMap: SymbolMap = IdentifierCache,
+        val mutable: Boolean = false
     ) : OperandType<Any?> {
         override fun equals(other: Any?): Boolean =
             when (other) {

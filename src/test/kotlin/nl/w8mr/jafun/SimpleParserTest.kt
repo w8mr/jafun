@@ -1,6 +1,8 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import jafun.compiler.Associativity
+import jafun.compiler.IdentifierCache
+import jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
@@ -128,6 +130,34 @@ class SimpleParserTest {
     }
 
     @Test
+    fun `var assignment whitespace`() {
+        testSingleParser(
+            ParserJafun.initVarAssignment,
+            """|var 
+               |abc = 
+               |5
+            """.trimMargin(),
+            ASTNode.VarAssignment(IR.JFVariableSymbol("abc", IR.SInt32, ParserJafun.currentSymbolMap, true), ASTNode.IntegerLiteral(5)),
+            13,
+        )
+    }
+
+    @Test
+    fun `var re-assignment whitespace`() {
+        val varSymbol = IR.JFVariableSymbol("abc", IR.SInt32, ParserJafun.currentSymbolMap, true)
+        ParserJafun.currentSymbolMap.add("abc", varSymbol)
+        testSingleParser(
+            ParserJafun.varAssignment,
+            """|abc = 
+               |5
+            """.trimMargin(),
+            ASTNode.VarAssignment(IR.JFVariableSymbol("abc", IR.SInt32, ParserJafun.currentSymbolMap, true), ASTNode.IntegerLiteral(5)),
+            8,
+        )
+    }
+
+
+    @Test
     fun `empty function definition compact`() {
         testSingleParser(
             ParserJafun.functionDefinition,
@@ -178,6 +208,7 @@ class SimpleParserTest {
         // val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = CharSequenceSource(input.trimMargin())
         val parsed = parser.apply(source)
+        ParserJafun.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
         if (parsed is Parser.Failure) {
             println("Tree: \n${parser.parseTree(source).second}")
         }
@@ -187,6 +218,7 @@ class SimpleParserTest {
             success,
         )
         assertEquals(source.index, afterIndex)
+
     }
 
     private fun <R> testSingleParserFailed(
@@ -197,7 +229,9 @@ class SimpleParserTest {
     ) {
         // val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = CharSequenceSource(input)
+
         val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
+        ParserJafun.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
         assertEquals(
             expected,
             failureMessage,

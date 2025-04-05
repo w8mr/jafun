@@ -35,14 +35,41 @@ import nl.w8mr.parsek.zeroOrMore
 import kotlin.collections.last
 
 object ParserJafun {
-    private fun assignment(
+    private fun valAssignment(
         identifier: Identifier,
-        expression: ASTNode.Expression,
+        expression: ASTNode.Expression
     ): ASTNode.ValAssignment {
-        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap)
+        if (identifier.value in currentSymbolMap) {
+            throw IllegalStateException("Variable ${identifier.value} already defined")
+        }
+        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, false)
         currentSymbolMap.add(identifier.value, variableSymbol)
         return ASTNode.ValAssignment(variableSymbol, expression)
     }
+
+    private fun varAssignment(
+        identifier: Identifier,
+        expression: ASTNode.Expression
+    ): ASTNode.VarAssignment {
+        if (identifier.value in currentSymbolMap) {
+            throw IllegalStateException("Variable ${identifier.value} already defined")
+        }
+        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, true)
+        currentSymbolMap.add(identifier.value, variableSymbol)
+        return ASTNode.VarAssignment(variableSymbol, expression)
+    }
+
+    private fun varReassignment(
+        identifier: Identifier,
+        expression: ASTNode.Expression
+    ): ASTNode.VarAssignment {
+        val variableSymbol = currentSymbolMap.find(identifier.value) as? IR.JFVariableSymbol ?: throw IllegalStateException("Variable ${identifier.value} not defined")
+        if (!variableSymbol.mutable) {
+            throw IllegalStateException("Variable ${identifier.value} is not mutable")
+        }
+        return ASTNode.VarAssignment(variableSymbol, expression)
+    }
+
 
     private fun newParameterDef(
         identifier: Identifier,
@@ -52,7 +79,7 @@ object ParserJafun {
             IR.JFVariableSymbol(
                 identifier.value,
                 type = currentSymbolMap.find(type.last().value) ?: throw IllegalStateException(),
-                currentSymbolMap,
+                currentSymbolMap
             ) // TODO: handle complex types
         currentSymbolMap.add(identifier.value, variableSymbol)
 
@@ -186,7 +213,30 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            assignment(identifier, expression)
+            valAssignment(identifier, expression)
+        }
+
+    val initVarAssignment =
+        combi {
+            -("var" and wsnl)
+            val identifier = identifier.bind()
+            -owsnl
+            -literal('=')
+            -owsnl
+            val expression = expressionUntilNewline.bind()
+
+            varAssignment(identifier, expression)
+        }
+
+    val varAssignment =
+        combi {
+            val identifier = identifier.bind()
+            -owsnl
+            -literal('=')
+            -owsnl
+            val expression = expressionUntilNewline.bind()
+
+            varReassignment(identifier, expression)
         }
 
     val whenExpression =
@@ -251,6 +301,8 @@ object ParserJafun {
                 (
                     oneOf(
                         initValAssignment,
+                        initVarAssignment,
+                        varAssignment,
                         whenExpression,
                         integerLiteral_term,
                         stringLiteral_term,

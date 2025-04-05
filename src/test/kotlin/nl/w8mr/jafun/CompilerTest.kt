@@ -360,6 +360,49 @@ class CompilerTest {
     }
 
     @Test
+    fun valReassignment() {
+        try {
+            test(
+                """
+                val i = 1
+                i = 2
+                println i""",
+                "2\n",
+            )
+        } catch (e: IllegalStateException) {
+            assertEquals("Variable i is not mutable", e.message)
+        }
+    }
+
+    @Test
+    fun reassignment() {
+        test(
+            """
+            var i = 1
+            i = 2
+            println i""",
+            "2\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                istore("i")
+                loadConstant(2)
+                istore("i")
+                iload("i")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
+
+
+
+    @Test
     fun inlineAssign() {
         test(
             """

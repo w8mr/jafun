@@ -15,6 +15,8 @@ annotation class FunctionPrecedence(val precedence: Int)
 interface SymbolMap {
     fun find(path: String): IR.OperandType<*>?
 
+    operator fun contains(path: String): Boolean
+
     fun add(
         path: String,
         typeSig: IR.OperandType<*>,
@@ -34,6 +36,7 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
     private val identifierMap = mutableMapOf<String, IR.OperandType<*>?>()
 
     override fun find(path: String): IR.OperandType<*>? = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
+    override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
 
     override fun add(
         path: String,
@@ -145,6 +148,8 @@ object IdentifierCache : SymbolMap {
             }
         }
     }
+    override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
+
 
     override fun add(
         path: String,

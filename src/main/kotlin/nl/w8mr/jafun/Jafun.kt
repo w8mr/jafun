@@ -1,5 +1,8 @@
 package nl.w8mr.jafun
 
+import jafun.compiler.IdentifierCache
+import jafun.compiler.LocalSymbolMap
+import nl.w8mr.jafun.ParserJafun.currentSymbolMap
 import nl.w8mr.jafun.debug.IRPrintTree
 import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.DynamicClassLoader
@@ -16,7 +19,7 @@ fun compile(
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val parsed = ParserJafun.parse(code)
-    println("PARSED: \n${parsed.map { it.tree() }.joinToString("\n\n")}")
+    println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
     println()
     return compile(parsed, className, methodName, returnType, parameterTypes)
 }
@@ -34,7 +37,7 @@ fun test(
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ) = testBytes(code, className, methodName, returnType, parameterTypes).first
 
-fun testBytes(
+fun     testBytes(
     code: String,
     className: String = "Script",
     methodName: String = "main",
@@ -43,8 +46,9 @@ fun testBytes(
 ): Pair<String, ByteArray> {
 
     val parsed = ParserJafun.parse(code)
-    println("PARSED: \n${parsed.map { it.tree() }.joinToString("\n\n")}")
+    println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
     println()
+    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
     val builder =
         IRBuilder.define {
             `class`(className) {
@@ -101,6 +105,7 @@ fun compile(
     returnType: IR.OperandType<*> = IR.Unit,
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
+    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
     val builder =
         IRBuilder.define {
             `class`(className) {
@@ -118,6 +123,7 @@ fun compileMethod(
     returnType: IR.OperandType<*>,
     parameterTypes: List<IR.OperandType<*>>,
 ) {
+
     with(builder) {
         method(methodName, returnType, parameterTypes) {
             codeBlock {

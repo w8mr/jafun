@@ -226,6 +226,28 @@ sealed interface ASTNode {
                |${expression.tree(indent+2)}""".trimMargin()
     }
 
+    data class VarAssignment(val variableSymbol: IR.JFVariableSymbol, val expression: Expression) : Expression() {
+        override fun type() = expression.type()
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            compileAsExpression(expression, builder)
+            if (returnValue) builder.dup()
+
+            builder.store(
+                "${variableSymbol.symbolMap.symbolMapId}.${variableSymbol.name}",
+                this.variableSymbol.type,
+            )
+        }
+
+        override fun tree(indent: Int): String =
+            """|${" ".repeat(indent)}var ${variableSymbol.name}: ${variableSymbol.type} = 
+               |${expression.tree(indent+2)}""".trimMargin()
+    }
+
+
     data class Variable(val variableSymbol: IR.JFVariableSymbol) : Expression() {
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
