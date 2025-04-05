@@ -78,9 +78,9 @@ sealed interface ASTNode {
         }
 
         override fun tree(indent: Int): String = StringBuilder().apply {
-            append(expressions.joinToString("\n") {
-                it.tree(indent + 2)
-            })
+            append(expressions.map {
+                it.tree(indent+2)
+            }.joinToString("\n"))
         }.toString()
 
     }
@@ -118,10 +118,10 @@ sealed interface ASTNode {
 
         override fun tree(indent: Int): String = StringBuilder().apply {
             append("${" ".repeat(indent)}${field?.name?:""}${method.name}(\n")
-            append(arguments.joinToString(",\n") {
-                it.tree(indent + 2)
+            append(arguments.map {
+                it.tree(indent+2)
 
-            })
+            }.joinToString(",\n"))
             append("\n${" ".repeat(indent)}): ${method.rtn}")
         }.toString()
     }
@@ -136,60 +136,58 @@ sealed interface ASTNode {
             val variable =
                 subject?.let {
                     when (it) {
-                        is Variable -> it.variableSymbol
-                        is ValAssignment -> {
+                        is ASTNode.Variable -> it.variableSymbol
+                        is ASTNode.ValAssignment -> {
                             compileAsStatement(it, builder)
                             it.variableSymbol
                         }
                         else -> {
                             val tmpVariable = IR.JFVariableSymbol("subject", it.type(), LocalSymbolMap(IdentifierCache))
-                            compileAsStatement(ValAssignment(tmpVariable, it), builder)
+                            compileAsStatement(ASTNode.ValAssignment(tmpVariable, it), builder)
                             tmpVariable
                         }
                     }
                 }
+            val after = builder.newCodeBlock()
             val lastIndex = matches.size - 1
-            var elseExpression: List<IR.Instruction>? = null
-            val condfitionMatches = mutableListOf<Pair<List<IR.Instruction>, List<IR.Instruction>>>()
-
             matches.forEachIndexed { index, (condition, expression) ->
-
-
+                val nextBlock = builder.newCodeBlock()
                 when {
                     (index == lastIndex) && (condition == BooleanLiteral(true)) -> {
-                        elseExpression = compileAsCodeBlock(builder, expression)
+                        builder.addCodeBlock(builder.newCodeBlock())
+                        compileAsExpression(expression, builder)
+                        builder.goto(after)
                     }
                     else -> {
-                        condfitionMatches.add(compileAsCodeBlock(builder, condition(variable, condition)) to compileAsCodeBlock(builder,expression))
+                        condition(variable, condition, builder)
+                        builder.iffalse(nextBlock)
+                        builder.addCodeBlock(builder.newCodeBlock())
+                        compileAsExpression(expression, builder)
+                        builder.goto(after)
                     }
                 }
+                builder.addCodeBlock(nextBlock)
             }
-            builder.`when`(condfitionMatches, elseExpression)
+            if ((matches.last().second == BooleanLiteral(true))) builder.pop() // throw Exception
+            builder.addCodeBlock(after)
         }
-
-        private fun compileAsCodeBlock(
-            builder: IRBuilder.CodeBlockDSL,
-            expression: Expression
-        ): List<IR.Instruction> {
-            val subBuilder = getSubBuilder(builder)
-            expression.compile(subBuilder)
-
-            return subBuilder.instructions
-        }
-
-        private fun getSubBuilder(builder: IRBuilder.CodeBlockDSL): IRBuilder.CodeBlockDSL =
-            IRBuilder.CodeBlockDSL(mutableListOf(), builder.parent)
 
         private fun condition(
             variable: IR.JFVariableSymbol?,
             condition: Expression,
-        ) = variable?.let {
-                Invocation(
-                    IdentifierCache.find("==") as IR.JFMethod,
-                    null,
-                    listOf(Variable(variable), condition),
+            builder: IRBuilder.CodeBlockDSL,
+        ) {
+            variable?.let {
+                compileAsExpression(
+                    Invocation(
+                        IdentifierCache.find("==") as IR.JFMethod,
+                        null,
+                        listOf(Variable(variable), condition),
+                    ),
+                    builder,
                 )
-            } ?: condition
+            } ?: compileAsExpression(condition, builder)
+        }
 
         override fun tree(indent: Int): String = StringBuilder().apply {
             append("${" ".repeat(indent)}when")
@@ -197,9 +195,9 @@ sealed interface ASTNode {
                 append("(${subject.tree()})")
             }
             append(" {\n")
-            append(matches.joinToString("\n") { (condition, code) ->
-                "${condition.tree(indent + 2)} -> ${code.tree()}"
-            })
+            append(matches.map {
+                (condition, code) -> "${condition.tree(indent+2)} -> ${code.tree()}"
+            }.joinToString("\n"))
             append("\n${" ".repeat(indent)}}")
         }.toString()
 
@@ -258,16 +256,20 @@ sealed interface ASTNode {
 
         override fun tree(indent: Int): String = StringBuilder().apply {
             append("${" ".repeat(indent)}fun ${symbol}(\n")
-            append(symbol.parameters.joinToString(",\n") {
-                "${" ".repeat(indent + 2)}${it.name}: ${it.type}"
-            })
+            append(symbol.parameters.map {
+                "${" ".repeat(indent+2)}${it.name}: ${it.type}"
+            }.joinToString(",\n"))
             append("\n${" ".repeat(indent)}): ${symbol.rtn} {\n")
-            append(block.joinToString("\n") {
-                it.tree(indent + 2)
-            })
+            append(block.map {
+                it.tree(indent+2)
+            }.joinToString("\n"))
             append("\n}")
         }.toString()
 
+    }
+
+    data class MethodIdentifier(val method: IR.JFMethod, val field: IR.JFField?) : Expression() {
+        override fun type() = method.rtn
     }
 
     fun loadArguments(

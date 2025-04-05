@@ -47,10 +47,14 @@ class IR {
 
     data class Return<J>(val type: OperandType<J>) : Instruction
 
-    data class When(val cases: List<WhenCase>): Instruction {
+    data class IfFalse(val block: IRBuilder.CodeBlock) : Instruction
+
+    data class Goto(val block: IRBuilder.CodeBlock) : Instruction
+
+    data class When(val cases: List<WhenCase>) {
         sealed interface WhenCase
-        data class WhenConditionCase(val condition: List<Instruction>, val execution: List<Instruction>): WhenCase
-        data class WhenElseCase(val execution: List<Instruction>): WhenCase
+        data class WhenConditionCase(val condition: List<IR.Instruction>, val execution: List<IR.Instruction>): WhenCase
+        data class WhenElseCase(val execution: List<IR.Instruction>): WhenCase
 
     }
 

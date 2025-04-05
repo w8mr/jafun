@@ -1,5 +1,7 @@
 package nl.w8mr.jafun
 
+import java.util.UUID
+
 object IRBuilder {
     fun define(init: BuilderDSL.() -> Unit): BuilderContext {
         val builderContext = BuilderContext()
@@ -15,9 +17,15 @@ object IRBuilder {
         val name: String,
         val returnType: IR.OperandType<*>,
         val parameterTypes: List<IR.OperandType<*>>,
-        val instructions: MutableList<IR.Instruction> = mutableListOf(),
+        val codeBlocks: MutableList<CodeBlock> = mutableListOf(),
         val parent: ClassContext,
     )
+
+    data class CodeBlock(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodContext, val uuid: UUID = UUID.randomUUID()) {
+        val byteSize: Int by lazy {
+            instructions.sumOf(::byteSize)
+        }
+    }
 
     class BuilderDSL(val context: BuilderContext) {
         @Suppress("ktlint:standard:function-naming")
@@ -46,38 +54,46 @@ object IRBuilder {
 
     class MethodDSL(val context: MethodContext, val parent: ClassDSL) {
         fun codeBlock(init: CodeBlockDSL.() -> Unit) {
-            init.invoke(CodeBlockDSL(context.instructions, this))
+            val codeBlock = CodeBlock(parent = context)
+            context.codeBlocks.add(codeBlock)
+            init.invoke(CodeBlockDSL(codeBlock, this))
         }
     }
 
-    class CodeBlockDSL(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodDSL) {
+    class CodeBlockDSL(var context: CodeBlock, val parent: MethodDSL) {
+        fun newCodeBlock(): CodeBlock = CodeBlock(parent = this.context.parent)
+
+        fun addCodeBlock(codeBlock: CodeBlock) {
+            context.parent.codeBlocks.add(codeBlock)
+            context = codeBlock
+        }
 
         fun <J> loadConstant(
             operand1: J,
             type: IR.OperandType<J>,
         ) {
-            instructions.add(IR.LoadConstant(operand1, type))
+            context.instructions.add(IR.LoadConstant(operand1, type))
         }
 
         fun <J> store(
             registerName: String,
             type: IR.OperandType<J>,
         ) {
-            instructions.add(IR.Store(registerName, type))
+            context.instructions.add(IR.Store(registerName, type))
         }
 
         fun <J> load(
             registerName: String,
             type: IR.OperandType<J>,
         ) {
-            instructions.add(IR.Load(registerName, type))
+            context.instructions.add(IR.Load(registerName, type))
         }
 
         fun invoke(
             method: IR.JFMethod,
             field: IR.JFField?,
         ) {
-            instructions.add(IR.Invoke(method, field))
+            context.instructions.add(IR.Invoke(method, field))
         }
 
         fun getStatic(
@@ -85,25 +101,28 @@ object IRBuilder {
             fieldName: String,
             type: IR.Reference<*>,
         ) {
-            instructions.add(IR.GetStatic(className, fieldName, type))
+            context.instructions.add(IR.GetStatic(className, fieldName, type))
         }
 
         fun pop() {
-            instructions.add(IR.Pop)
+            context.instructions.add(IR.Pop)
         }
 
         fun dup() {
-            instructions.add(IR.Dup)
+            context.instructions.add(IR.Dup)
         }
 
         @Suppress("ktlint:standard:function-naming")
         fun <J> `return`(type: IR.OperandType<J>) {
-            instructions.add(IR.Return(type))
+            context.instructions.add(IR.Return(type))
         }
 
-        fun `when`(matches: List<Pair<List<IR.Instruction>, List<IR.Instruction>>>, elseBlock: List<IR.Instruction>?) {
-            instructions.add(IR.When(matches.map { IR.When.WhenConditionCase(it.first, it.second) } + (elseBlock?.let { listOf(IR.When.WhenElseCase(it)) } ?: emptyList())))
+        fun iffalse(block: CodeBlock) {
+            context.instructions.add(IR.IfFalse(block))
         }
 
+        fun goto(block: CodeBlock) {
+            context.instructions.add(IR.Goto(block))
+        }
     }
 }

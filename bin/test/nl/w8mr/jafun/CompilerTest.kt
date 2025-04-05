@@ -438,84 +438,87 @@ class CompilerTest {
 
     @Test
     fun calc() {
-        test(
-            """
-        println 4 + 3 * 5 - 6 / 2""",
-            "16\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant(4)
-                loadConstant(3)
-                loadConstant(5)
-                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
-                loadConstant(6)
-                loadConstant(2)
-                invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
-                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
-                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        val result =
+            test(
+                """
+            println 4 + 3 * 5 - 6 / 2""",
+                "16\n",
+            ) {
+                name = "Script"
+                method {
+                    name = "main"
+                    signature = "([Ljava/lang/String;)V"
+                    loadConstant(4)
+                    loadConstant(3)
+                    loadConstant(5)
+                    invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    loadConstant(6)
+                    loadConstant(2)
+                    invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                    invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                    `return`()
+                }
             }
-        }
     }
 
     @Test
     fun calcWithAssignment() {
-        test(
-            """
-        val a = 4 + 3 * 5 - 6 / 2
-        println a""",
-            "16\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant(4)
-                loadConstant(3)
-                loadConstant(5)
-                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
-                loadConstant(6)
-                loadConstant(2)
-                invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
-                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
-                istore("a")
-                iload("a")
-                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        val result =
+            test(
+                """
+            val a = 4 + 3 * 5 - 6 / 2
+            println a""",
+                "16\n",
+            ) {
+                name = "Script"
+                method {
+                    name = "main"
+                    signature = "([Ljava/lang/String;)V"
+                    loadConstant(4)
+                    loadConstant(3)
+                    loadConstant(5)
+                    invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    loadConstant(6)
+                    loadConstant(2)
+                    invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                    istore("a")
+                    iload("a")
+                    invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                    `return`()
+                }
             }
-        }
     }
 
     @Test
     fun calcParentheses() {
-        test(
-            """
-        println((4 + 3) * (6 - 4))""",
-            "14\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant(4)
-                loadConstant(3)
-                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
-                loadConstant(6)
-                loadConstant(4)
-                invokeStatic("jafun/lang/IntKt", "-", "(II)I")
-                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        val result =
+            test(
+                """
+            println((4 + 3) * (6 - 4))""",
+                "14\n",
+            ) {
+                name = "Script"
+                method {
+                    name = "main"
+                    signature = "([Ljava/lang/String;)V"
+                    loadConstant(4)
+                    loadConstant(3)
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    loadConstant(6)
+                    loadConstant(4)
+                    invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                    invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                    invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                    `return`()
+                }
             }
-        }
     }
 
     @Test
@@ -1039,8 +1042,9 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("One")
-                goto(6)
+                goto(9)
                 loadConstant("Else")
+                goto(3)
                 `return`()
             }
         }
@@ -1089,20 +1093,21 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("One")
-                goto(36)
+                goto(39)
                 iload("a")
                 loadConstant(2)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Two")
-                goto(21)
+                goto(24)
                 iload("a")
                 loadConstant(3)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Three")
-                goto(6)
+                goto(9)
                 loadConstant("More")
+                goto(3)
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -1133,20 +1138,21 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("One")
-                goto(36)
+                goto(39)
                 iload("a")
                 loadConstant(2)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Two")
-                goto(21)
+                goto(24)
                 iload("a")
                 loadConstant(3)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Three")
-                goto(6)
+                goto(9)
                 loadConstant("More")
+                goto(3)
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -1178,20 +1184,21 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("One")
-                goto(36)
+                goto(39)
                 iload("tmp")
                 loadConstant(2)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Two")
-                goto(21)
+                goto(24)
                 iload("tmp")
                 loadConstant(3)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Three")
-                goto(6)
+                goto(9)
                 loadConstant("More")
+                goto(3)
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -1223,20 +1230,21 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("One")
-                goto(36)
+                goto(39)
                 iload("a")
                 loadConstant(2)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Two")
-                goto(21)
+                goto(24)
                 iload("a")
                 loadConstant(3)
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(9)
                 loadConstant("Three")
-                goto(6)
+                goto(9)
                 loadConstant("More")
+                goto(3)
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -1274,14 +1282,15 @@ class CompilerTest {
                 invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                 ifequal(7)
                 loadConstant(1)
-                goto(17)
+                goto(20)
                 iload("param1")
                 iload("param1")
                 loadConstant(1)
                 invokeStatic("jafun/lang/IntKt", "-", "(II)I")
                 invokeStatic("Script", "factorial", "(I)I")
                 invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                ireturn()
+                goto(3)
+                `ireturn`()
             }
         }
     }

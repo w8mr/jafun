@@ -29,10 +29,22 @@ object IRPrintTree {
                     -"method "
                     -name
                     -"("
-                    -parameterTypes.joinToString(", ") { typeName(it) }
+                    -parameterTypes.map { typeName(it) }.joinToString(", ")
                     -"): "
                     -typeName(returnType)
                     +" {"
+                    indent {
+                        codeBlocks.forEach { block ->
+                            print(this, block)
+                        }
+                    }
+                    +"}"
+                }
+
+                is IRBuilder.CodeBlock -> with(ir) {
+                    -"code ("
+                    -ir.uuid
+                    +") {"
                     indent {
                         instructions.forEach { instruction ->
                             print(this, instruction)
@@ -40,7 +52,6 @@ object IRPrintTree {
                     }
                     +"}"
                 }
-
                 is IR.Invoke -> with(ir) {
                     -"Invoke "
                     -ir.method.parent.path
@@ -63,6 +74,14 @@ object IRPrintTree {
                     -": "
                     -typeName(ir.type)
                 }
+                is IR.IfFalse -> with(ir) {
+                    -"IfFalse "
+                    +ir.block.uuid
+                }
+                is IR.Goto -> with(ir) {
+                    -"Goto "
+                    +ir.block.uuid
+                }
                 else -> +ir.toString()
             }
         }
@@ -70,10 +89,10 @@ object IRPrintTree {
 
         fun <J> typeName(operandType: IR.OperandType<J>): String = when (operandType) {
             is IR.Array<*> -> "Array<${typeName(operandType.type)}>"
-            is IR.JFClass -> operandType.path
+            is IR.JFClass -> "${operandType.path}"
             is IR.JFMethod -> "${operandType.parent.path}.${operandType.name}"
             is IR.JFVariableSymbol -> "${operandType.name}: ${typeName(operandType.type)}"
-            is IR.Reference<*> -> operandType.type
+            is IR.Reference<*> -> "${operandType.type}"
             IR.SInt32 -> "Int32"
             IR.StringType -> "String"
             IR.UInt1 -> "Boolean"
