@@ -251,6 +251,20 @@ object ParserJafun {
             ASTNode.When(subject, matches)
         }
 
+    val whileExpression =
+        combi {
+            -("while" and owsnl)
+            pushSymbolMap()
+            -lParenTerm
+            val condition = expressionUntilRightParen.bind()
+            -rParenTerm
+            -owsnl
+            val expressions = curlBlock.bind()
+            popSymbolMap()
+            ASTNode.While(condition, expressions)
+        }
+
+
     val parameter = identifier and owsnl and ':' and owsnl and complexIdentifier map (::newParameterDef)
 
     val functionDefinition =
@@ -304,6 +318,7 @@ object ParserJafun {
                         initVarAssignment,
                         varAssignment,
                         whenExpression,
+                        whileExpression,
                         integerLiteral_term,
                         stringLiteral_term,
                         booleanLiteral_term,

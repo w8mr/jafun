@@ -2,6 +2,7 @@ package nl.w8mr.jafun
 
 import jafun.compiler.IdentifierCache
 import jafun.compiler.LocalSymbolMap
+import kotlin.collections.joinToString
 
 sealed interface ASTNode {
     fun compile(
@@ -167,19 +168,6 @@ sealed interface ASTNode {
             builder.`when`(condfitionMatches, elseExpression)
         }
 
-        private fun compileAsCodeBlock(
-            builder: IRBuilder.CodeBlockDSL,
-            expression: Expression
-        ): List<IR.Instruction> {
-            val subBuilder = getSubBuilder(builder)
-            expression.compile(subBuilder)
-
-            return subBuilder.instructions
-        }
-
-        private fun getSubBuilder(builder: IRBuilder.CodeBlockDSL): IRBuilder.CodeBlockDSL =
-            IRBuilder.CodeBlockDSL(mutableListOf(), builder.parent)
-
         private fun condition(
             variable: IR.JFVariableSymbol?,
             condition: Expression,
@@ -204,6 +192,42 @@ sealed interface ASTNode {
         }.toString()
 
     }
+
+    data class While(val condition: Expression, val expressions: ExpressionList) : Expression() {
+        override fun type() = expressions.type()
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            val conditionInstructions = compileAsCodeBlock(builder, condition)
+            val expressionInstructions = compileAsCodeBlock(builder, expressions, false)
+            builder.`while`(conditionInstructions, expressionInstructions)
+        }
+
+        override fun tree(indent: Int): String = StringBuilder().apply {
+            append("${" ".repeat(indent)}while")
+            append("(${condition.tree()})")
+            append("{\n")
+            append(expressions.tree(indent + 2))
+            append("}\n")
+        }.toString()
+    }
+
+
+    fun compileAsCodeBlock(
+        builder: IRBuilder.CodeBlockDSL,
+        expression: Expression,
+        returnValue: Boolean = true
+    ): List<IR.Instruction> {
+        val subBuilder = getSubBuilder(builder)
+        expression.compile(subBuilder, returnValue)
+
+        return subBuilder.instructions
+    }
+
+    fun getSubBuilder(builder: IRBuilder.CodeBlockDSL): IRBuilder.CodeBlockDSL =
+        IRBuilder.CodeBlockDSL(mutableListOf(), builder.parent)
 
     data class ValAssignment(val variableSymbol: IR.JFVariableSymbol, val expression: Expression) : Expression() {
         override fun type() = expression.type()

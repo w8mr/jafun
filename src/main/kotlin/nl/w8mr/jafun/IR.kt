@@ -54,6 +54,10 @@ class IR {
 
     }
 
+    data class DoWhile(val condition: List<Instruction>, val expressions: List<Instruction>): Instruction
+
+    data class While(val condition: List<Instruction>, val expressions: List<Instruction>): Instruction
+
     data class JFClass(override val path: String) : OperandType<Any?>, HasPath
 
     data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath

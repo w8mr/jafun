@@ -97,6 +97,25 @@ class JVMBackend {
                     insertInstructionBlock(after)
                     
                 }
+                is IR.DoWhile -> {
+                    val body = createTarget()
+                    insertInstructionBlock(body)
+                    instruction.expressions.forEach { compile(it) }
+                    instruction.condition.forEach { compile(it) }
+                    ifnotequal(body)
+                }
+
+                is IR.While -> {
+                    val after = createTarget()
+                    val body = createTarget()
+                    insertInstructionBlock(body)
+                    instruction.condition.forEach { compile(it) }
+                    ifequal(after)
+                    instruction.expressions.forEach { compile(it) }
+                    goto(body)
+                    insertInstructionBlock(after)
+                }
+
             }
         }
     }

@@ -1359,4 +1359,97 @@ class CompilerTest {
             "233\n",
         )
     }
+
+    @Test
+    fun basicWhile() {
+        test(
+            """
+                var i = 0
+                while (i < 3) {
+                    println i
+                    i = i + 1
+                }""",
+            "0\n1\n2\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(0)
+                istore("i")
+                iload("i")
+                loadConstant(3)
+                invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                ifequal(22)
+                iload("i")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                iload("i")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("i")
+                goto(-25)
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun nestedWhile() {
+        test(
+            """
+                var i = 1
+                println "Start"
+                while (i < 4) {
+                    var j = 1
+                    while (j < 4) {
+                        println i * j
+                        j = j + 1
+                    }
+                    i = i + 1
+                }
+                println "End"
+                """,
+            "Start\n1\n2\n3\n2\n4\n6\n3\n6\n9\nEnd\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant(1)
+                istore("i")
+                loadConstant("Start")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                iload("i")
+                loadConstant(4)
+                invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                ifequal(50)
+                loadConstant(1)
+                istore("j")
+                iload("j")
+                loadConstant(4)
+                invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                ifequal(27)
+                iload("i")
+                iload("j")
+                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                iload("j")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("j")
+                goto(-30)
+                iload("i")
+                loadConstant(1)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                istore("i")
+                goto(-53)
+                loadConstant("End")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+        }
+    }
+
 }

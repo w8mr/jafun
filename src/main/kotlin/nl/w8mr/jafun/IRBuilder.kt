@@ -105,5 +105,13 @@ object IRBuilder {
             instructions.add(IR.When(matches.map { IR.When.WhenConditionCase(it.first, it.second) } + (elseBlock?.let { listOf(IR.When.WhenElseCase(it)) } ?: emptyList())))
         }
 
+        fun `doWhile`(condition: List<IR.Instruction>, expression: List<IR.Instruction>) {
+            instructions.add(IR.DoWhile(condition, expression))
+        }
+
+        fun `while`(condition: List<IR.Instruction>, expression: List<IR.Instruction>) {
+            instructions.add(IR.While(condition, expression))
+        }
+
     }
 }
