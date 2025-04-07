@@ -1460,7 +1460,7 @@ class CompilerTest {
     @Test
     fun whileWithInput() {
         test("""
-            val input = first(param1)
+            val input = first(arguments)
             var i = 0
             val l = length(input)
             while (i < l) {

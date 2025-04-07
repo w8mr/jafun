@@ -63,6 +63,7 @@ object IdentifierCache : SymbolMap {
                 "out",
                 "java.io.PrintStream",
                 "println",
+                IR.StringType,
             )
         val integerValueOf =
             staticMethod(
@@ -82,7 +83,7 @@ object IdentifierCache : SymbolMap {
             staticMethod(
                 "java.lang.Character",
                 "valueOf",
-                IR.Reference<java.lang.Character>("java/lang/Character"),
+                IR.Reference<Character>("java/lang/Character"),
                 IR.CharType,
             )
         identifierMap["System.out.println"] = systemOutPrintln
@@ -100,11 +101,12 @@ object IdentifierCache : SymbolMap {
         staticField: String,
         staticFieldType: String,
         methodName: String,
+        vararg parameterTypes: IR.OperandType<*>,
     ): IR.JFMethod {
         val parent = jfClass(containingClass)
         val field = IR.JFField(parent, staticFieldType.replace('.', '/'), staticField)
         return IR.JFMethod(
-            listOf(IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache)),
+            arguments(parameterTypes),
             field,
             methodName,
             IR.Unit,
@@ -120,19 +122,22 @@ object IdentifierCache : SymbolMap {
     ): IR.JFMethod {
         val parent = jfClass(containingClass)
         return IR.JFMethod(
-            parameterTypes.mapIndexed { index, param ->
-                IR.JFVariableSymbol(
-                    "param${index + 1}",
-                    param,
-                    IdentifierCache,
-                )
-            },
+            arguments(parameterTypes),
             parent,
             methodName,
             rtnType,
             true,
         )
     }
+
+    private fun arguments(parameterTypes: Array<out IR.OperandType<*>>): List<IR.JFVariableSymbol> =
+        parameterTypes.mapIndexed { index, param ->
+            IR.JFVariableSymbol(
+                "param${index + 1}",
+                param,
+                IdentifierCache,
+            )
+        }
 
     override fun find(path: String): IR.OperandType<*>? {
         return identifierMap.computeIfAbsent(path) {
@@ -156,7 +161,7 @@ object IdentifierCache : SymbolMap {
                     }
                 }
             }
-        }.also { println("---> $path $it")}
+        }
     }
     override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
 

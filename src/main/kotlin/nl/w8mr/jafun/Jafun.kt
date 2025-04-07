@@ -49,7 +49,7 @@ fun     testBytes(
     val parsed = ParserJafun.parse(code)
     println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
     println()
-    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("param1", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) } // TODO: look into this.
+    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("arguments", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) } // TODO: look into this.
     val builder =
         IRBuilder.define {
             `class`(className) {

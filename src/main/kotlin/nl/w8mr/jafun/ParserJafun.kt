@@ -9,6 +9,7 @@ import jafun.compiler.IdentifierCache
 import jafun.compiler.LocalSymbolMap
 import jafun.compiler.SymbolMap
 import nl.w8mr.jafun.Token.Identifier
+import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.Parser.Success
 import nl.w8mr.parsek.and
@@ -32,6 +33,7 @@ import nl.w8mr.parsek.text.sepBy
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
 import nl.w8mr.parsek.zeroOrMore
+import kotlin.collections.joinToString
 import kotlin.collections.last
 
 object ParserJafun {
@@ -63,7 +65,8 @@ object ParserJafun {
         identifier: Identifier,
         expression: ASTNode.Expression
     ): ASTNode.VarAssignment {
-        val variableSymbol = currentSymbolMap.find(identifier.value) as? IR.JFVariableSymbol ?: throw IllegalStateException("Variable ${identifier.value} not defined")
+        val variableSymbol = currentSymbolMap.find(identifier.value) as? IR.JFVariableSymbol
+            ?: throw IllegalStateException("Variable ${identifier.value} not defined")
         if (!variableSymbol.mutable) {
             throw IllegalStateException("Variable ${identifier.value} is not mutable")
         }
@@ -147,7 +150,8 @@ object ParserJafun {
     val stringLiteral_term = ('"' and lineStringContent and '"').map(ASTNode::StringLiteral)
     // TODO: Multiline string
 
-    val charLiteral_term = ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map(ASTNode::CharLiteral)
+    val charLiteral_term =
+        ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map(ASTNode::CharLiteral)
 
     val decimalDigit = char { it in '0'..'9' }
     val decimalDigitNoZero = char { it in '1'..'9' }
@@ -164,7 +168,7 @@ object ParserJafun {
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
     val normalIdentifier =
         (letter or char('_')) and
-            any(letter or char('_') or unicode_digit) map (::Identifier)
+                any(letter or char('_') or unicode_digit) map (::Identifier)
 
     val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
     val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
@@ -172,15 +176,6 @@ object ParserJafun {
     val identifier = normalIdentifier or operatorIdentifier
     val complexIdentifier = identifier sepBy '.'
 
-    val variableIdentifier =
-        combi {
-            val identifier = complexIdentifier.bind()
-            val name = identifier.last().value
-            when (val symbol = currentSymbolMap.find(name)) {
-                is IR.JFVariableSymbol -> ASTNode.Variable(symbol)
-                else -> fail("no variable identifier")
-            }
-        }
     val whenArrow = identifier.filter { it.value == "->" }.asLiteral()
 
     val expressionUntilNewline = prattParser()
@@ -247,7 +242,8 @@ object ParserJafun {
             pushSymbolMap()
             val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
             -blockOpen
-            val matches = zeroOrMore(expressionUntilArrow and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
+            val matches =
+                zeroOrMore(expressionUntilArrow and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
             -blockClose
             popSymbolMap()
             ASTNode.When(subject, matches)
@@ -287,7 +283,12 @@ object ParserJafun {
     val function: Parser<Char, ASTNode.Expression> =
         functionDefinition and curlBlock map (::newFunction)
 
-    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("param1", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) }
+    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
+        add(
+            "arguments",
+            IR.JFVariableSymbol("arguments", IR.Array(IR.JFClass("java/lang/String")), this, false)
+        )
+    }
 
     private fun pushSymbolMap() {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
@@ -313,24 +314,20 @@ object ParserJafun {
         minPrecedence: Int = 0,
     ): Parser<Char, ASTNode.Expression> =
         combi {
-            var current =
-                (
+            var current = (
                     oneOf(
+                        integerLiteral_term,
+                        stringLiteral_term,
+                        charLiteral_term,
+                        booleanLiteral_term,
+                        function,
                         initValAssignment,
                         initVarAssignment,
                         varAssignment,
                         whenExpression,
                         whileExpression,
-                        integerLiteral_term,
-                        stringLiteral_term,
-                        charLiteral_term,
-                        booleanLiteral_term,
-                        variableIdentifier,
-                        soloMethod,
-                        methodWithParameterArguments(null),
-                        methodWithPrecedence(null, minPrecedence),
-                        function,
                         betweenParentheses,
+                        methodLhs(minPrecedence),
                         curlBlock,
                     ) and ows
                 ).bindAsResult()
@@ -342,25 +339,15 @@ object ParserJafun {
                         reset(mark)
                         break
                     }
-
                     is Parser.Failure -> {
                         reset(mark)
-                        val rhs =
-                            (
-                                owsnl and
-                                    oneOf(
-                                        postfixMethod(current.value),
-                                        methodWithParameterArguments(current.value),
-                                        // methodWithPrecedence(current.value, minPrecedence),
-                                        methodParser(current.value, minPrecedence),
-                                    ) and ows
-                            ).bindAsResult()
-                        if (rhs is Parser.Failure) break
-                        current = rhs
+                        when (val rhs = (owsnl and methodRhs(current.value, minPrecedence) and ows).bindAsResult()) {
+                            is Parser.Failure -> break
+                            else -> current = rhs
+                        }
                     }
                 }
             }
-            // println("<=== ${context.tokenOrNull()} $minP $current")
             current.bind()
         }
 
@@ -370,91 +357,73 @@ object ParserJafun {
             else -> listOf(this)
         }
 
-    fun postfixMethod(lhsExpression: ASTNode.Expression?) =
-        combi {
-            val complexIdentifier = (complexIdentifier).bind()
-            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if ((method is IR.JFMethod) && (method.associativity == POSTFIX)) {
-                methodInvocation(method, lhsExpression.asList())
-            } else {
-                fail("Method ($complexIdentifier) not found or not of the right type")
+    private fun CombinatorDSL<Char, ASTNode.Expression>.methodArguments(
+        method: IR.JFMethod,
+        minPrecedence: Int,
+        lhsExpression: ASTNode.Expression? = null
+    ): List<ASTNode.Expression> {
+        val newPrecedence =
+            when {
+                method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
+                else -> 0
             }
-        }
+        val rhsArguments =
+            oneOf(
+                lParenTerm and (expressionUntilComma sepByAllowEmpty commaTerm) and rParenTerm,
+                prattParser(minPrecedence = newPrecedence).map { listOf(it) }
+            ).bind()
+        return lhsExpression.asList() + rhsArguments
+    }
 
-    val soloMethod =
-        combi {
-            val complexIdentifier = (complexIdentifier).bind()
-            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if ((method is IR.JFMethod) && (method.associativity == SOLO)) {
-                methodInvocation(method, emptyList())
-            } else {
-                fail("Method ($complexIdentifier) not found or not of the right type")
-            }
-        }
-
-    fun methodWithParameterArguments(lhsExpression: ASTNode.Expression?) =
-        combi {
-            val complexIdentifier = (complexIdentifier).bind()
-            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if ((method is IR.JFMethod) && (method.associativity in listOf(PREFIX, INFIXL, INFIXR)) && (!method.operator)) {
-                val arguments =
-                    (
-                        lParenTerm and
-                            (expressionUntilComma sepByAllowEmpty commaTerm) and
-                            rParenTerm
-                    ).bind()
-                methodInvocation(method, lhsExpression.asList() + arguments)
-            } else {
-                fail("Method ($complexIdentifier) not found or not of the right type")
-            }
-        }
-
-    fun methodWithPrecedence(
-        lhsExpression: ASTNode.Expression?,
+    fun methodLhs(
         minPrecedence: Int,
     ): Parser<Char, ASTNode.Expression> =
         combi {
-            val complexIdentifier = (complexIdentifier and owsnl).bind()
-            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if (method is IR.JFMethod) {
-                val newPrecedence =
-                    when {
-                        method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
-                        else -> 0
-                    }
-                val argument = prattParser(minPrecedence = newPrecedence).bind()
-                methodInvocation(method, lhsExpression.asList() + listOf(argument))
-            } else {
-                fail("Method ($complexIdentifier) not found")
-            }
-        }
+            val complexIdentifier = (complexIdentifier and ows).bind()
+            val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            when (symbol) {
+                is IR.JFVariableSymbol ->
+                    ASTNode.Variable(symbol)
+                is IR.JFMethod -> {
+                    val arguments = when (symbol.associativity) {
+                        SOLO -> {
+                            -optional(lParenTerm and rParenTerm)
+                            emptyList()
+                        }
 
-    fun methodParser(
-        lhsExpression: ASTNode.Expression?,
-        minPrecedence: Int,
-    ): Parser<Char, ASTNode.Expression> =
-        combi {
-            val complexIdentifier = (complexIdentifier and owsnl).bind()
-            val method = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if (method is IR.JFMethod) {
-                val lhsArguments = lhsExpression?.let { (listOf(it)) } ?: emptyList()
-                when (method.associativity) {
-                    POSTFIX -> TODO()
-                    SOLO -> TODO()
-                    else -> {
-                        val newPrecedence =
-                            when {
-                                method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
-                                else -> 0
-                            }
-                        if (method.precedence <= minPrecedence) fail("Lower precedence")
+                        PREFIX, INFIXL, INFIXR -> {
+                            methodArguments(symbol, minPrecedence)
+                        }
 
-                        val argument = (prattParser(minPrecedence = newPrecedence)).bind()
-                        methodInvocation(method, lhsArguments + listOf(argument))
+                        else -> fail("Method (${complexIdentifier.joinToString(".") { it.value}}) does not have the right associativity")
                     }
+                    methodInvocation(symbol, arguments)
                 }
+                else -> fail("Method or variable (${complexIdentifier.joinToString(".") { it.value}}) not found")
+            }
+        }
+
+    fun methodRhs(
+        lhsExpression: ASTNode.Expression?,
+        minPrecedence: Int,
+    ): Parser<Char, ASTNode.Expression> =
+        combi {
+            val complexIdentifier = (complexIdentifier and owsnl).bind()
+            val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            if (symbol is IR.JFMethod) {
+                val arguments = when (symbol.associativity) {
+                    POSTFIX -> {
+                        lhsExpression.asList()
+                    }
+                    INFIXL, INFIXR -> {
+                        if (symbol.precedence <= minPrecedence) fail("Lower precedence")
+                        methodArguments(symbol, minPrecedence, lhsExpression)
+                    }
+                    else -> fail("Method (${complexIdentifier.joinToString(".") { it.value}}) does not have the right associativity")
+                }
+                methodInvocation(symbol, arguments)
             } else {
-                fail("Method ($complexIdentifier) not found")
+                fail("Method (${complexIdentifier.joinToString(".") { it.value}}) not found")
             }
         }
 

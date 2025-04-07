@@ -65,7 +65,7 @@ class SimpleParserTest {
         val varSymbol = IR.JFVariableSymbol("abcd", IR.SInt32, ParserJafun.currentSymbolMap)
         ParserJafun.currentSymbolMap.add("abcd", varSymbol)
         testSingleParser(
-            ParserJafun.variableIdentifier,
+            ParserJafun.methodLhs(0),
             "abcd+3",
             ASTNode.Variable(varSymbol),
             4,
@@ -77,9 +77,9 @@ class SimpleParserTest {
         val varSymbol = IR.JFVariableSymbol("abcd", IR.SInt32, ParserJafun.currentSymbolMap)
         ParserJafun.currentSymbolMap.add("abcd", varSymbol)
         testSingleParserFailed(
-            ParserJafun.variableIdentifier,
+            ParserJafun.methodLhs(0),
             "bcd+3",
-            "Combinator failed, parser number 1 with error: no variable identifier",
+            "Combinator failed, parser number 1 with error: Method or variable (bcd) not found",
             0,
         )
     }
