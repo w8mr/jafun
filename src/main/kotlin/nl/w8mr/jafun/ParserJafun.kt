@@ -147,6 +147,8 @@ object ParserJafun {
     val stringLiteral_term = ('"' and lineStringContent and '"').map(ASTNode::StringLiteral)
     // TODO: Multiline string
 
+    val charLiteral_term = ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map(ASTNode::CharLiteral)
+
     val decimalDigit = char { it in '0'..'9' }
     val decimalDigitNoZero = char { it in '1'..'9' }
     val decimalDigitOrSeparator = decimalDigit or char('_')
@@ -285,7 +287,7 @@ object ParserJafun {
     val function: Parser<Char, ASTNode.Expression> =
         functionDefinition and curlBlock map (::newFunction)
 
-    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset())
+    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("param1", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) }
 
     private fun pushSymbolMap() {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
@@ -321,6 +323,7 @@ object ParserJafun {
                         whileExpression,
                         integerLiteral_term,
                         stringLiteral_term,
+                        charLiteral_term,
                         booleanLiteral_term,
                         variableIdentifier,
                         soloMethod,

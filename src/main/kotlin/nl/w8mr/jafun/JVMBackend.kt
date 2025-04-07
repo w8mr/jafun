@@ -20,6 +20,7 @@ class JVMBackend {
                                     true -> 1
                                 },
                             )
+                        is IR.CharType -> loadConstant(instruction.type.operand1(instruction).toInt())
 
                         is IR.Reference -> TODO()
                         is IR.Array -> TODO()
@@ -47,6 +48,7 @@ class JVMBackend {
                         is IR.SInt32 -> istore(instruction.registerName)
                         is IR.StringType -> astore(instruction.registerName)
                         is IR.UInt1 -> istore(instruction.registerName)
+                        is IR.CharType -> istore(instruction.registerName)
                         is IR.Array -> TODO()
                         is IR.JFClass -> astore(instruction.registerName)
                         is IR.JFMethod -> TODO()
@@ -58,7 +60,8 @@ class JVMBackend {
                         is IR.SInt32 -> iload(instruction.registerName)
                         is IR.StringType -> aload(instruction.registerName)
                         is IR.UInt1 -> iload(instruction.registerName)
-                        is IR.Array -> TODO()
+                        is IR.CharType -> iload(instruction.registerName)
+                        is IR.Array -> aload(instruction.registerName)
                         is IR.JFClass -> aload(instruction.registerName)
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
@@ -70,6 +73,7 @@ class JVMBackend {
                         is IR.SInt32 -> ireturn()
                         is IR.StringType -> areturn()
                         is IR.UInt1 -> ireturn()
+                        is IR.CharType -> ireturn()
                         is IR.Array -> TODO()
                         is IR.JFClass -> areturn()
                         is IR.JFMethod -> TODO()
@@ -153,6 +157,7 @@ fun signature(type: IR.OperandType<*>): String =
         is IR.StringType -> "Ljava/lang/String;"
         is IR.Reference -> "L${type.type.replace('.', '/')};"
         is IR.SInt32 -> "I"
+        is IR.CharType -> "C"
         is IR.UInt1 -> "Z"
         is IR.JFMethod -> TODO()
         is IR.JFClass -> "L${type.path.replace('.', '/')};"

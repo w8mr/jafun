@@ -35,7 +35,9 @@ interface SymbolMap {
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
     private val identifierMap = mutableMapOf<String, IR.OperandType<*>?>()
 
-    override fun find(path: String): IR.OperandType<*>? = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
+    override fun find(path: String): IR.OperandType<*>? = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(
+        path
+    )
     override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
 
     override fun add(
@@ -76,10 +78,18 @@ object IdentifierCache : SymbolMap {
                 IR.Reference<java.lang.Boolean>("java/lang/Boolean"),
                 IR.UInt1,
             )
+        val characterValueOf =
+            staticMethod(
+                "java.lang.Character",
+                "valueOf",
+                IR.Reference<java.lang.Character>("java/lang/Character"),
+                IR.CharType,
+            )
         identifierMap["System.out.println"] = systemOutPrintln
         identifierMap["java.lang.System.out.println"] = systemOutPrintln
         identifierMap["java.lang.Integer.valueOf"] = integerValueOf
         identifierMap["java.lang.Boolean.valueOf"] = booleanValueOf
+        identifierMap["java.lang.Character.valueOf"] = characterValueOf
 
         identifierMap["Int"] = IR.SInt32
         identifierMap["String"] = IR.StringType
@@ -146,7 +156,7 @@ object IdentifierCache : SymbolMap {
                     }
                 }
             }
-        }
+        }.also { println("---> $path $it")}
     }
     override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
 
@@ -198,15 +208,18 @@ object IdentifierCache : SymbolMap {
             "int" to IR.SInt32,
             "boolean" to IR.UInt1,
             "void" to IR.Unit,
+            "char" to IR.CharType,
             "java.lang.String" to IR.StringType,
         )
 
-    private fun jvmType(returnName: String) = jvmTypes[returnName] ?: jfClass(returnName)
+    private fun jvmType(returnName: String) = jvmTypes[returnName] ?: jfArray(returnName) ?: jfClass(returnName)
 
-    private fun jfClass(name: String) = IR.JFClass(name.replace('.', '/'))
+    private fun jfClass(name: String) = if (name.startsWith('L') && name.endsWith(';')) IR.JFClass(name.substring(1, name.length-1)) else IR.JFClass(name.replace('.', '/'))
+
+    private fun jfArray(returnName: String): IR.Array<*>? = if (returnName.startsWith('[')) IR.Array(jvmType(returnName.substring(1))) else null //TODO: check implementation
 
     fun reset(): IdentifierCache {
-        symbolMapCounter = 0
+        symbolMapCounter = 1
         return this
     }
 }

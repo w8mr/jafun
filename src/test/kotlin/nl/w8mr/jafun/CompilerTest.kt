@@ -13,48 +13,53 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class CompilerTest {
-    fun String.runCommand(workingDir: File): String? {
-        try {
-            val parts = this.split("\\s".toRegex())
-            val proc =
-                ProcessBuilder(*parts.toTypedArray())
-                    .directory(workingDir)
-                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                    .redirectError(ProcessBuilder.Redirect.PIPE)
-                    .start()
-
-            proc.waitFor(60, TimeUnit.MINUTES)
-            return proc.inputStream.bufferedReader().readText()
-        } catch (e: IOException) {
-            e.printStackTrace()
-            return null
+    companion object {
+        fun test(
+            code: String,
+            result: String,
+            params: Array<String>? = null,
+            bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
+        ) {
+            val tested =
+                testBytes(
+                    code,
+                    returnType = IR.Unit,
+                    parameterTypes = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
+                    params = params
+                )
+            val expected = bytecode?.let { classBuilder(bytecode).write() } ?: tested.second
+            if ((result != tested.first) || (expected.zip(tested.second).any { it.first != it.second })) {
+                val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
+                writeFile("Script", expected)
+                val expectedDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
+                if (bytecode == null) println(resultDecompiled)
+                assertEquals(expectedDecompiled, resultDecompiled)
+                assertEquals(result, tested.first)
+                assertContentEquals(expected, tested.second)
+            } else {
+                assertEquals(result, tested.first)
+                assertContentEquals(expected, tested.second)
+            }
         }
-    }
 
-    fun test(
-        code: String,
-        result: String,
-        bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
-    ) {
-        val tested =
-            testBytes(
-                code,
-                returnType = IR.Unit,
-                parameterTypes = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
-            )
-        val expected = bytecode?.let { classBuilder(bytecode).write() } ?: tested.second
-        if ((result != tested.first) || (expected.zip(tested.second).any { it.first != it.second })) {
-            val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
-            writeFile("Script", expected)
-            val expectedDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
-            if (bytecode == null) println(resultDecompiled)
-            assertEquals(expectedDecompiled, resultDecompiled)
-            assertEquals(result, tested.first)
-            assertContentEquals(expected, tested.second)
-        } else {
-            assertEquals(result, tested.first)
-            assertContentEquals(expected, tested.second)
+        fun String.runCommand(workingDir: File): String? {
+            try {
+                val parts = this.split("\\s".toRegex())
+                val proc =
+                    ProcessBuilder(*parts.toTypedArray())
+                        .directory(workingDir)
+                        .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                        .redirectError(ProcessBuilder.Redirect.PIPE)
+                        .start()
+
+                proc.waitFor(60, TimeUnit.MINUTES)
+                return proc.inputStream.bufferedReader().readText()
+            } catch (e: IOException) {
+                e.printStackTrace()
+                return null
+            }
         }
+
     }
 
     @Test
@@ -1450,6 +1455,23 @@ class CompilerTest {
                 `return`()
             }
         }
+    }
+
+    @Test
+    fun whileWithInput() {
+        test("""
+            val input = first(param1)
+            var i = 0
+            val l = length(input)
+            while (i < l) {
+                val c = charAt(input, i)
+                println c
+                i = i + 1
+            }
+            
+        """,
+            "T\ne\ns\nt\n",
+            arrayOf("Test"))
     }
 
 }

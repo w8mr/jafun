@@ -77,5 +77,6 @@ object IRPrintTree {
             IR.SInt32 -> "Int32"
             IR.StringType -> "String"
             IR.UInt1 -> "Boolean"
+            IR.CharType -> "Char"
         }
 }

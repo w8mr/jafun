@@ -36,6 +36,19 @@ sealed interface ASTNode {
         override fun tree(indent: Int): String = "${" ".repeat(indent)}StringLiteral(\"${value}\")"
     }
 
+    data class CharLiteral(val value: String) : Expression() {
+        override fun type() = IR.CharType
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            builder.loadConstant(value[0], IR.CharType)
+        }
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}CharLiteral(\"${value[0]}\")"
+    }
+
     data class IntegerLiteral(val value: Int) : Expression() {
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -329,9 +342,14 @@ sealed interface ASTNode {
                     compileAsExpression(argument, builder)
                 } else if (argument.type() is IR.JFClass && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
+                } else if (argument.type() is IR.Array && parameter is IR.Array) {
+                    compileAsExpression(argument, builder)
                 } else if (argument.type() == IR.SInt32 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
                     builder.invoke(IdentifierCache.find("java.lang.Integer.valueOf") as IR.JFMethod, null)
+                } else if (argument.type() == IR.CharType && parameter is IR.JFClass) {
+                    compileAsExpression(argument, builder)
+                    builder.invoke(IdentifierCache.find("java.lang.Character.valueOf") as IR.JFMethod, null)
                 } else if (argument.type() == IR.UInt1 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
                     builder.invoke(IdentifierCache.find("java.lang.Boolean.valueOf") as IR.JFMethod, null)

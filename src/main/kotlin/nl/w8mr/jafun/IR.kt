@@ -29,6 +29,8 @@ class IR {
 
     object UInt1 : OperandType<Boolean> { override fun toString() = "BooleanType" }
 
+    object CharType : OperandType<Char> { override fun toString() = "CharType" }
+
     object Unit : Reference<jafun.Unit>("jafun.Unit") { override fun toString() = "UnitType" }
 
     data class LoadConstant<J, T : OperandType<J>>(override val operand1: J, override val type: T) : OneOperand<J, T>

@@ -43,12 +43,13 @@ fun     testBytes(
     methodName: String = "main",
     returnType: IR.OperandType<*> = IR.Unit,
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
+    params: Array<String>? = null,
 ): Pair<String, ByteArray> {
 
     val parsed = ParserJafun.parse(code)
     println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
     println()
-    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
+    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("param1", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) } // TODO: look into this.
     val builder =
         IRBuilder.define {
             `class`(className) {
@@ -66,7 +67,7 @@ fun     testBytes(
     val output = ByteArrayOutputStream()
     System.setOut(PrintStream(output))
     try {
-        runMethod(bytes, className, methodName)
+        runMethod(bytes, className, methodName, params)
         System.setOut(oldOut)
     } catch (t: Throwable) {
         System.setOut(oldOut)
@@ -82,10 +83,11 @@ private fun runMethod(
     bytes: ByteArray,
     className: String,
     methodName: String,
+    params: Array<String>? = null,
 ) {
     val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
     val scriptClass = loader.define(className, bytes)
-    scriptClass.getMethod(methodName, Array<String>::class.java).invoke(null, null)
+    scriptClass.getMethod(methodName, Array<String>::class.java).invoke(null, params)
 }
 
 fun writeFile(
