@@ -8,6 +8,11 @@ import jafun.compiler.Associativity.SOLO
 import jafun.compiler.IdentifierCache
 import jafun.compiler.LocalSymbolMap
 import jafun.compiler.SymbolMap
+import nl.w8mr.jafun.IR.JFClass
+import nl.w8mr.jafun.IR.JFField
+import nl.w8mr.jafun.IR.JFMethod
+import nl.w8mr.jafun.IR.JFVariableSymbol
+import nl.w8mr.jafun.IR.Unit
 import nl.w8mr.jafun.Token.Identifier
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -37,102 +42,6 @@ import kotlin.collections.joinToString
 import kotlin.collections.last
 
 object ParserJafun {
-    private fun valAssignment(
-        identifier: Identifier,
-        expression: ASTNode.Expression
-    ): ASTNode.ValAssignment {
-        if (identifier.value in currentSymbolMap) {
-            throw IllegalStateException("Variable ${identifier.value} already defined")
-        }
-        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, false)
-        currentSymbolMap.add(identifier.value, variableSymbol)
-        return ASTNode.ValAssignment(variableSymbol, expression)
-    }
-
-    private fun varAssignment(
-        identifier: Identifier,
-        expression: ASTNode.Expression
-    ): ASTNode.VarAssignment {
-        if (identifier.value in currentSymbolMap) {
-            throw IllegalStateException("Variable ${identifier.value} already defined")
-        }
-        val variableSymbol = IR.JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, true)
-        currentSymbolMap.add(identifier.value, variableSymbol)
-        return ASTNode.VarAssignment(variableSymbol, expression)
-    }
-
-    private fun varReassignment(
-        identifier: Identifier,
-        expression: ASTNode.Expression
-    ): ASTNode.VarAssignment {
-        val variableSymbol = currentSymbolMap.find(identifier.value) as? IR.JFVariableSymbol
-            ?: throw IllegalStateException("Variable ${identifier.value} not defined")
-        if (!variableSymbol.mutable) {
-            throw IllegalStateException("Variable ${identifier.value} is not mutable")
-        }
-        return ASTNode.VarAssignment(variableSymbol, expression)
-    }
-
-
-    private fun newParameterDef(
-        identifier: Identifier,
-        type: List<Identifier>,
-    ): IR.JFVariableSymbol {
-        val variableSymbol =
-            IR.JFVariableSymbol(
-                identifier.value,
-                type = currentSymbolMap.find(type.last().value) ?: throw IllegalStateException(),
-                currentSymbolMap
-            ) // TODO: handle complex types
-        currentSymbolMap.add(identifier.value, variableSymbol)
-
-        return variableSymbol
-    }
-
-    private fun newFunction(
-        functionDef: FunctionDef,
-        block: ASTNode.ExpressionList,
-    ): ASTNode.Function {
-        popSymbolMap()
-        val symbol =
-            IR.JFMethod(
-                functionDef.parameters,
-                IR.JFClass("Script"),
-                functionDef.identifier.value,
-                block.expressions.lastOrNull()?.type() ?: IR.Unit,
-                static = true,
-                operator = functionDef.identifier.operator,
-                associativity = if (functionDef.parameters.isEmpty()) SOLO else PREFIX,
-            )
-        currentSymbolMap.add(functionDef.identifier.value, symbol)
-        return ASTNode.Function(symbol, block.expressions)
-    }
-
-    data class FunctionDef(
-        val identifier: Identifier,
-        val parameters: List<IR.JFVariableSymbol>,
-        val returnType: Identifier?,
-    )
-
-    private fun defineFunction(
-        identifier: Identifier,
-        parameters: List<IR.JFVariableSymbol>,
-        returnType: Identifier?,
-    ): FunctionDef {
-        val symbol =
-            IR.JFMethod(
-                parameters,
-                IR.JFClass("Script"),
-                identifier.value,
-                returnType?.value?.let { currentSymbolMap.find(it) } ?: IR.Unit,
-                static = true,
-                operator = identifier.operator,
-                associativity = if (parameters.isEmpty()) SOLO else PREFIX,
-            )
-        currentSymbolMap.add(identifier.value, symbol)
-        return FunctionDef(identifier, parameters, returnType)
-    }
-
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.asLiteral()
     val ows = zeroOrMore(whitespace)
 
@@ -201,6 +110,7 @@ object ParserJafun {
             ASTNode.ExpressionList(expressions)
         }
 
+
     val initValAssignment =
         combi {
             -("val" and wsnl)
@@ -210,7 +120,12 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            valAssignment(identifier, expression)
+            if (identifier.value in currentSymbolMap) {
+                throw IllegalStateException("Variable ${identifier.value} already defined")
+            }
+            val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, false)
+            currentSymbolMap.add(identifier.value, variableSymbol)
+            ASTNode.ValAssignment(variableSymbol, expression)
         }
 
     val initVarAssignment =
@@ -222,7 +137,12 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            varAssignment(identifier, expression)
+            if (identifier.value in currentSymbolMap) {
+                throw IllegalStateException("Variable ${identifier.value} already defined")
+            }
+            val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, true)
+            currentSymbolMap.add(identifier.value, variableSymbol)
+            ASTNode.VarAssignment(variableSymbol, expression)
         }
 
     val varAssignment =
@@ -233,7 +153,12 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            varReassignment(identifier, expression)
+            val variableSymbol = currentSymbolMap.find(identifier.value) as? JFVariableSymbol
+                ?: throw IllegalStateException("Variable ${identifier.value} not defined")
+            if (!variableSymbol.mutable) {
+                throw IllegalStateException("Variable ${identifier.value} is not mutable")
+            }
+            ASTNode.VarAssignment(variableSymbol, expression)
         }
 
     val whenExpression =
@@ -262,52 +187,54 @@ object ParserJafun {
             ASTNode.While(condition, expressions)
         }
 
-
-    val parameter = identifier and owsnl and ':' and owsnl and complexIdentifier map (::newParameterDef)
-
-    val functionDefinition =
+    val function =
         combi {
+            fun newParameterDef(
+                identifier: Identifier,
+                type: List<Identifier>,
+            ): JFVariableSymbol {
+                val variableSymbol =
+                    JFVariableSymbol(
+                        identifier.value,
+                        type = currentSymbolMap.find(type.last().value) ?: throw IllegalStateException(),
+                        currentSymbolMap
+                    ) // TODO: handle complex types
+                currentSymbolMap.add(identifier.value, variableSymbol)
+
+                return variableSymbol
+            }
+
             -literal("fun")
             -wsnl
-            pushSymbolMap()
             val name = identifier.bind()
             -owsnl
             -lParenTerm
-            val parameters = (parameter sepByAllowEmpty commaTerm).bind()
+            val parameters =
+                (identifier and owsnl and ':' and owsnl and complexIdentifier map (::newParameterDef) sepByAllowEmpty commaTerm).bind()
             -rParenTerm
             val returnType = optional(':' and owsnl and identifier).bind()
             -owsnl
-            defineFunction(name, parameters, returnType)
+
+            val symbol =
+                JFMethod(
+                    parameters,
+                    JFClass("Script"),
+                    name.value,
+                    returnType?.value?.let { currentSymbolMap.find(it) } ?: Unit,
+                    static = true,
+                    operator = name.operator,
+                    associativity = if (parameters.isEmpty()) SOLO else PREFIX,
+                )
+            currentSymbolMap.add(name.value, symbol)
+
+            val block = curlBlock.bind()
+
+            val symbolWithReturnType = symbol.copy(rtn = block.expressions.lastOrNull()?.type() ?: Unit)
+            currentSymbolMap.add(name.value, symbolWithReturnType)
+
+            ASTNode.Function(symbolWithReturnType, block.expressions)
+
         }
-
-    val function: Parser<Char, ASTNode.Expression> =
-        functionDefinition and curlBlock map (::newFunction)
-
-    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
-        add(
-            "arguments",
-            IR.JFVariableSymbol("arguments", IR.Array(IR.JFClass("java/lang/String")), this, false)
-        )
-    }
-
-    private fun pushSymbolMap() {
-        currentSymbolMap = LocalSymbolMap(currentSymbolMap)
-    }
-
-    private fun popSymbolMap() {
-        val oldSymbolMap = currentSymbolMap
-        currentSymbolMap =
-            if (oldSymbolMap is LocalSymbolMap) {
-                oldSymbolMap.parent
-            } else {
-                throw IllegalStateException("already at top of symbol map stack")
-            }
-    }
-
-    fun parse(input: String): List<ASTNode.Expression> {
-        val source = CharSequenceSource(input)
-        return expressions.parse(source)
-    }
 
     fun prattParser(
         stopTerm: Parser<Char, *> = newline or ';',
@@ -351,30 +278,6 @@ object ParserJafun {
             current.bind()
         }
 
-    fun ASTNode.Expression?.asList() =
-        when (this) {
-            null -> emptyList()
-            else -> listOf(this)
-        }
-
-    private fun CombinatorDSL<Char, ASTNode.Expression>.methodArguments(
-        method: IR.JFMethod,
-        minPrecedence: Int,
-        lhsExpression: ASTNode.Expression? = null
-    ): List<ASTNode.Expression> {
-        val newPrecedence =
-            when {
-                method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
-                else -> 0
-            }
-        val rhsArguments =
-            oneOf(
-                lParenTerm and (expressionUntilComma sepByAllowEmpty commaTerm) and rParenTerm,
-                prattParser(minPrecedence = newPrecedence).map { listOf(it) }
-            ).bind()
-        return lhsExpression.asList() + rhsArguments
-    }
-
     fun methodLhs(
         minPrecedence: Int,
     ): Parser<Char, ASTNode.Expression> =
@@ -382,9 +285,9 @@ object ParserJafun {
             val complexIdentifier = (complexIdentifier and ows).bind()
             val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
             when (symbol) {
-                is IR.JFVariableSymbol ->
+                is JFVariableSymbol ->
                     ASTNode.Variable(symbol)
-                is IR.JFMethod -> {
+                is JFMethod -> {
                     val arguments = when (symbol.associativity) {
                         SOLO -> {
                             -optional(lParenTerm and rParenTerm)
@@ -410,7 +313,7 @@ object ParserJafun {
         combi {
             val complexIdentifier = (complexIdentifier and owsnl).bind()
             val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
-            if (symbol is IR.JFMethod) {
+            if (symbol is JFMethod) {
                 val arguments = when (symbol.associativity) {
                     POSTFIX -> {
                         lhsExpression.asList()
@@ -427,13 +330,63 @@ object ParserJafun {
             }
         }
 
+    private fun ASTNode.Expression?.asList() =
+        when (this) {
+            null -> emptyList()
+            else -> listOf(this)
+        }
+
+    private fun CombinatorDSL<Char, ASTNode.Expression>.methodArguments(
+        method: JFMethod,
+        minPrecedence: Int,
+        lhsExpression: ASTNode.Expression? = null
+    ): List<ASTNode.Expression> {
+        val newPrecedence =
+            when {
+                method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
+                else -> 0
+            }
+        val rhsArguments =
+            oneOf(
+                lParenTerm and (expressionUntilComma sepByAllowEmpty commaTerm) and rParenTerm,
+                prattParser(minPrecedence = newPrecedence).map { listOf(it) }
+            ).bind()
+        return lhsExpression.asList() + rhsArguments
+    }
+
     private fun methodInvocation(
-        method: IR.JFMethod,
+        method: JFMethod,
         arguments: List<ASTNode.Expression>,
     ): ASTNode.Expression =
         when {
             method.static -> ASTNode.Invocation(method, null, arguments)
-            method.parent is IR.JFField -> ASTNode.Invocation(method, method.parent, arguments)
+            method.parent is JFField -> ASTNode.Invocation(method, method.parent, arguments)
             else -> TODO()
         }
+
+    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
+        add(
+            "arguments",
+            JFVariableSymbol("arguments", IR.Array(JFClass("java/lang/String")), this, false)
+        )
+    }
+
+    private fun pushSymbolMap() {
+        currentSymbolMap = LocalSymbolMap(currentSymbolMap)
+    }
+
+    private fun popSymbolMap() {
+        val oldSymbolMap = currentSymbolMap
+        currentSymbolMap =
+            if (oldSymbolMap is LocalSymbolMap) {
+                oldSymbolMap.parent
+            } else {
+                throw IllegalStateException("already at top of symbol map stack")
+            }
+    }
+
+    fun parse(input: String): List<ASTNode.Expression> {
+        val source = CharSequenceSource(input)
+        return expressions.parse(source)
+    }
 }

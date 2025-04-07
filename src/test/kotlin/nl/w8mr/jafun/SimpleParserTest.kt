@@ -156,17 +156,6 @@ class SimpleParserTest {
         )
     }
 
-
-    @Test
-    fun `empty function definition compact`() {
-        testSingleParser(
-            ParserJafun.functionDefinition,
-            """|fun test(){ }""".trimMargin(),
-            ParserJafun.FunctionDef(Token.Identifier("test"), emptyList(), null),
-            10,
-        )
-    }
-
     @Test
     fun `empty function compact`() {
         testSingleParser(
