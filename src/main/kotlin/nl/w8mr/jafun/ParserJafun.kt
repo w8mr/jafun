@@ -153,7 +153,7 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            val variableSymbol = currentSymbolMap.find(identifier.value) as? JFVariableSymbol
+            val variableSymbol = currentSymbolMap.findSingle(identifier.value) as? JFVariableSymbol
                 ?: throw IllegalStateException("Variable ${identifier.value} not defined")
             if (!variableSymbol.mutable) {
                 throw IllegalStateException("Variable ${identifier.value} is not mutable")
@@ -196,7 +196,7 @@ object ParserJafun {
                 val variableSymbol =
                     JFVariableSymbol(
                         identifier.value,
-                        type = currentSymbolMap.find(type.last().value) ?: throw IllegalStateException(),
+                        type = currentSymbolMap.findSingle(type.last().value),
                         currentSymbolMap
                     ) // TODO: handle complex types
                 currentSymbolMap.add(identifier.value, variableSymbol)
@@ -220,7 +220,7 @@ object ParserJafun {
                     parameters,
                     JFClass("Script"),
                     name.value,
-                    returnType?.value?.let { currentSymbolMap.find(it) } ?: Unit,
+                    returnType?.value?.let { currentSymbolMap.findSingleOrNull(it) } ?: Unit,
                     static = true,
                     operator = name.operator,
                     associativity = if (parameters.isEmpty()) SOLO else PREFIX,
@@ -240,6 +240,7 @@ object ParserJafun {
         stopTerm: Parser<Char, *> = newline or ';',
         minPrecedence: Int = 0,
     ): Parser<Char, ASTNode.Expression> =
+        //TODO: Cache parsers
         combi {
             var current = (
                     oneOf(
@@ -281,9 +282,10 @@ object ParserJafun {
     fun methodLhs(
         minPrecedence: Int,
     ): Parser<Char, ASTNode.Expression> =
+        //TODO: Cache parsers
         combi {
             val complexIdentifier = (complexIdentifier and ows).bind()
-            val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            val symbol = currentSymbolMap.findFirstOrNull(complexIdentifier.joinToString(".") { it.value })
             when (symbol) {
                 is JFVariableSymbol ->
                     ASTNode.Variable(symbol)
@@ -310,9 +312,10 @@ object ParserJafun {
         lhsExpression: ASTNode.Expression?,
         minPrecedence: Int,
     ): Parser<Char, ASTNode.Expression> =
+        //TODO: Cache parsers
         combi {
             val complexIdentifier = (complexIdentifier and owsnl).bind()
-            val symbol = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            val symbol = currentSymbolMap.findFirstOrNull(complexIdentifier.joinToString(".") { it.value })
             if (symbol is JFMethod) {
                 val arguments = when (symbol.associativity) {
                     POSTFIX -> {

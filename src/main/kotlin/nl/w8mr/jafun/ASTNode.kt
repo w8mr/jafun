@@ -186,7 +186,7 @@ sealed interface ASTNode {
             condition: Expression,
         ) = variable?.let {
                 Invocation(
-                    IdentifierCache.find("==") as IR.JFMethod,
+                    IdentifierCache.findSingleOrNull("==") as IR.JFMethod,
                     null,
                     listOf(Variable(variable), condition),
                 )
@@ -346,13 +346,13 @@ sealed interface ASTNode {
                     compileAsExpression(argument, builder)
                 } else if (argument.type() == IR.SInt32 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                    builder.invoke(IdentifierCache.find("java.lang.Integer.valueOf") as IR.JFMethod, null)
+                    builder.invoke(IdentifierCache.findSingle("java.lang.Integer.valueOf") as IR.JFMethod, null)
                 } else if (argument.type() == IR.CharType && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                    builder.invoke(IdentifierCache.find("java.lang.Character.valueOf") as IR.JFMethod, null)
+                    builder.invoke(IdentifierCache.findSingle("java.lang.Character.valueOf") as IR.JFMethod, null)
                 } else if (argument.type() == IR.UInt1 && parameter is IR.JFClass) {
                     compileAsExpression(argument, builder)
-                    builder.invoke(IdentifierCache.find("java.lang.Boolean.valueOf") as IR.JFMethod, null)
+                    builder.invoke(IdentifierCache.findSingle("java.lang.Boolean.valueOf") as IR.JFMethod, null)
                 } else if (argument.type() == parameter) {
                     compileAsExpression(argument, builder)
                 } else {

@@ -13,7 +13,11 @@ annotation class FunctionAssociativity(val associativity: Associativity)
 annotation class FunctionPrecedence(val precedence: Int)
 
 interface SymbolMap {
-    fun find(path: String): IR.OperandType<*>?
+    fun find(path: String): List<IR.OperandType<*>>
+    fun findSingle(path: String) = find(path).single()
+    fun findSingleOrNull(path: String) = find(path).singleOrNull()
+    fun findFirst(path: String) = find(path).first()
+    fun findFirstOrNull(path: String) = find(path).firstOrNull()
 
     operator fun contains(path: String): Boolean
 
@@ -33,9 +37,9 @@ interface SymbolMap {
 }
 
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
-    private val identifierMap = mutableMapOf<String, IR.OperandType<*>?>()
+    private val identifierMap = mutableMapOf<String, List<IR.OperandType<*>>>()
 
-    override fun find(path: String): IR.OperandType<*>? = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(
+    override fun find(path: String): List<IR.OperandType<*>> = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(
         path
     )
     override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
@@ -45,14 +49,14 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
         typeSig: IR.OperandType<*>,
     ) {
         // TODO: Add shadow check
-        identifierMap[path.replaceIllegalCharacters()] = typeSig
+        identifierMap[path.replaceIllegalCharacters()] = listOf(typeSig)
     }
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
 }
 
 object IdentifierCache : SymbolMap {
-    private val identifierMap = mutableMapOf<String, IR.OperandType<*>?>()
+    private val identifierMap = mutableMapOf<String, List<IR.OperandType<*>>>()
     private var symbolMapCounter: Int = 0
     override val symbolMapId: Int = 0
 
@@ -86,14 +90,14 @@ object IdentifierCache : SymbolMap {
                 IR.Reference<Character>("java/lang/Character"),
                 IR.CharType,
             )
-        identifierMap["System.out.println"] = systemOutPrintln
-        identifierMap["java.lang.System.out.println"] = systemOutPrintln
-        identifierMap["java.lang.Integer.valueOf"] = integerValueOf
-        identifierMap["java.lang.Boolean.valueOf"] = booleanValueOf
-        identifierMap["java.lang.Character.valueOf"] = characterValueOf
+        identifierMap["System.out.println"] = listOf(systemOutPrintln)
+        identifierMap["java.lang.System.out.println"] = listOf(systemOutPrintln)
+        identifierMap["java.lang.Integer.valueOf"] = listOf(integerValueOf)
+        identifierMap["java.lang.Boolean.valueOf"] = listOf(booleanValueOf)
+        identifierMap["java.lang.Character.valueOf"] = listOf(characterValueOf)
 
-        identifierMap["Int"] = IR.SInt32
-        identifierMap["String"] = IR.StringType
+        identifierMap["Int"] = listOf(IR.SInt32)
+        identifierMap["String"] = listOf(IR.StringType)
     }
 
     private fun staticFieldMethod(
@@ -139,23 +143,23 @@ object IdentifierCache : SymbolMap {
             )
         }
 
-    override fun find(path: String): IR.OperandType<*>? {
+    override fun find(path: String): List<IR.OperandType<*>> {
         return identifierMap.computeIfAbsent(path) {
             val split = path.split(".")
             when {
                 split.size == 1 -> {
                     val name = split[0]
                     val typeSigs =
-                        listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt").map {
+                        listOf("jafun.lang.IntKt"/*, "jafun.lang.CharKt"*/, "jafun.io.ConsoleKt").mapNotNull {
                             val jClass = Class.forName(it)
                             findInClass(jClass, name.replaceIllegalCharacters())
-                        }.firstOrNull { it != null }
+                        }
                     typeSigs
                 }
                 else -> {
                     try {
                         val jClass = Class.forName(path)
-                        IR.JFClass(jClass.name.replace('.', '/'))
+                        listOf(IR.JFClass(jClass.name.replace('.', '/')))
                     } catch (e: Exception) {
                         TODO()
                     }
@@ -170,7 +174,7 @@ object IdentifierCache : SymbolMap {
         path: String,
         typeSig: IR.OperandType<*>,
     ) {
-        identifierMap[path] = typeSig
+        identifierMap[path.replaceIllegalCharacters()] = listOf(typeSig)
     }
 
     override fun incSymbolMapCount(): Int {
