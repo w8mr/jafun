@@ -34,6 +34,7 @@ import nl.w8mr.parsek.text.letter
 import nl.w8mr.parsek.text.literal
 import nl.w8mr.parsek.text.oneOrMore
 import nl.w8mr.parsek.text.or
+import nl.w8mr.parsek.text.repeat
 import nl.w8mr.parsek.text.sepBy
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
@@ -66,7 +67,7 @@ object ParserJafun {
     val decimalDigitNoZero = char { it in '1'..'9' }
     val decimalDigitOrSeparator = decimalDigit or char('_')
     val integerLiteral_term =
-        ((decimalDigitNoZero and any(decimalDigitOrSeparator)) or decimalDigit).map {
+        ((repeat(char('-'), 1, 0) and decimalDigitNoZero and any(decimalDigitOrSeparator)) or decimalDigit).map {
             ASTNode.IntegerLiteral(it.replace("_", "").toInt())
         }
 

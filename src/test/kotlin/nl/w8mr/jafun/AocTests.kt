@@ -17,7 +17,7 @@ class AocTests {
             while (i < l) {
                 val c = charAt(input, i)
                 floor = floor + when (c) {
-                    ')' -> 0-1
+                    ')' -> -1
                     '(' -> 1
                     else -> 0
                 }
@@ -40,7 +40,7 @@ class AocTests {
             while (floor >= 0) {
                 val c = charAt(input, i)
                 floor = floor + when (c) {
-                    ')' -> 0-1
+                    ')' -> -1
                     '(' -> 1
                     else -> 0
                 }
