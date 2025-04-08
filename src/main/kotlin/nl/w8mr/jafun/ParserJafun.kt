@@ -295,11 +295,9 @@ object ParserJafun {
                             -optional(lParenTerm and rParenTerm)
                             emptyList()
                         }
-
-                        PREFIX, INFIXL, INFIXR -> {
+                        PREFIX -> {
                             methodArguments(symbol, minPrecedence)
                         }
-
                         else -> fail("Method (${complexIdentifier.joinToString(".") { it.value}}) does not have the right associativity")
                     }
                     methodInvocation(symbol, arguments)
