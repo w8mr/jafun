@@ -1,4 +1,4 @@
-package jafun.compiler
+package nl.w8mr.jafun.compiler
 
 enum class Associativity {
     INFIXL,

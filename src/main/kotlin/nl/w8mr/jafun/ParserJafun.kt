@@ -1,13 +1,13 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.Associativity.INFIXL
-import jafun.compiler.Associativity.INFIXR
-import jafun.compiler.Associativity.POSTFIX
-import jafun.compiler.Associativity.PREFIX
-import jafun.compiler.Associativity.SOLO
-import jafun.compiler.IdentifierCache
-import jafun.compiler.LocalSymbolMap
-import jafun.compiler.SymbolMap
+import nl.w8mr.jafun.compiler.Associativity.INFIXL
+import nl.w8mr.jafun.compiler.Associativity.INFIXR
+import nl.w8mr.jafun.compiler.Associativity.POSTFIX
+import nl.w8mr.jafun.compiler.Associativity.PREFIX
+import nl.w8mr.jafun.compiler.Associativity.SOLO
+import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.LocalSymbolMap
+import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.IR.JFClass
 import nl.w8mr.jafun.IR.JFField
 import nl.w8mr.jafun.IR.JFMethod

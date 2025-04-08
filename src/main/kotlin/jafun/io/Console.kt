@@ -1,8 +1,8 @@
 package jafun.io
 
-import jafun.compiler.Associativity
-import jafun.compiler.FunctionAssociativity
-import jafun.compiler.FunctionPrecedence
+import nl.w8mr.jafun.compiler.Associativity
+import nl.w8mr.jafun.compiler.FunctionAssociativity
+import nl.w8mr.jafun.compiler.FunctionPrecedence
 
 fun print(text: Any?) = System.out.print(text)
 

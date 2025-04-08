@@ -1,9 +1,9 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.Associativity
-import jafun.compiler.HasPath
-import jafun.compiler.IdentifierCache
-import jafun.compiler.SymbolMap
+import nl.w8mr.jafun.compiler.Associativity
+import nl.w8mr.jafun.compiler.HasPath
+import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.SymbolMap
 
 class IR {
     sealed interface OperandType<J> {

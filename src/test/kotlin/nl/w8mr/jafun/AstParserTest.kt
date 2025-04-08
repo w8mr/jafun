@@ -1,8 +1,8 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import jafun.compiler.Associativity
-import jafun.compiler.HasPath
-import jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.Associativity
+import nl.w8mr.jafun.compiler.HasPath
+import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.ASTNode.Expression
 import nl.w8mr.jafun.ASTNode.Function

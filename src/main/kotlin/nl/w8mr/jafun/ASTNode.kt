@@ -1,7 +1,7 @@
 package nl.w8mr.jafun
 
-import jafun.compiler.IdentifierCache
-import jafun.compiler.LocalSymbolMap
+import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.LocalSymbolMap
 import kotlin.collections.joinToString
 
 sealed interface ASTNode {

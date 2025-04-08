@@ -1,59 +1,8 @@
-package jafun.compiler
+package nl.w8mr.jafun.compiler
 
-import jafun.compiler.IdentifierCache.incSymbolMapCount
 import nl.w8mr.jafun.IR
-import nl.w8mr.jafun.ParserJafun.operatorSymbols
-
-@Target(AnnotationTarget.FUNCTION)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class FunctionAssociativity(val associativity: Associativity)
-
-@Target(AnnotationTarget.FUNCTION)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class FunctionPrecedence(val precedence: Int)
-
-interface SymbolMap {
-    fun find(path: String): List<IR.OperandType<*>>
-    fun findSingle(path: String) = find(path).single()
-    fun findSingleOrNull(path: String) = find(path).singleOrNull()
-    fun findFirst(path: String) = find(path).first()
-    fun findFirstOrNull(path: String) = find(path).firstOrNull()
-
-    operator fun contains(path: String): Boolean
-
-    fun add(
-        path: String,
-        typeSig: IR.OperandType<*>,
-    )
-
-    fun incSymbolMapCount(): Int
-
-    val symbolMapId: Int
-
-    fun String.replaceIllegalCharacters() =
-        this.replace('<', '﹤')
-            .replace('>', '﹥')
-            .replace('/', '∕')
-}
-
-data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
-    private val identifierMap = mutableMapOf<String, List<IR.OperandType<*>>>()
-
-    override fun find(path: String): List<IR.OperandType<*>> =
-        identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
-
-    override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
-
-    override fun add(
-        path: String,
-        typeSig: IR.OperandType<*>,
-    ) {
-        // TODO: Add shadow check
-        identifierMap[path.replaceIllegalCharacters()] = listOf(typeSig)
-    }
-
-    override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
-}
+import nl.w8mr.jafun.ParserJafun
+import java.lang.Boolean
 
 object IdentifierCache : SymbolMap {
     private val identifierMap = mutableMapOf<String, List<IR.OperandType<*>>>()
@@ -80,7 +29,7 @@ object IdentifierCache : SymbolMap {
             staticMethod(
                 "java.lang.Boolean",
                 "valueOf",
-                IR.Reference<java.lang.Boolean>("java/lang/Boolean"),
+                IR.Reference<Boolean>("java/lang/Boolean"),
                 IR.UInt1,
             )
         val characterValueOf =
@@ -204,7 +153,7 @@ object IdentifierCache : SymbolMap {
                     name,
                     rtn,
                     true,
-                    jMethod.name.all(operatorSymbols::contains),
+                    jMethod.name.all(ParserJafun.operatorSymbols::contains),
                     associativity,
                     precedence,
                 )
@@ -231,8 +180,4 @@ object IdentifierCache : SymbolMap {
         symbolMapCounter = 1
         return this
     }
-}
-
-interface HasPath {
-    val path: String
 }
