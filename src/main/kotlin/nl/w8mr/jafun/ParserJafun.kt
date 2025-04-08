@@ -84,7 +84,7 @@ object ParserJafun {
     val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
 
     val identifier = normalIdentifier or operatorIdentifier
-    val complexIdentifier = identifier sepBy '.'
+    val complexIdentifier = identifier sepBy '.' //TODO remove complex identifier. Move to pratt parser
 
     val whenArrow = identifier.filter { it.value == "->" }.asLiteral()
 

@@ -39,20 +39,9 @@ interface SymbolMap {
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = incSymbolMapCount()) : SymbolMap {
     private val identifierMap = mutableMapOf<String, List<IR.OperandType<*>>>()
 
-    override fun find(path: String): List<IR.OperandType<*>> {
-        val full = identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
-        return when {
-            full.isEmpty() -> {
-                val obj = identifierMap[path.substringBefore('.')]?.filterIsInstance<IR.JFVariableSymbol>()?.singleOrNull()
-                if (obj != null) {
-                    //check for methods
-                }
-                emptyList()
-            }
-            else -> full
+    override fun find(path: String): List<IR.OperandType<*>> =
+        identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
 
-        }
-    }
     override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
 
     override fun add(
