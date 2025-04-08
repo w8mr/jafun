@@ -19,7 +19,7 @@ class AocTests {
                 floor = floor + when (c) {
                     ')' -> 0-1
                     '(' -> 1
-                    true -> 0
+                    else -> 0
                 }
                 i = i + 1
             }
@@ -42,7 +42,7 @@ class AocTests {
                 floor = floor + when (c) {
                     ')' -> 0-1
                     '(' -> 1
-                    true -> 0
+                    else -> 0
                 }
                 i = i + 1
             }

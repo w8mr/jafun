@@ -1074,7 +1074,7 @@ class CompilerTest {
             """
                 when {
                     1 == 1 -> "One"
-                    true -> "Else"
+                    else -> "Else"
                 }""",
             "",
         ) {
@@ -1141,7 +1141,7 @@ class CompilerTest {
                     a == 1 -> "One"
                     a == 2 -> "Two"
                     a == 3 -> "Three"
-                    true -> "More"
+                    else -> "More"
                 }""",
             "Two\n",
         ) {
@@ -1185,7 +1185,7 @@ class CompilerTest {
                     1 -> "One"
                     2 -> "Two"
                     3 -> "Three"
-                    true -> "More"
+                    else -> "More"
                 }""",
             "Two\n",
         ) {
@@ -1228,7 +1228,7 @@ class CompilerTest {
                     1 -> "One"
                     2 -> "Two"
                     3 -> "Three"
-                    true -> "More"
+                    else -> "More"
                 }""",
             "Two\n",
         ) {
@@ -1273,7 +1273,7 @@ class CompilerTest {
                     1 -> "One"
                     2 -> "Two"
                     3 -> "Three"
-                    true -> "More"
+                    else -> "More"
                 }""",
             "Two\n",
         ) {
@@ -1317,7 +1317,7 @@ class CompilerTest {
                 fun factorial(n: Int): Int {
                     when (n) {
                         0 -> 1
-                        true -> n * (factorial n - 1)
+                        else -> n * (factorial n - 1)
                     }
                 }
                 println factorial 6""",
@@ -1361,7 +1361,7 @@ class CompilerTest {
                     when (n) {
                         0 -> 0
                         1 -> 1
-                        true -> (fibonacci n - 1) + (fibonacci n - 2)
+                        else -> (fibonacci n - 1) + (fibonacci n - 2)
                     }
                 }
                 println fibonacci 13""",
@@ -1376,7 +1376,7 @@ class CompilerTest {
                 fun fibonacci(n: Int): Int {
                     when {
                         n <= 1 -> n
-                        true -> fibonacci(n - 1) + fibonacci(n - 2)
+                        else -> fibonacci(n - 1) + fibonacci(n - 2)
                     }
                 }
                 println fibonacci 13""",

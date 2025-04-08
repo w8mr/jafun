@@ -161,6 +161,7 @@ object ParserJafun {
             ASTNode.VarAssignment(variableSymbol, expression)
         }
 
+    val elseInWhen = "else".value(ASTNode.BooleanLiteral(true)) and owsnl
     val whenExpression =
         combi {
             -("when" and owsnl)
@@ -168,7 +169,7 @@ object ParserJafun {
             val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
             -blockOpen
             val matches =
-                zeroOrMore(expressionUntilArrow and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
+                zeroOrMore((elseInWhen or expressionUntilArrow) and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
             -blockClose
             popSymbolMap()
             ASTNode.When(subject, matches)
