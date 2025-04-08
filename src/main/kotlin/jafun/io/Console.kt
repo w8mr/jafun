@@ -17,7 +17,7 @@ fun reverse(str: String) = str.reversed()
 
 fun first(strings: Array<String>) = strings.first()
 fun length(string: String) = string.length
-fun charAt(string: String, index: Int) = string[index]
+//fun charAt(string: String, index: Int) = string[index]
 
 @FunctionPrecedence(40)
 @FunctionAssociativity(Associativity.POSTFIX)
