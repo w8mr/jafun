@@ -15,8 +15,6 @@ class IR {
     sealed interface OneOperand<J, T : OperandType<J>> : Instruction {
         val operand1: J
         val type: T
-
-        fun operand() = this.operand1
     }
 
     object StringType : OperandType<String> { override fun toString() = "StringType" }
