@@ -1114,6 +1114,25 @@ class CompilerTest {
     }
 
     @Test
+    fun basicEqualityChars() {
+        test(
+            """'a' == 'a'""",
+            "",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                loadConstant('a')
+                loadConstant('a')
+                invokeStatic("jafun/lang/CharKt", "==", "(CC)Z")
+                pop()
+                `return`()
+            }
+        }
+    }
+
+    @Test
     fun basicWhen() {
         test(
             """

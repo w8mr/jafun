@@ -150,7 +150,7 @@ object IdentifierCache : SymbolMap {
                 split.size == 1 -> {
                     val name = split[0]
                     val typeSigs =
-                        listOf("jafun.lang.IntKt"/*, "jafun.lang.CharKt"*/, "jafun.io.ConsoleKt").mapNotNull {
+                        listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.io.ConsoleKt").mapNotNull {
                             val jClass = Class.forName(it)
                             findInClass(jClass, name.replaceIllegalCharacters())
                         }
@@ -160,7 +160,7 @@ object IdentifierCache : SymbolMap {
                     try {
                         val jClass = Class.forName(path)
                         listOf(IR.JFClass(jClass.name.replace('.', '/')))
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         TODO()
                     }
                 }

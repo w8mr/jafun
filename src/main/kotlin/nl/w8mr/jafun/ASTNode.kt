@@ -185,8 +185,12 @@ sealed interface ASTNode {
             variable: IR.JFVariableSymbol?,
             condition: Expression,
         ) = variable?.let {
+                val symbols = IdentifierCache.find("==")
+                val symbol = symbols.filterIsInstance<IR.JFMethod>().singleOrNull { symbol ->
+                    symbol.parameters.map { it.type } == listOf(variable.type, condition.type())
+                } ?: error("No single method found for == in when condition check")
                 Invocation(
-                    IdentifierCache.findSingleOrNull("==") as IR.JFMethod,
+                    symbol,
                     null,
                     listOf(Variable(variable), condition),
                 )

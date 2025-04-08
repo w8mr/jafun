@@ -313,22 +313,34 @@ object ParserJafun {
         //TODO: Cache parsers
         combi {
             val complexIdentifier = (complexIdentifier and owsnl).bind()
-            val symbol = currentSymbolMap.findFirstOrNull(complexIdentifier.joinToString(".") { it.value })
-            if (symbol is JFMethod) {
+            val symbols = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            var okMark = mark()
+            val result = symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
+                val mark = mark()
                 val arguments = when (symbol.associativity) {
                     POSTFIX -> {
                         lhsExpression.asList()
                     }
+
                     INFIXL, INFIXR -> {
                         if (symbol.precedence <= minPrecedence) fail("Lower precedence")
                         methodArguments(symbol, minPrecedence, lhsExpression)
                     }
-                    else -> fail("Method (${complexIdentifier.joinToString(".") { it.value}}) does not have the right associativity")
+
+                    else -> fail("Method (${complexIdentifier.joinToString(".") { it.value }}) does not have the right associativity")
                 }
-                methodInvocation(symbol, arguments)
-            } else {
-                fail("Method (${complexIdentifier.joinToString(".") { it.value}}) not found")
-            }
+                if (arguments.map { it.type() } == symbol.parameters.map { it.type }) {
+                    okMark = mark()
+                    reset(mark)
+                    methodInvocation(symbol, arguments)
+                } else {
+                    reset(mark)
+                    null
+                }
+
+            }.singleOrNull() ?: fail("No single method (${complexIdentifier}) not found")
+            reset(okMark)
+            result
         }
 
     private fun ASTNode.Expression?.asList() =
