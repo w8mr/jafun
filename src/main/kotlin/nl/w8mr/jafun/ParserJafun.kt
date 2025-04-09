@@ -4,7 +4,6 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXL
 import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
-import nl.w8mr.jafun.compiler.Associativity.SOLO
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
@@ -39,6 +38,7 @@ import nl.w8mr.parsek.text.repeat
 import nl.w8mr.parsek.text.sepBy
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
+import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 import kotlin.collections.last
 
@@ -225,7 +225,7 @@ object ParserJafun {
                     returnType?.value?.let { currentSymbolMap.findSingleOrNull(it) } ?: Unit,
                     static = true,
                     operator = name.operator,
-                    associativity = if (parameters.isEmpty()) SOLO else PREFIX,
+                    associativity = PREFIX,
                 )
             currentSymbolMap.add(name.value, symbol)
 
@@ -290,16 +290,12 @@ object ParserJafun {
         //TODO: Cache parsers
         combi {
             val identifier = (this@ParserJafun.identifier and ows).bind()
-            val symbol = currentSymbolMap.findFirstOrNull(identifier.value)
+            val symbol = currentSymbolMap.findFirstOrNull(identifier.value) //TODO handle multiple cases and get rid of SOLO
             when (symbol) {
                 is JFVariableSymbol ->
                     ASTNode.Variable(symbol)
                 is JFMethod -> {
                     val arguments = when (symbol.associativity) {
-                        SOLO -> {
-                            -optional(lParenTerm and rParenTerm)
-                            emptyList()
-                        }
                         PREFIX -> {
                             methodArguments(symbol, minPrecedence)
                         }
@@ -414,6 +410,7 @@ object ParserJafun {
         minPrecedence: Int,
         lhsExpression: ASTNode.Expression? = null
     ): List<ASTNode.Expression> {
+        val count = method.parameters.size - (if (lhsExpression == null) 0 else 1)
         val newPrecedence =
             when {
                 method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
@@ -421,8 +418,14 @@ object ParserJafun {
             }
         val rhsArguments =
             oneOf(
-                lParenTerm and (expressionUntilComma sepByAllowEmpty commaTerm) and rParenTerm,
-                prattParser(minPrecedence = newPrecedence).map { listOf(it) }
+                lParenTerm and combi {
+                    when (count) {
+                        0 -> emptyList()
+                        1 -> listOf(expressionUntilComma.bind())
+                        else -> listOf(expressionUntilComma.bind()) + (commaTerm and expressionUntilComma).times(count - 1).bind()
+                    }
+                } and rParenTerm,
+                prattParser(minPrecedence = newPrecedence).times(count),
             ).bind()
         return lhsExpression.asList() + rhsArguments
     }

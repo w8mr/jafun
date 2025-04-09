@@ -162,7 +162,7 @@ class SimpleParserTest {
             ParserJafun.function,
             """|fun test(){}""".trimMargin(),
             ASTNode.Function(
-                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10),
+                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.PREFIX, 10),
                 emptyList(),
             ),
             12,
@@ -181,7 +181,7 @@ class SimpleParserTest {
                 |}
             """.trimMargin(),
             ASTNode.Function(
-                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.SOLO, 10),
+                IR.JFMethod(emptyList(), IR.JFClass("Script"), "test", IR.Unit, true, false, Associativity.PREFIX, 10),
                 emptyList(),
             ),
             21,
