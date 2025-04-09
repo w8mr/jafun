@@ -276,7 +276,7 @@ class AstParserTest {
             IR.StringType,
             IR.StringType,
             IR.StringType,
-            parent = IR.JFClass("jafun/io/ConsoleKt"),
+            parent = IR.JFClass("jafun/io/test/TestKt"),
             operator = false,
         )
 

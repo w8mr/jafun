@@ -54,6 +54,7 @@ class JVMBackend {
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
                         is IR.JFField -> TODO()
+                        is IR.JFPackage -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
@@ -67,8 +68,7 @@ class JVMBackend {
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
                         is IR.JFField -> TODO()
-
-
+                        is IR.JFPackage -> TODO()
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
@@ -83,6 +83,7 @@ class JVMBackend {
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
                         is IR.JFField -> TODO()
+                        is IR.JFPackage -> TODO()
                     }
 
                 is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
@@ -168,4 +169,5 @@ fun signature(type: IR.OperandType<*>): String =
         is IR.JFClass -> "L${type.path.replace('.', '/')};" //TODO: check if this needs to bee JFObject?
         is IR.JFVariableSymbol -> TODO()
         is IR.JFField -> TODO()
+        is IR.JFPackage -> TODO()
     }

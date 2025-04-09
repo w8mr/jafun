@@ -39,7 +39,7 @@ object IdentifierCache : SymbolMap {
                 IR.Reference<Character>("java/lang/Character"),
                 IR.CharType,
             )
-        identifierMap["System.out.println"] = listOf(systemOutPrintln)
+    //    identifierMap["System.out.println"] = listOf(systemOutPrintln)
         identifierMap["java.lang.System.out.println"] = listOf(systemOutPrintln)
         identifierMap["java.lang.Integer.valueOf"] = listOf(integerValueOf)
         identifierMap["java.lang.Boolean.valueOf"] = listOf(booleanValueOf)
@@ -51,6 +51,13 @@ object IdentifierCache : SymbolMap {
         identifierMap["System"] = listOf(IR.JFClass("java.lang.System"))
         identifierMap["java.lang.System.out"] = listOf(IR.JFField(IR.JFClass("java.lang.System"), "java.lang.System.out", "out", IR.JFClass("java.io.PrintStream")))
         identifierMap["java.io.PrintStream.println"] = listOf(systemOutPrintln)
+
+        identifierMap["java"] = listOf(IR.JFPackage("java"))
+        identifierMap["java.lang"] = listOf(IR.JFPackage("java.lang"))
+        identifierMap["java.lang.System"] = listOf(IR.JFClass("java.lang.System"))
+        identifierMap["java.io"] = listOf(IR.JFPackage("java.io"))
+        identifierMap["java.io.PrintStream"] = listOf(IR.JFClass("java.io.PrintStream"))
+
     }
 
     private fun staticFieldMethod(
@@ -103,7 +110,7 @@ object IdentifierCache : SymbolMap {
                 split.size == 1 -> {
                     val name = split[0]
                     val typeSigs =
-                        listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt").mapNotNull {
+                        listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.io.test.TestKt").mapNotNull {
                             val jClass = Class.forName(it)
                             findInClass(jClass, name.replaceIllegalCharacters())
                         }

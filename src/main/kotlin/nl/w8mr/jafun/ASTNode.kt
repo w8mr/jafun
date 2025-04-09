@@ -143,8 +143,8 @@ sealed interface ASTNode {
         }.toString()
     }
 
-    data class Class(val clazz: IR.JFClass): Expression() {
-        override fun type() = clazz
+    data class Class(val `class`: IR.JFClass): Expression() {
+        override fun type() = `class`
 
         override fun compile(
             builder: IRBuilder.CodeBlockDSL,
@@ -153,10 +153,24 @@ sealed interface ASTNode {
             error("Should not be in compiler output")
         }
 
-        override fun tree(indent: Int): String = "${" ".repeat(indent)}Class(${clazz.path})"
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Class(${`class`.path})"
     }
 
-    data class Field(val clazz: IR.JFClass, val field: IR.JFField) : Expression() {
+    data class Package(val `package`: IR.JFPackage): Expression() {
+        override fun type() = `package`
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            error("Should not be in compiler output")
+        }
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Package(${`package`.path})"
+    }
+
+
+    data class Field(val `class`: IR.JFClass, val field: IR.JFField) : Expression() {
         override fun type() = field.type ?: TODO("remove null type")
 
         override fun compile(
@@ -167,7 +181,7 @@ sealed interface ASTNode {
         }
 
 
-        override fun tree(indent: Int): String = "${" ".repeat(indent)}Field(${clazz.path}.${field.name})"
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Field(${`class`.path}.${field.name})"
 
     }
 

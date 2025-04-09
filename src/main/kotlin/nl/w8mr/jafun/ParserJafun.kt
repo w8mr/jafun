@@ -11,6 +11,7 @@ import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.IR.JFClass
 import nl.w8mr.jafun.IR.JFField
 import nl.w8mr.jafun.IR.JFMethod
+import nl.w8mr.jafun.IR.JFPackage
 import nl.w8mr.jafun.IR.JFVariableSymbol
 import nl.w8mr.jafun.IR.Unit
 import nl.w8mr.jafun.Token.Identifier
@@ -309,6 +310,9 @@ object ParserJafun {
                 is JFClass -> {
                     ASTNode.Class(symbol)
                 }
+                is JFPackage -> {
+                    ASTNode.Package(symbol)
+                }
                 else -> fail("Method or variable (${identifier.value}) not found")
             }
         }
@@ -360,10 +364,10 @@ object ParserJafun {
             val identifier = (identifier and owsnl).bind()
             when (lhsExpression) {
                 is ASTNode.Class -> {
-                    val symbols = currentSymbolMap.findSingleOrNull("${lhsExpression.clazz.path}.${identifier.value}")
+                    val symbols = currentSymbolMap.findSingleOrNull("${lhsExpression.`class`.path}.${identifier.value}")
                     when (symbols) {
                         is JFField -> {
-                            ASTNode.Field(lhsExpression.clazz, symbols)
+                            ASTNode.Field(lhsExpression.`class`, symbols)
                         }
                         is JFMethod -> TODO("Handle method invocation")
                         else -> error("Should be field or method")
@@ -373,7 +377,7 @@ object ParserJafun {
                     val symbols = currentSymbolMap.findSingleOrNull("${(lhsExpression.type() as JFClass).path}.${identifier.value}")
                     when (symbols) {
                         is JFField -> {
-                            ASTNode.Field(lhsExpression.clazz, symbols)
+                            ASTNode.Field(lhsExpression.`class`, symbols)
                         }
                         is JFMethod -> {
                             methodInvocation(symbols, methodArguments(symbols, minPrecedence))
@@ -382,8 +386,20 @@ object ParserJafun {
                         else -> error("Should be field or method")
                     }
                 }
+                is ASTNode.Package -> {
+                    val symbols = currentSymbolMap.findSingleOrNull("${lhsExpression.`package`.path}.${identifier.value}")
+                    when (symbols) {
+                        is JFClass -> {
+                            ASTNode.Class(symbols)
+                        }
+                        is JFPackage -> {
+                            ASTNode.Package(symbols)
+                        }
+                        else -> error("Should be pacakge or class")
+                    }
+                }
                 else ->
-                    fail("Should be class, field or method")
+                    error("Should be class, field or method")
             }
         }
 
