@@ -59,6 +59,42 @@ class AstParserTest {
     @Test
     fun complexHelloWorldParser() {
         test(
+            """System.out.println "Hello World"""",
+            invocation(
+                method(
+                    "println",
+                    IR.Unit,
+                    IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache),
+                    parent = IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    static = false,
+                ),
+                IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                s("Hello World"),
+            ),
+        )
+    }
+
+    @Test
+    fun complexHelloWorldParserWithParentheses() {
+        test(
+            """System.out.println("Hello World")""",
+            invocation(
+                method(
+                    "println",
+                    IR.Unit,
+                    IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache),
+                    parent = IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    static = false,
+                ),
+                IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                s("Hello World"),
+            ),
+        )
+    }
+
+    @Test
+    fun complexHelloWorldParserFullyQualified() {
+        test(
             """java.lang.System.out.println "Hello World"""",
             invocation(
                 method(
@@ -73,6 +109,7 @@ class AstParserTest {
             ),
         )
     }
+
 
     @Test
     fun `Assignment with plus`() {

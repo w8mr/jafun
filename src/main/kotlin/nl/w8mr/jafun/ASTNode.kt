@@ -72,6 +72,9 @@ sealed interface ASTNode {
         }
 
         override fun type() = IR.UInt1
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}BooleanLiteral(${value})"
+
     }
 
     data class ExpressionList(val expressions: List<Expression>) : Expression() {
@@ -139,6 +142,35 @@ sealed interface ASTNode {
             append("\n${" ".repeat(indent)}): ${method.rtn}")
         }.toString()
     }
+
+    data class Class(val clazz: IR.JFClass): Expression() {
+        override fun type() = clazz
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            error("Should not be in compiler output")
+        }
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Class(${clazz.path})"
+    }
+
+    data class Field(val clazz: IR.JFClass, val field: IR.JFField) : Expression() {
+        override fun type() = field.type ?: TODO("remove null type")
+
+        override fun compile(
+            builder: IRBuilder.CodeBlockDSL,
+            returnValue: Boolean,
+        ) {
+            TODO("identify compiler code")
+        }
+
+
+        override fun tree(indent: Int): String = "${" ".repeat(indent)}Field(${clazz.path}.${field.name})"
+
+    }
+
 
     data class When(val subject: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
         override fun type() = matches.last().second.type() // TODO: find common type

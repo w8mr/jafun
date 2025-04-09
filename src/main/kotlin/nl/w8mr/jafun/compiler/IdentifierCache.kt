@@ -47,6 +47,10 @@ object IdentifierCache : SymbolMap {
 
         identifierMap["Int"] = listOf(IR.SInt32)
         identifierMap["String"] = listOf(IR.StringType)
+
+        identifierMap["System"] = listOf(IR.JFClass("java.lang.System"))
+        identifierMap["java.lang.System.out"] = listOf(IR.JFField(IR.JFClass("java.lang.System"), "java.lang.System.out", "out", IR.JFClass("java.io.PrintStream")))
+        identifierMap["java.io.PrintStream.println"] = listOf(systemOutPrintln)
     }
 
     private fun staticFieldMethod(

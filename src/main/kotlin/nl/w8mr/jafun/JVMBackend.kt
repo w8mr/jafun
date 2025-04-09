@@ -20,7 +20,7 @@ class JVMBackend {
                                     true -> 1
                                 },
                             )
-                        is IR.CharType -> loadConstant(instruction.type.operand1(instruction).toInt())
+                        is IR.CharType -> loadConstant(instruction.type.operand1(instruction).code)
 
                         is IR.Reference -> TODO()
                         is IR.Array -> TODO()
@@ -53,6 +53,7 @@ class JVMBackend {
                         is IR.JFClass -> astore(instruction.registerName)
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
+                        is IR.JFField -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
@@ -65,6 +66,9 @@ class JVMBackend {
                         is IR.JFClass -> aload(instruction.registerName)
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
+                        is IR.JFField -> TODO()
+
+
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
@@ -78,6 +82,7 @@ class JVMBackend {
                         is IR.JFClass -> areturn()
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
+                        is IR.JFField -> TODO()
                     }
 
                 is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
@@ -160,6 +165,7 @@ fun signature(type: IR.OperandType<*>): String =
         is IR.CharType -> "C"
         is IR.UInt1 -> "Z"
         is IR.JFMethod -> TODO()
-        is IR.JFClass -> "L${type.path.replace('.', '/')};"
+        is IR.JFClass -> "L${type.path.replace('.', '/')};" //TODO: check if this needs to bee JFObject?
         is IR.JFVariableSymbol -> TODO()
+        is IR.JFField -> TODO()
     }

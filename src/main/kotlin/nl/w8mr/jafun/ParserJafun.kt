@@ -39,7 +39,6 @@ import nl.w8mr.parsek.text.sepBy
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
 import nl.w8mr.parsek.zeroOrMore
-import kotlin.collections.joinToString
 import kotlin.collections.last
 
 object ParserJafun {
@@ -271,7 +270,10 @@ object ParserJafun {
                     }
                     is Parser.Failure -> {
                         reset(mark)
-                        when (val rhs = (owsnl and methodRhs(current.value, minPrecedence) and ows).bindAsResult()) {
+                        when (val rhs = (owsnl and oneOf(
+                            dotMethod(current.value, minPrecedence),
+                            methodRhs(current.value, minPrecedence)
+                        ) and ows).bindAsResult()) {
                             is Parser.Failure -> break
                             else -> current = rhs
                         }
@@ -286,8 +288,8 @@ object ParserJafun {
     ): Parser<Char, ASTNode.Expression> =
         //TODO: Cache parsers
         combi {
-            val complexIdentifier = (complexIdentifier and ows).bind()
-            val symbol = currentSymbolMap.findFirstOrNull(complexIdentifier.joinToString(".") { it.value })
+            val identifier = (this@ParserJafun.identifier and ows).bind()
+            val symbol = currentSymbolMap.findFirstOrNull(identifier.value)
             when (symbol) {
                 is JFVariableSymbol ->
                     ASTNode.Variable(symbol)
@@ -300,11 +302,14 @@ object ParserJafun {
                         PREFIX -> {
                             methodArguments(symbol, minPrecedence)
                         }
-                        else -> fail("Method (${complexIdentifier.joinToString(".") { it.value}}) does not have the right associativity")
+                        else -> fail("Method (${identifier.value}) does not have the right associativity")
                     }
                     methodInvocation(symbol, arguments)
                 }
-                else -> fail("Method or variable (${complexIdentifier.joinToString(".") { it.value}}) not found")
+                is JFClass -> {
+                    ASTNode.Class(symbol)
+                }
+                else -> fail("Method or variable (${identifier.value}) not found")
             }
         }
 
@@ -314,8 +319,8 @@ object ParserJafun {
     ): Parser<Char, ASTNode.Expression> =
         //TODO: Cache parsers
         combi {
-            val complexIdentifier = (complexIdentifier and owsnl).bind()
-            val symbols = currentSymbolMap.find(complexIdentifier.joinToString(".") { it.value })
+            val identifier = (identifier and owsnl).bind()
+            val symbols = currentSymbolMap.find(identifier.value)
             var okMark = mark()
             val result = symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                 val mark = mark()
@@ -329,7 +334,7 @@ object ParserJafun {
                         methodArguments(symbol, minPrecedence, lhsExpression)
                     }
 
-                    else -> fail("Method (${complexIdentifier.joinToString(".") { it.value }}) does not have the right associativity")
+                    else -> fail("Method (${identifier.value }) does not have the right associativity")
                 }
                 if (arguments.map { it.type() } == symbol.parameters.map { it.type }) {
                     okMark = mark()
@@ -340,9 +345,46 @@ object ParserJafun {
                     null
                 }
 
-            }.singleOrNull() ?: fail("No single method (${complexIdentifier}) not found")
+            }.singleOrNull() ?: fail("No single method (${identifier}) not found")
             reset(okMark)
             result
+        }
+
+    fun dotMethod(
+        lhsExpression: ASTNode.Expression?,
+        minPrecedence: Int,
+    ): Parser<Char, ASTNode.Expression> =
+        //TODO: Cache parsers
+        combi {
+            -char('.')
+            val identifier = (identifier and owsnl).bind()
+            when (lhsExpression) {
+                is ASTNode.Class -> {
+                    val symbols = currentSymbolMap.findSingleOrNull("${lhsExpression.clazz.path}.${identifier.value}")
+                    when (symbols) {
+                        is JFField -> {
+                            ASTNode.Field(lhsExpression.clazz, symbols)
+                        }
+                        is JFMethod -> TODO("Handle method invocation")
+                        else -> error("Should be field or method")
+                    }
+                }
+                is ASTNode.Field -> {
+                    val symbols = currentSymbolMap.findSingleOrNull("${(lhsExpression.type() as JFClass).path}.${identifier.value}")
+                    when (symbols) {
+                        is JFField -> {
+                            ASTNode.Field(lhsExpression.clazz, symbols)
+                        }
+                        is JFMethod -> {
+                            methodInvocation(symbols, methodArguments(symbols, minPrecedence))
+                            //
+                        }
+                        else -> error("Should be field or method")
+                    }
+                }
+                else ->
+                    fail("Should be class, field or method")
+            }
         }
 
     private fun ASTNode.Expression?.asList() =

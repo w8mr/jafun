@@ -60,7 +60,7 @@ class IR {
 
     data class JFClass(override val path: String) : OperandType<Any?>, HasPath
 
-    data class JFField(val parent: JFClass, override val path: String, val name: String) : HasPath
+    data class JFField(val parent: JFClass, override val path: String, val name: String, val type: OperandType<*>? = null /* TODO: remove default null */) : OperandType<Any?>, HasPath
 
     data class JFMethod(
         val parameters: List<JFVariableSymbol>,

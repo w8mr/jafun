@@ -234,7 +234,25 @@ class CompilerTest {
     fun complexHelloWorldCompile() {
         test(
             """
-            System.out.println "Hello World"
+            System.out.println "Hello World"""",
+            "Hello World\n",
+        ) {
+            name = "Script"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
+                loadConstant("Hello World")
+                invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                `return`()
+            }
+        }
+    }
+
+    @Test
+    fun complexHelloWorldCompileFullyQualified() {
+        test(
+            """
             java.lang.System.out.println "Hello World"""",
             "Hello World\nHello World\n",
         ) {
@@ -245,13 +263,11 @@ class CompilerTest {
                 getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
                 loadConstant("Hello World")
                 invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-                getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
-                loadConstant("Hello World")
-                invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
                 `return`()
             }
         }
     }
+
 
     @Test
     fun simpleInfix() {

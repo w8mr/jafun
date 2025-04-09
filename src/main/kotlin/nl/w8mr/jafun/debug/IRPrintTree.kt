@@ -78,5 +78,6 @@ object IRPrintTree {
             IR.StringType -> "String"
             IR.UInt1 -> "Boolean"
             IR.CharType -> "Char"
+            is IR.JFField -> TODO()
         }
 }
