@@ -9,7 +9,7 @@ class JVMBackend {
             instruction: IR.Instruction,
         ): Unit = with(method) {
             when (instruction) {
-                is IR.LoadConstant<*, *> ->
+                is IR.LoadConstant<*> ->
                     when (instruction.type) {
                         is IR.StringType -> loadConstant(instruction.type.operand1(instruction))
                         is IR.SInt32 -> loadConstant(instruction.type.operand1(instruction))
@@ -27,6 +27,8 @@ class JVMBackend {
                         is IR.JFClass -> TODO()
                         is IR.JFMethod -> TODO()
                         is IR.JFVariableSymbol -> TODO()
+                        is IR.JFField -> TODO()
+                        is IR.JFPackage -> TODO()
                     }
                 is IR.Invoke -> {
                     with(method) {

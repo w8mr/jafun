@@ -5,6 +5,7 @@ import nl.w8mr.jafun.compiler.HasPath
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMap
 
+
 class IR {
     sealed interface OperandType<J> {
         fun operand1(instruction: OneOperand<*>) = instruction.operand1 as J
@@ -31,7 +32,7 @@ class IR {
 
     object Unit : Reference<jafun.Unit>("jafun.Unit") { override fun toString() = "UnitType" }
 
-    data class LoadConstant<J, T : OperandType<J>>(override val operand1: J, override val type: T) : OneOperand<J>
+    data class LoadConstant<J>(override val operand1: J, override val type: OperandType<J>) : OneOperand<J>
 
     data class Store<J>(val registerName: String, val type: OperandType<J>) : Instruction
 
