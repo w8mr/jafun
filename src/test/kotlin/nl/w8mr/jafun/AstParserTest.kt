@@ -12,6 +12,7 @@ import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 
@@ -260,12 +261,22 @@ class AstParserTest {
         code: String,
         vararg expressions: Expression,
     ) {
-        val parsed = ParserJafun.parse(code.trimMargin())
-        println(parsed.joinToString("\n\n"))
-        assertContentEquals(
-            expressions.toList(),
-            parsed,
-        )
+        val parseResult = ParserJafun.parse(code.trimMargin())
+        when (parseResult.second) {
+            is Parser.Failure<*> -> {
+                println(parseResult.second)
+                error("Parser failed")
+            }
+
+            is Parser.Success<*> -> {
+                val parsed = parseResult.first
+                println("PARSED: \n${parsed!!.joinToString("\n\n") { it.tree() }}")
+                assertContentEquals(
+                    expressions.toList(),
+                    parsed,
+                )
+            }
+        }
     }
 
     val objectType = IR.JFClass("java/lang/Object")

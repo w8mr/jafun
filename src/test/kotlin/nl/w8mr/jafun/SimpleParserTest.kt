@@ -6,7 +6,6 @@ import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
-import nl.w8mr.jafun.Token
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.text.CharSequenceSource
 import kotlin.test.Test
@@ -19,17 +18,23 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.complexIdentifier,
             "==4",
-            listOf(Token.Identifier("==", true)),
+            listOf(
+                IR.JFMethod(listOf(IR.JFVariableSymbol("param1", IR.SInt32), IR.JFVariableSymbol("param2", IR.SInt32)), IR.JFClass("jafun/lang/IntKt"), "==", IR.UInt1, true, true, Associativity.INFIXL, 40),
+                IR.JFMethod(listOf(IR.JFVariableSymbol("param1", IR.CharType), IR.JFVariableSymbol("param2", IR.CharType)), IR.JFClass("jafun/lang/CharKt"), "==", IR.UInt1, true, true, Associativity.INFIXL, 40),
+            ),
             2,
         )
     }
 
     @Test
     fun `Spaceship`() {
+        //TODO: should be operator (not sure if it matters)
         testSingleParser(
             ParserJafun.complexIdentifier,
             "<=>4",
-            listOf(Token.Identifier("<=>", true)),
+            listOf(
+                IR.JFMethod(listOf(IR.JFVariableSymbol("param1", IR.SInt32)), IR.JFClass("jafun/io/test/TestKt"), "﹤=﹥", IR.SInt32, true, false, Associativity.PREFIX, 10),
+            ),
             3,
         )
     }
@@ -39,7 +44,9 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.complexIdentifier,
             "println()",
-            listOf(Token.Identifier("println", false)),
+            listOf(
+                IR.JFMethod(listOf(IR.JFVariableSymbol("param1", IR.JFClass("java/lang/Object"))), IR.JFClass("jafun/io/ConsoleKt"), "println", IR.Unit, true, false, Associativity.PREFIX, 10),
+            ),
             7,
         )
     }
@@ -50,11 +57,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "java.lang.System.out.println()",
             listOf(
-                Token.Identifier("java", false),
-                Token.Identifier("lang", false),
-                Token.Identifier("System", false),
-                Token.Identifier("out", false),
-                Token.Identifier("println", false),
+                IR.JFMethod(listOf(IR.JFVariableSymbol("param1", IR.StringType)), IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream","out"),  "println", IR.Unit, false, false, Associativity.PREFIX, 10),
             ),
             28,
         )
@@ -79,7 +82,7 @@ class SimpleParserTest {
         testSingleParserFailed(
             ParserJafun.methodLhs(0),
             "bcd+3",
-            "Combinator failed, parser number 1 with error: Method or variable (bcd) not found",
+            "Combinator failed, parser number 1 with error: No single method found",
             0,
         )
     }

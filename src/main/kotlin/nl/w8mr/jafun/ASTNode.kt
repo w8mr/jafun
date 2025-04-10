@@ -143,49 +143,6 @@ sealed interface ASTNode {
         }.toString()
     }
 
-    data class Class(val `class`: IR.JFClass): Expression() {
-        override fun type() = `class`
-
-        override fun compile(
-            builder: IRBuilder.CodeBlockDSL,
-            returnValue: Boolean,
-        ) {
-            error("Should not be in compiler output")
-        }
-
-        override fun tree(indent: Int): String = "${" ".repeat(indent)}Class(${`class`.path})"
-    }
-
-    data class Package(val `package`: IR.JFPackage): Expression() {
-        override fun type() = `package`
-
-        override fun compile(
-            builder: IRBuilder.CodeBlockDSL,
-            returnValue: Boolean,
-        ) {
-            error("Should not be in compiler output")
-        }
-
-        override fun tree(indent: Int): String = "${" ".repeat(indent)}Package(${`package`.path})"
-    }
-
-
-    data class Field(val `class`: IR.JFClass, val field: IR.JFField) : Expression() {
-        override fun type() = field.type ?: TODO("remove null type")
-
-        override fun compile(
-            builder: IRBuilder.CodeBlockDSL,
-            returnValue: Boolean,
-        ) {
-            TODO("identify compiler code")
-        }
-
-
-        override fun tree(indent: Int): String = "${" ".repeat(indent)}Field(${`class`.path}.${field.name})"
-
-    }
-
-
     data class When(val subject: Expression?, val matches: List<Pair<Expression, Expression>>) : Expression() {
         override fun type() = matches.last().second.type() // TODO: find common type
 

@@ -26,3 +26,5 @@ fun cent(n: Int) = n
 // @FunctionPrecedence(10)
 // @FunctionAssociativity(Associativity.SOLO)
 // fun test() = 5
+
+fun `﹤=﹥`(n: Int) = 1

@@ -6,6 +6,7 @@ import nl.w8mr.jafun.ParserJafun.currentSymbolMap
 import nl.w8mr.jafun.debug.IRPrintTree
 import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.DynamicClassLoader
+import nl.w8mr.parsek.Parser
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -18,10 +19,19 @@ fun compile(
     returnType: IR.OperandType<*> = IR.Unit,
     parameterTypes: List<IR.OperandType<*>> = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
 ): ByteArray {
-    val parsed = ParserJafun.parse(code)
-    println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
-    println()
-    return compile(parsed, className, methodName, returnType, parameterTypes)
+    val parseResult = ParserJafun.parse(code)
+    when (parseResult.second) {
+        is Parser.Failure<*> -> {
+            println(parseResult.second)
+            error("Parser failed")
+        }
+        is Parser.Success<*> -> {
+            val parsed = parseResult.first
+            println("PARSED: \n${parsed!!.joinToString("\n\n") { it.tree() }}")
+            println()
+            return compile(parsed, className, methodName, returnType, parameterTypes)
+        }
+    }
 }
 
 fun runMain(bytes: ByteArray) {
@@ -46,37 +56,52 @@ fun     testBytes(
     params: Array<String>? = null,
 ): Pair<String, ByteArray> {
 
-    val parsed = ParserJafun.parse(code)
-    println("PARSED: \n${parsed.joinToString("\n\n") { it.tree() }}")
-    println()
-    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply { add("arguments", IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)) } // TODO: look into this.
-    val builder =
-        IRBuilder.define {
-            `class`(className) {
-                compileMethod(this, parsed, methodName, returnType, parameterTypes)
-            }
+    val parseResult = ParserJafun.parse(code)
+    when (parseResult.second) {
+        is Parser.Failure<*> -> {
+            println(parseResult.second)
+            error("Parser failed")
         }
 
-    println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
-    val clazz = buildClass(className, builder)
-    println("Bytecode: \n${clazz.classDef.print()}")
-    val bytes = clazz.write()
+        is Parser.Success<*> -> {
+            val parsed = parseResult.first
+            println("PARSED: \n${parsed!!.joinToString("\n\n") { it.tree() }}")
+            println()
+            currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
+                add(
+                    "arguments",
+                    IR.JFVariableSymbol("param1", IR.Array(IR.JFClass("java/lang/String")), this, false)
+                )
+            } // TODO: look into this.
+            val builder =
+                IRBuilder.define {
+                    `class`(className) {
+                        compileMethod(this, parsed, methodName, returnType, parameterTypes)
+                    }
+                }
 
-    writeFile(className, bytes)
-    val oldOut = System.out
-    val output = ByteArrayOutputStream()
-    System.setOut(PrintStream(output))
-    try {
-        runMethod(bytes, className, methodName, params)
-        System.setOut(oldOut)
-    } catch (t: Throwable) {
-        System.setOut(oldOut)
-        println(t.message)
-        t.printStackTrace()
+            println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
+            val clazz = buildClass(className, builder)
+            println("Bytecode: \n${clazz.classDef.print()}")
+            val bytes = clazz.write()
+
+            writeFile(className, bytes)
+            val oldOut = System.out
+            val output = ByteArrayOutputStream()
+            System.setOut(PrintStream(output))
+            try {
+                runMethod(bytes, className, methodName, params)
+                System.setOut(oldOut)
+            } catch (t: Throwable) {
+                System.setOut(oldOut)
+                println(t.message)
+                t.printStackTrace()
+            }
+            val result = String(output.toByteArray())
+            println("OUTPUT: $result")
+            return result to bytes
+        }
     }
-    val result = String(output.toByteArray())
-    println("OUTPUT: $result")
-    return result to bytes
 }
 
 private fun runMethod(
