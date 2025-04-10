@@ -185,7 +185,7 @@ object IdentifierCache : SymbolMap {
 
     private fun jfClass(name: String) = if (name.startsWith('L') && name.endsWith(';')) Type.JFClass(name.substring(1, name.length-1)) else Type.JFClass(name.replace('.', '/'))
 
-    private fun jfArray(returnName: String): Type.Array<*>? = if (returnName.startsWith('[')) Type.Array(jvmType(returnName.substring(1))) else null //TODO: check implementation
+    private fun jfArray(returnName: String): Type.Array? = if (returnName.startsWith('[')) Type.Array(jvmType(returnName.substring(1))) else null //TODO: check implementation
 
     fun reset(): IdentifierCache {
         symbolMapCounter = 1

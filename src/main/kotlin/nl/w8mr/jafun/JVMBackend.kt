@@ -29,6 +29,7 @@ class JVMBackend {
                         is Type.JFVariableSymbol -> TODO()
                         is Type.JFField -> TODO()
                         is Type.JFPackage -> TODO()
+                        is Type.Generic -> TODO()
                     }
                 is IR.Invoke -> {
                     with(method) {
@@ -57,6 +58,7 @@ class JVMBackend {
                         is Type.JFVariableSymbol -> TODO()
                         is Type.JFField -> TODO()
                         is Type.JFPackage -> TODO()
+                        is Type.Generic -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
@@ -71,6 +73,7 @@ class JVMBackend {
                         is Type.JFVariableSymbol -> TODO()
                         is Type.JFField -> TODO()
                         is Type.JFPackage -> TODO()
+                        is Type.Generic -> TODO()
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
@@ -86,6 +89,7 @@ class JVMBackend {
                         is Type.JFVariableSymbol -> TODO()
                         is Type.JFField -> TODO()
                         is Type.JFPackage -> TODO()
+                        is Type.Generic -> TODO()
                     }
 
                 is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
@@ -160,7 +164,7 @@ fun buildClass(
 
 fun signature(type: Type.OperandType<*>): String =
     when (type) {
-        is Type.Array -> "[${signature(type.type)}"
+        is Type.Array -> "[${signature(type.genericTypes[0])}"
         is Type.Unit -> "V"
         is Type.StringType -> "Ljava/lang/String;"
         is Type.Reference -> "L${type.type.replace('.', '/')};"
@@ -172,4 +176,5 @@ fun signature(type: Type.OperandType<*>): String =
         is Type.JFVariableSymbol -> TODO()
         is Type.JFField -> TODO()
         is Type.JFPackage -> TODO()
+        is Type.Generic -> TODO()
     }

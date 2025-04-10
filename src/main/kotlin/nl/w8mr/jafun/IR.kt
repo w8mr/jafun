@@ -18,7 +18,9 @@ class Type {
 
     open class Reference<T>(val type: String) : OperandType<T>
 
-    class Array<T>(val type: OperandType<T>) : OperandType<T>
+    abstract class Generic(vararg val genericTypes : OperandType<*>) : OperandType<Any>
+
+    class Array(genericType : OperandType<*>) : Generic(genericType)
 
     object SInt32 : OperandType<Int> { override fun toString() = "Int32Type" }
 

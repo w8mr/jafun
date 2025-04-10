@@ -111,7 +111,7 @@ object IRPrintTree {
 
 
         fun <J> typeName(operandType: Type.OperandType<J>): String = when (operandType) {
-            is Type.Array<*> -> "Array<${typeName(operandType.type)}>"
+            is Type.Array -> "Array<${operandType.genericTypes[0]}>"
             is Type.JFClass -> operandType.path
             is Type.JFMethod -> "${operandType.parent.path}.${operandType.name}"
             is Type.JFVariableSymbol -> "${operandType.name}: ${typeName(operandType.type)}"
@@ -122,5 +122,6 @@ object IRPrintTree {
             Type.CharType -> "Char"
             is Type.JFField -> "JFField"
             is Type.JFPackage -> "JFPackage"
+            is Type.Generic -> TODO()
         }
 }
