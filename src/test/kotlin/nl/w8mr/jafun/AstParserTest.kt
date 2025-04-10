@@ -12,6 +12,7 @@ import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -270,7 +271,7 @@ class AstParserTest {
 
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
-                println("PARSED: \n${parsed!!.joinToString("\n\n") { it.tree() }}")
+                println("PARSED: \n${parsed!!.joinToString("\n\n") { it.prettyPrint() }}")
                 assertContentEquals(
                     expressions.toList(),
                     parsed,

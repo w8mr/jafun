@@ -60,7 +60,7 @@ object ParserJafun {
     // TODO: Multiline string
 
     val charLiteral_term =
-        ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map(ASTNode::CharLiteral)
+        ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map { ASTNode.CharLiteral(it[0]) }
 
     val decimalDigit = char { it in '0'..'9' }
     val decimalDigitNoZero = char { it in '1'..'9' }

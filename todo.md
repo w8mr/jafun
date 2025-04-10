@@ -15,10 +15,10 @@
 - imports / exports
 
 ## Debug
-- Extract ast tree debug to a separate file
+- Extract ast tree debug to a separate file  &#x2611;
 
 ## Compiler Frontend
-- Extract AST 2 IR code away from ASTNodes
+- Extract AST 2 IR code away from ASTNodes  &#x2611;
 - Create separate package for AST2IR
 
 ## Compiler backend
