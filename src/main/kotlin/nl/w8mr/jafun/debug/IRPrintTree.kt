@@ -63,6 +63,47 @@ object IRPrintTree {
                     -": "
                     -typeName(ir.type)
                 }
+                is IR.When -> with(ir) {
+                    -"When {"
+                    indent {
+                        cases.forEach { case ->
+                            when (case) {
+                                is IR.When.WhenConditionCase -> {
+                                    case.condition.forEach {
+                                        print(this, it)
+                                    }
+                                    +" -> {"
+                                    indent {
+                                        case.execution.forEach {
+                                            print(this, it)
+                                        }
+                                    }
+                                    +"}"
+                                }
+
+                                is IR.When.WhenElseCase -> {
+                                    +"else -> {"
+                                    case.execution.forEach {
+                                        print(this, it)
+                                    }
+                                    +"}"
+                                }
+                            }
+                        }
+                    }
+
+                    +"}"
+                }
+                is IR.While -> with(ir) {
+                    -"While {"
+                    indent {
+                        ir.expressions.forEach { expression ->
+                            print(this, expression)
+                        }
+
+                    }
+                    +"}"
+                }
                 else -> +ir.toString() //TODO While && When
             }
         }
