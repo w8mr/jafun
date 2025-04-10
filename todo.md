@@ -19,7 +19,7 @@
 
 ## Compiler Frontend
 - Extract AST 2 IR code away from ASTNodes  &#x2611;
-- Create separate package for AST2IR
+- Create separate package for AST2IR  &#x2611;
 
 ## Compiler backend
 - Create separate package for IR2Jvm

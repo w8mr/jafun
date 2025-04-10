@@ -7,14 +7,14 @@ import nl.w8mr.jafun.compiler.SymbolMap
 
 class IR {
     sealed interface OperandType<J> {
-        fun operand1(instruction: OneOperand<*, *>): J = instruction.operand1 as J
+        fun operand1(instruction: OneOperand<*>) = instruction.operand1 as J
     }
 
     sealed interface Instruction
 
-    sealed interface OneOperand<J, T : OperandType<J>> : Instruction {
+    sealed interface OneOperand<J> : Instruction {
         val operand1: J
-        val type: T
+        val type: OperandType<J>
     }
 
     object StringType : OperandType<String> { override fun toString() = "StringType" }
@@ -31,7 +31,7 @@ class IR {
 
     object Unit : Reference<jafun.Unit>("jafun.Unit") { override fun toString() = "UnitType" }
 
-    data class LoadConstant<J, T : OperandType<J>>(override val operand1: J, override val type: T) : OneOperand<J, T>
+    data class LoadConstant<J, T : OperandType<J>>(override val operand1: J, override val type: T) : OneOperand<J>
 
     data class Store<J>(val registerName: String, val type: OperandType<J>) : Instruction
 
