@@ -11,24 +11,24 @@ class JVMBackend {
             when (instruction) {
                 is IR.LoadConstant<*> ->
                     when (instruction.type) {
-                        is IR.StringType -> loadConstant(instruction.type.operand1(instruction))
-                        is IR.SInt32 -> loadConstant(instruction.type.operand1(instruction))
-                        is IR.UInt1 ->
+                        is Type.StringType -> loadConstant(instruction.type.operand1(instruction))
+                        is Type.SInt32 -> loadConstant(instruction.type.operand1(instruction))
+                        is Type.UInt1 ->
                             loadConstant(
                                 when (instruction.type.operand1(instruction)) {
                                     false -> 0
                                     true -> 1
                                 },
                             )
-                        is IR.CharType -> loadConstant(instruction.type.operand1(instruction).code)
+                        is Type.CharType -> loadConstant(instruction.type.operand1(instruction).code)
 
-                        is IR.Reference -> TODO()
-                        is IR.Array -> TODO()
-                        is IR.JFClass -> TODO()
-                        is IR.JFMethod -> TODO()
-                        is IR.JFVariableSymbol -> TODO()
-                        is IR.JFField -> TODO()
-                        is IR.JFPackage -> TODO()
+                        is Type.Reference -> TODO()
+                        is Type.Array -> TODO()
+                        is Type.JFClass -> TODO()
+                        is Type.JFMethod -> TODO()
+                        is Type.JFVariableSymbol -> TODO()
+                        is Type.JFField -> TODO()
+                        is Type.JFPackage -> TODO()
                     }
                 is IR.Invoke -> {
                     with(method) {
@@ -46,46 +46,46 @@ class JVMBackend {
                 is IR.Dup -> dup()
                 is IR.Store<*> ->
                     when (instruction.type) {
-                        is IR.Reference -> astore(instruction.registerName)
-                        is IR.SInt32 -> istore(instruction.registerName)
-                        is IR.StringType -> astore(instruction.registerName)
-                        is IR.UInt1 -> istore(instruction.registerName)
-                        is IR.CharType -> istore(instruction.registerName)
-                        is IR.Array -> TODO()
-                        is IR.JFClass -> astore(instruction.registerName)
-                        is IR.JFMethod -> TODO()
-                        is IR.JFVariableSymbol -> TODO()
-                        is IR.JFField -> TODO()
-                        is IR.JFPackage -> TODO()
+                        is Type.Reference -> astore(instruction.registerName)
+                        is Type.SInt32 -> istore(instruction.registerName)
+                        is Type.StringType -> astore(instruction.registerName)
+                        is Type.UInt1 -> istore(instruction.registerName)
+                        is Type.CharType -> istore(instruction.registerName)
+                        is Type.Array -> TODO()
+                        is Type.JFClass -> astore(instruction.registerName)
+                        is Type.JFMethod -> TODO()
+                        is Type.JFVariableSymbol -> TODO()
+                        is Type.JFField -> TODO()
+                        is Type.JFPackage -> TODO()
                     }
                 is IR.Load<*> ->
                     when (instruction.type) {
-                        is IR.Reference -> aload(instruction.registerName)
-                        is IR.SInt32 -> iload(instruction.registerName)
-                        is IR.StringType -> aload(instruction.registerName)
-                        is IR.UInt1 -> iload(instruction.registerName)
-                        is IR.CharType -> iload(instruction.registerName)
-                        is IR.Array -> aload(instruction.registerName)
-                        is IR.JFClass -> aload(instruction.registerName)
-                        is IR.JFMethod -> TODO()
-                        is IR.JFVariableSymbol -> TODO()
-                        is IR.JFField -> TODO()
-                        is IR.JFPackage -> TODO()
+                        is Type.Reference -> aload(instruction.registerName)
+                        is Type.SInt32 -> iload(instruction.registerName)
+                        is Type.StringType -> aload(instruction.registerName)
+                        is Type.UInt1 -> iload(instruction.registerName)
+                        is Type.CharType -> iload(instruction.registerName)
+                        is Type.Array -> aload(instruction.registerName)
+                        is Type.JFClass -> aload(instruction.registerName)
+                        is Type.JFMethod -> TODO()
+                        is Type.JFVariableSymbol -> TODO()
+                        is Type.JFField -> TODO()
+                        is Type.JFPackage -> TODO()
                     }
                 is IR.Return<*> ->
                     when (instruction.type) {
-                        is IR.Unit -> `return`() // TODO: check how to handle unit.
-                        is IR.Reference -> areturn()
-                        is IR.SInt32 -> ireturn()
-                        is IR.StringType -> areturn()
-                        is IR.UInt1 -> ireturn()
-                        is IR.CharType -> ireturn()
-                        is IR.Array -> TODO()
-                        is IR.JFClass -> areturn()
-                        is IR.JFMethod -> TODO()
-                        is IR.JFVariableSymbol -> TODO()
-                        is IR.JFField -> TODO()
-                        is IR.JFPackage -> TODO()
+                        is Type.Unit -> `return`() // TODO: check how to handle unit.
+                        is Type.Reference -> areturn()
+                        is Type.SInt32 -> ireturn()
+                        is Type.StringType -> areturn()
+                        is Type.UInt1 -> ireturn()
+                        is Type.CharType -> ireturn()
+                        is Type.Array -> TODO()
+                        is Type.JFClass -> areturn()
+                        is Type.JFMethod -> TODO()
+                        is Type.JFVariableSymbol -> TODO()
+                        is Type.JFField -> TODO()
+                        is Type.JFPackage -> TODO()
                     }
 
                 is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
@@ -158,18 +158,18 @@ fun buildClass(
     }
 }
 
-fun signature(type: IR.OperandType<*>): String =
+fun signature(type: Type.OperandType<*>): String =
     when (type) {
-        is IR.Array -> "[${signature(type.type)}"
-        is IR.Unit -> "V"
-        is IR.StringType -> "Ljava/lang/String;"
-        is IR.Reference -> "L${type.type.replace('.', '/')};"
-        is IR.SInt32 -> "I"
-        is IR.CharType -> "C"
-        is IR.UInt1 -> "Z"
-        is IR.JFMethod -> TODO()
-        is IR.JFClass -> "L${type.path.replace('.', '/')};" //TODO: check if this needs to bee JFObject?
-        is IR.JFVariableSymbol -> TODO()
-        is IR.JFField -> TODO()
-        is IR.JFPackage -> TODO()
+        is Type.Array -> "[${signature(type.type)}"
+        is Type.Unit -> "V"
+        is Type.StringType -> "Ljava/lang/String;"
+        is Type.Reference -> "L${type.type.replace('.', '/')};"
+        is Type.SInt32 -> "I"
+        is Type.CharType -> "C"
+        is Type.UInt1 -> "Z"
+        is Type.JFMethod -> TODO()
+        is Type.JFClass -> "L${type.path.replace('.', '/')};" //TODO: check if this needs to bee JFObject?
+        is Type.JFVariableSymbol -> TODO()
+        is Type.JFField -> TODO()
+        is Type.JFPackage -> TODO()
     }

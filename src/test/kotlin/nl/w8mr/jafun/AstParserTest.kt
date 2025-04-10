@@ -10,8 +10,8 @@ import nl.w8mr.jafun.ASTNode.IntegerLiteral
 import nl.w8mr.jafun.ASTNode.StringLiteral
 import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
-import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.parsek.Parser
 import kotlin.test.Test
@@ -65,12 +65,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    IR.Unit,
-                    IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache),
-                    parent = IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    Type.Unit,
+                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
+                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                     static = false,
                 ),
-                IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -83,12 +83,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    IR.Unit,
-                    IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache),
-                    parent = IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    Type.Unit,
+                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
+                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                     static = false,
                 ),
-                IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -101,12 +101,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    IR.Unit,
-                    IR.JFVariableSymbol("param1", IR.StringType, IdentifierCache),
-                    parent = IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    Type.Unit,
+                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
+                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                     static = false,
                 ),
-                IR.JFField(IR.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -118,7 +118,7 @@ class AstParserTest {
         test(
             """
             |val num=1""",
-            ValAssignment(IR.JFVariableSymbol("num", IR.SInt32, IdentifierCache), i(1)),
+            ValAssignment(Type.JFVariableSymbol("num", Type.SInt32, IdentifierCache), i(1)),
         )
     }
 
@@ -128,8 +128,8 @@ class AstParserTest {
             """
             |val str = "Hello World"
             |println str""",
-            ValAssignment(IR.JFVariableSymbol("str", IR.StringType, IdentifierCache), s("Hello World")),
-            invocation(println, null, Variable(IR.JFVariableSymbol("str", IR.StringType, IdentifierCache))),
+            ValAssignment(Type.JFVariableSymbol("str", Type.StringType, IdentifierCache), s("Hello World")),
+            invocation(println, null, Variable(Type.JFVariableSymbol("str", Type.StringType, IdentifierCache))),
         )
     }
 
@@ -138,7 +138,7 @@ class AstParserTest {
         test(
             """fun test() { }""",
             function(
-                method("test", IR.Unit, operator = false),
+                method("test", Type.Unit, operator = false),
             ),
         )
     }
@@ -148,7 +148,7 @@ class AstParserTest {
         test(
             "fun test() { println 1 + 2 }",
             function(
-                method("test", IR.Unit, operator = false),
+                method("test", Type.Unit, operator = false),
                 invocation(
                     println,
                     null,
@@ -163,11 +163,11 @@ class AstParserTest {
         test(
             "fun test(a: Int) { println 1 + a }",
             function(
-                method("test", IR.Unit, IR.JFVariableSymbol("a", IR.SInt32, IdentifierCache)),
+                method("test", Type.Unit, Type.JFVariableSymbol("a", Type.SInt32, IdentifierCache)),
                 invocation(
                     println,
                     null,
-                    invocation(plus, null, i(1), Variable(IR.JFVariableSymbol("a", IR.SInt32, IdentifierCache))),
+                    invocation(plus, null, i(1), Variable(Type.JFVariableSymbol("a", Type.SInt32, IdentifierCache))),
                 ),
             ),
         )
@@ -178,7 +178,7 @@ class AstParserTest {
         test(
             "fun test() { 1 + 2 }",
             function(
-                method("test", IR.SInt32, operator = false),
+                method("test", Type.SInt32, operator = false),
                 invocation(plus, null, i(1), i(2)),
             ),
         )
@@ -189,9 +189,9 @@ class AstParserTest {
         test(
             "fun test() { fun inner() { println 1 + 2 } }",
             function(
-                method("test", IR.Unit, operator = false),
+                method("test", Type.Unit, operator = false),
                 function(
-                    method("inner", IR.Unit, operator = false),
+                    method("inner", Type.Unit, operator = false),
                     invocation(
                         println,
                         null,
@@ -209,14 +209,14 @@ class AstParserTest {
             |fun test() { println 1 + 2 }
             |test""",
             function(
-                method("test", IR.Unit, operator = false),
+                method("test", Type.Unit, operator = false),
                 invocation(
                     println,
                     null,
                     invocation(plus, null, i(1), i(2)),
                 ),
             ),
-            invocation(method("test", IR.Unit, operator = false), null),
+            invocation(method("test", Type.Unit, operator = false), null),
         )
     }
 
@@ -249,10 +249,10 @@ class AstParserTest {
             |}
             """,
             ASTNode.When(
-                ValAssignment(IR.JFVariableSymbol("a", IR.SInt32), i(2)),
+                ValAssignment(Type.JFVariableSymbol("a", Type.SInt32), i(2)),
                 listOf(
-                    ASTNode.Invocation(equals, null, listOf(Variable(IR.JFVariableSymbol("a", IR.SInt32)), i(2))) to s("False"),
-                    ASTNode.Invocation(equals, null, listOf(Variable(IR.JFVariableSymbol("a", IR.SInt32)), i(1))) to s("True"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", Type.SInt32)), i(2))) to s("False"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", Type.SInt32)), i(1))) to s("True"),
                 ),
             ),
         )
@@ -280,60 +280,60 @@ class AstParserTest {
         }
     }
 
-    val objectType = IR.JFClass("java/lang/Object")
+    val objectType = Type.JFClass("java/lang/Object")
 
     private val join =
         method(
             "join",
-            IR.StringType,
-            IR.StringType,
-            IR.StringType,
-            parent = IR.JFClass("jafun/io/test/TestKt"),
+            Type.StringType,
+            Type.StringType,
+            Type.StringType,
+            parent = Type.JFClass("jafun/io/test/TestKt"),
             operator = false,
         )
 
     private val println =
         method(
             "println",
-            IR.Unit,
+            Type.Unit,
             objectType,
-            parent = IR.JFClass("jafun/io/ConsoleKt"),
+            parent = Type.JFClass("jafun/io/ConsoleKt"),
             operator = false,
         )
 
     private val plus =
         method(
             "+",
-            IR.SInt32,
-            IR.SInt32,
-            IR.SInt32,
+            Type.SInt32,
+            Type.SInt32,
+            Type.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 100,
-            parent = IR.JFClass("jafun/lang/IntKt"),
+            parent = Type.JFClass("jafun/lang/IntKt"),
             operator = true,
         )
 
     private val equals =
         method(
             "==",
-            IR.UInt1,
-            IR.SInt32,
-            IR.SInt32,
+            Type.UInt1,
+            Type.SInt32,
+            Type.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 40,
-            parent = IR.JFClass("jafun/lang/IntKt"),
+            parent = Type.JFClass("jafun/lang/IntKt"),
             operator = true,
         )
 
     private fun method(
         name: String,
-        returnType: IR.OperandType<*>,
-        vararg parameters: IR.JFVariableSymbol,
+        returnType: Type.OperandType<*>,
+        vararg parameters: Type.JFVariableSymbol,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = IR.JFClass("Script"),
-    ) = IR.JFMethod(
+        parent: HasPath = Type.JFClass("Script"),
+    ) = Type.JFMethod(
         parameters.toList(),
         parent,
         name,
@@ -346,15 +346,15 @@ class AstParserTest {
 
     private fun method(
         name: String,
-        returnType: IR.OperandType<*>,
-        vararg parameters: IR.OperandType<*>,
+        returnType: Type.OperandType<*>,
+        vararg parameters: Type.OperandType<*>,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = IR.JFClass("Script"),
+        parent: HasPath = Type.JFClass("Script"),
         operator: Boolean,
-    ) = IR.JFMethod(
-        parameters.toList().mapIndexed { i, type -> IR.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
+    ) = Type.JFMethod(
+        parameters.toList().mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
         parent,
         name,
         returnType,
@@ -366,13 +366,13 @@ class AstParserTest {
 
     private fun method(
         name: String,
-        returnType: IR.OperandType<*>,
+        returnType: Type.OperandType<*>,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = IR.JFClass("Script"),
+        parent: HasPath = Type.JFClass("Script"),
         operator: Boolean,
-    ) = IR.JFMethod(
+    ) = Type.JFMethod(
         emptyList(),
         parent,
         name,
@@ -388,8 +388,8 @@ class AstParserTest {
     private fun s(string: String) = StringLiteral(string)
 
     private fun invocation(
-        method: IR.JFMethod,
-        field: IR.JFField?,
+        method: Type.JFMethod,
+        field: Type.JFField?,
         vararg parameters: Expression,
     ) = ASTNode.Invocation(
         method,
@@ -398,7 +398,7 @@ class AstParserTest {
     )
 
     private fun function(
-        method: IR.JFMethod,
+        method: Type.JFMethod,
         vararg expressions: Expression,
     ) = Function(method, expressions.toList())
 }

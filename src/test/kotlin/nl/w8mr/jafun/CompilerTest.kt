@@ -1,6 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.IR
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.testBytes
 import nl.w8mr.jafun.writeFile
 import nl.w8mr.kasmine.ClassBuilder
@@ -23,8 +23,8 @@ class CompilerTest {
             val tested =
                 testBytes(
                     code,
-                    returnType = IR.Unit,
-                    parameterTypes = listOf(IR.Array(IR.Reference<String>("java.lang.String"))),
+                    returnType = Type.Unit,
+                    parameterTypes = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
                     params = params
                 )
             val expected = bytecode?.let { classBuilder(bytecode).write() } ?: tested.second

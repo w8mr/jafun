@@ -13,8 +13,8 @@ object IRBuilder {
 
     data class MethodContext(
         val name: String,
-        val returnType: IR.OperandType<*>,
-        val parameterTypes: List<IR.OperandType<*>>,
+        val returnType: Type.OperandType<*>,
+        val parameterTypes: List<Type.OperandType<*>>,
         val instructions: MutableList<IR.Instruction> = mutableListOf(),
         val parent: ClassContext,
     )
@@ -34,8 +34,8 @@ object IRBuilder {
     class ClassDSL(val context: ClassContext, val parent: BuilderDSL) {
         fun method(
             name: String,
-            returnType: IR.OperandType<*>,
-            parameterTypes: List<IR.OperandType<*>>,
+            returnType: Type.OperandType<*>,
+            parameterTypes: List<Type.OperandType<*>>,
             init: MethodDSL.() -> Unit,
         ) {
             val methodContext = MethodContext(name, returnType, parameterTypes, parent = context)
@@ -54,28 +54,28 @@ object IRBuilder {
 
         fun <J> loadConstant(
             operand1: J,
-            type: IR.OperandType<J>,
+            type: Type.OperandType<J>,
         ) {
             instructions.add(IR.LoadConstant(operand1, type))
         }
 
         fun <J> store(
             registerName: String,
-            type: IR.OperandType<J>,
+            type: Type.OperandType<J>,
         ) {
             instructions.add(IR.Store(registerName, type))
         }
 
         fun <J> load(
             registerName: String,
-            type: IR.OperandType<J>,
+            type: Type.OperandType<J>,
         ) {
             instructions.add(IR.Load(registerName, type))
         }
 
         fun invoke(
-            method: IR.JFMethod,
-            field: IR.JFField?,
+            method: Type.JFMethod,
+            field: Type.JFField?,
         ) {
             instructions.add(IR.Invoke(method, field))
         }
@@ -83,7 +83,7 @@ object IRBuilder {
         fun getStatic(
             className: String,
             fieldName: String,
-            type: IR.Reference<*>,
+            type: Type.Reference<*>,
         ) {
             instructions.add(IR.GetStatic(className, fieldName, type))
         }
@@ -97,7 +97,7 @@ object IRBuilder {
         }
 
         @Suppress("ktlint:standard:function-naming")
-        fun <J> `return`(type: IR.OperandType<J>) {
+        fun <J> `return`(type: Type.OperandType<J>) {
             instructions.add(IR.Return(type))
         }
 

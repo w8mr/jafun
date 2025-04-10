@@ -2,6 +2,7 @@ package nl.w8mr.jafun.debug
 
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.Type
 
 object IRPrintTree {
     fun print(ir: Any) =
@@ -58,7 +59,7 @@ object IRPrintTree {
                     -"): "
                     +typeName(method.rtn)
                 }
-                is IR.JFVariableSymbol -> with(ir) {
+                is Type.JFVariableSymbol -> with(ir) {
                     +ir.name
                     -": "
                     -typeName(ir.type)
@@ -109,17 +110,17 @@ object IRPrintTree {
         }
 
 
-        fun <J> typeName(operandType: IR.OperandType<J>): String = when (operandType) {
-            is IR.Array<*> -> "Array<${typeName(operandType.type)}>"
-            is IR.JFClass -> operandType.path
-            is IR.JFMethod -> "${operandType.parent.path}.${operandType.name}"
-            is IR.JFVariableSymbol -> "${operandType.name}: ${typeName(operandType.type)}"
-            is IR.Reference<*> -> operandType.type
-            IR.SInt32 -> "Int32"
-            IR.StringType -> "String"
-            IR.UInt1 -> "Boolean"
-            IR.CharType -> "Char"
-            is IR.JFField -> "JFField"
-            is IR.JFPackage -> "JFPackage"
+        fun <J> typeName(operandType: Type.OperandType<J>): String = when (operandType) {
+            is Type.Array<*> -> "Array<${typeName(operandType.type)}>"
+            is Type.JFClass -> operandType.path
+            is Type.JFMethod -> "${operandType.parent.path}.${operandType.name}"
+            is Type.JFVariableSymbol -> "${operandType.name}: ${typeName(operandType.type)}"
+            is Type.Reference<*> -> operandType.type
+            Type.SInt32 -> "Int32"
+            Type.StringType -> "String"
+            Type.UInt1 -> "Boolean"
+            Type.CharType -> "Char"
+            is Type.JFField -> "JFField"
+            is Type.JFPackage -> "JFPackage"
         }
 }

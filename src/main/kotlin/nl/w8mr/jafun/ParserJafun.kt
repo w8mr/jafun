@@ -7,12 +7,12 @@ import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
-import nl.w8mr.jafun.IR.JFClass
-import nl.w8mr.jafun.IR.JFField
-import nl.w8mr.jafun.IR.JFMethod
-import nl.w8mr.jafun.IR.JFPackage
-import nl.w8mr.jafun.IR.JFVariableSymbol
-import nl.w8mr.jafun.IR.Unit
+import nl.w8mr.jafun.Type.JFClass
+import nl.w8mr.jafun.Type.JFField
+import nl.w8mr.jafun.Type.JFMethod
+import nl.w8mr.jafun.Type.JFPackage
+import nl.w8mr.jafun.Type.JFVariableSymbol
+import nl.w8mr.jafun.Type.Unit
 import nl.w8mr.jafun.Token.Identifier
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -84,12 +84,12 @@ object ParserJafun {
 
     val identifier = normalIdentifier or operatorIdentifier
 
-    val complexIdentifier: Parser<Char, List<IR.OperandType<*>>> = combi {
-        fun CombinatorDSL<Char, List<IR.OperandType<*>>>.nextIdentifierPart(current: IR.OperandType<*>): List<IR.OperandType<*>> {
-            fun CombinatorDSL<Char, List<IR.OperandType<*>>>.handleNexts(
+    val complexIdentifier: Parser<Char, List<Type.OperandType<*>>> = combi {
+        fun CombinatorDSL<Char, List<Type.OperandType<*>>>.nextIdentifierPart(current: Type.OperandType<*>): List<Type.OperandType<*>> {
+            fun CombinatorDSL<Char, List<Type.OperandType<*>>>.handleNexts(
                 nextIdResult: Success<Identifier>,
                 currentPath: String
-            ): List<IR.OperandType<*>> {
+            ): List<Type.OperandType<*>> {
                 val nexts =
                     currentSymbolMap.find("$currentPath.${nextIdResult.value.value}")
                 return nexts.flatMap { next ->
@@ -234,7 +234,7 @@ object ParserJafun {
         combi {
             fun newParameterDef(
                 identifier: Identifier,
-                type: List<IR.OperandType<*>>,
+                type: List<Type.OperandType<*>>,
             ): JFVariableSymbol {
                 val variableSymbol =
                     JFVariableSymbol(
@@ -420,7 +420,7 @@ object ParserJafun {
     var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
         add(
             "arguments",
-            JFVariableSymbol("arguments", IR.Array(JFClass("java/lang/String")), this, false)
+            JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), this, false)
         )
     }
 
