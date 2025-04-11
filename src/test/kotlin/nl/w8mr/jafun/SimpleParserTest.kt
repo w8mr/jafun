@@ -19,8 +19,8 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "==4",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32), Type.JFVariableSymbol("param2", Type.SInt32)), Type.JFClass("jafun/lang/IntKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.CharType), Type.JFVariableSymbol("param2", Type.CharType)), Type.JFClass("jafun/lang/CharKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32), Type.JFVariableSymbol("param2", Type.SInt32)), Type.JFClass("jafun.lang.IntKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.CharType), Type.JFVariableSymbol("param2", Type.CharType)), Type.JFClass("jafun.lang.CharKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
             ),
             2,
         )
@@ -33,7 +33,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "<=>4",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32)), Type.JFClass("jafun/test/TestKt"), "<=>", Type.SInt32, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32)), Type.JFClass("jafun.test.TestKt"), "<=>", Type.SInt32, true, false, Associativity.PREFIX, 10),
             ),
             3,
         )
@@ -45,7 +45,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "println()",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.JFClass("java/lang/Object"))), Type.JFClass("jafun/io/ConsoleKt"), "println", Type.Unit, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.JFClass("java.lang.Object"))), Type.JFClass("jafun.io.ConsoleKt"), "println", Type.Unit, true, false, Associativity.PREFIX, 10),
             ),
             7,
         )
@@ -57,7 +57,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "java.lang.System.out.println()",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.StringType)), Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream","out"),  "println", Type.Unit, false, false, Associativity.PREFIX, 10),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.StringType)), Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream","out"),  "println", Type.Unit, false, false, Associativity.PREFIX, 10),
             ),
             28,
         )

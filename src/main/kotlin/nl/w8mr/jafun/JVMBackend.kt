@@ -34,7 +34,7 @@ class JVMBackend {
                     }
                 is IR.Invoke -> {
                     with(method) {
-                        val methodClassName = instruction.method.parent.path
+                        val methodClassName = instruction.method.parent.path.replace('.', '/')
                         val methodSignature =
                             "(${instruction.method.parameters.joinToString("") { signature(it.type) }})" +
                                     signature(instruction.method.rtn)
@@ -93,7 +93,7 @@ class JVMBackend {
                         is Type.Generic -> TODO()
                     }
 
-                is IR.GetStatic -> getStatic(instruction.className, instruction.fieldName, signature(instruction.type))
+                is IR.GetStatic -> getStatic(instruction.className.replace('.', '/'), instruction.fieldName, signature(instruction.type))
                 is IR.When -> {
                     val after = createTarget()
                     instruction.cases.forEach { case ->

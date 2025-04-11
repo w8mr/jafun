@@ -187,5 +187,5 @@ fun compileAsExpression(
     builder: IRBuilder.CodeBlockDSL,
 ) {
     compileExpressionNode(expression, builder, true)
-    if (expression.type() == Type.Unit) builder.getStatic("jafun/Unit", "INSTANCE", Type.Unit)
+    if (expression.type() == Type.Unit) builder.getStatic("jafun.Unit", "INSTANCE", Type.Unit)
 }

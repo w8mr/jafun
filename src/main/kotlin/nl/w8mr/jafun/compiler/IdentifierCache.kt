@@ -68,7 +68,7 @@ object IdentifierCache : SymbolMap {
         vararg parameterTypes: Type.OperandType<*>,
     ): Type.JFMethod {
         val parent = jfClass(containingClass)
-        val field = Type.JFField(parent, staticFieldType.replace('.', '/'), staticField)
+        val field = Type.JFField(parent, staticFieldType, staticField)
         return Type.JFMethod(
             arguments(parameterTypes),
             field,
@@ -119,7 +119,7 @@ object IdentifierCache : SymbolMap {
                 else -> {
                     try {
                         val jClass = Class.forName(path)
-                        listOf(Type.JFClass(jClass.name.replace('.', '/')))
+                        listOf(Type.JFClass(jClass.name))
                     } catch (_: Exception) {
                         emptyList<Type.OperandType<*>>()
                     }
@@ -160,7 +160,7 @@ object IdentifierCache : SymbolMap {
             val method =
                 Type.JFMethod(
                     params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t, IdentifierCache) },
-                    Type.JFClass(jClass.name.replace('.', '/')),
+                    Type.JFClass(jClass.name),
                     name,
                     rtn,
                     true,
@@ -183,7 +183,7 @@ object IdentifierCache : SymbolMap {
 
     private fun jvmType(returnName: String) = jvmTypes[returnName] ?: jfArray(returnName) ?: jfClass(returnName)
 
-    private fun jfClass(name: String) = if (name.startsWith('L') && name.endsWith(';')) Type.JFClass(name.substring(1, name.length-1)) else Type.JFClass(name.replace('.', '/'))
+    private fun jfClass(name: String) = if (name.startsWith('L') && name.endsWith(';')) Type.JFClass(name.substring(1, name.length-1)) else Type.JFClass(name)
 
     private fun jfArray(returnName: String): Type.Array? = if (returnName.startsWith('[')) Type.Array(jvmType(returnName.substring(1))) else null //TODO: check implementation
 

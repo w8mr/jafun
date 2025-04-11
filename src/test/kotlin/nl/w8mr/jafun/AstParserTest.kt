@@ -67,10 +67,10 @@ class AstParserTest {
                     "println",
                     Type.Unit,
                     Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -85,10 +85,10 @@ class AstParserTest {
                     "println",
                     Type.Unit,
                     Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -103,10 +103,10 @@ class AstParserTest {
                     "println",
                     Type.Unit,
                     Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java/lang/System"), "java/io/PrintStream", "out"),
+                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
                 s("Hello World"),
             ),
         )
@@ -280,7 +280,7 @@ class AstParserTest {
         }
     }
 
-    val objectType = Type.JFClass("java/lang/Object")
+    val objectType = Type.JFClass("java.lang.Object")
 
     private val join =
         method(
@@ -288,7 +288,7 @@ class AstParserTest {
             Type.StringType,
             Type.StringType,
             Type.StringType,
-            parent = Type.JFClass("jafun/test/TestKt"),
+            parent = Type.JFClass("jafun.test.TestKt"),
             operator = false,
         )
 
@@ -297,7 +297,7 @@ class AstParserTest {
             "println",
             Type.Unit,
             objectType,
-            parent = Type.JFClass("jafun/io/ConsoleKt"),
+            parent = Type.JFClass("jafun.io.ConsoleKt"),
             operator = false,
         )
 
@@ -309,7 +309,7 @@ class AstParserTest {
             Type.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 100,
-            parent = Type.JFClass("jafun/lang/IntKt"),
+            parent = Type.JFClass("jafun.lang.IntKt"),
             operator = true,
         )
 
@@ -321,7 +321,7 @@ class AstParserTest {
             Type.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 40,
-            parent = Type.JFClass("jafun/lang/IntKt"),
+            parent = Type.JFClass("jafun.lang.IntKt"),
             operator = true,
         )
 
