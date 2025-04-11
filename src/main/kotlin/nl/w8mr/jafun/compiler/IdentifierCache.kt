@@ -112,7 +112,7 @@ object IdentifierCache : SymbolMap {
                     val typeSigs =
                         listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.test.TestKt").mapNotNull {
                             val jClass = Class.forName(it)
-                            findInClass(jClass, name.replaceIllegalCharacters())
+                            findInClass(jClass, name)
                         }
                     typeSigs
                 }
@@ -146,7 +146,7 @@ object IdentifierCache : SymbolMap {
         jClass: Class<*>,
         name: String,
     ): Type.OperandType<*>? {
-        val jMethod = jClass.declaredMethods.find { it.name == name }
+        val jMethod = jClass.declaredMethods.find { it.name == name.replaceIllegalCharacters() }
         return jMethod?.let {
             val params = jMethod.parameters.map { jvmType(it.type.name) }
             val returnName = jMethod.returnType.name

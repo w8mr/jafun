@@ -31,9 +31,10 @@ interface SymbolMap {
 
     val symbolMapId: Int
 
-    fun String.replaceIllegalCharacters() =
-        this.replace('<', '﹤')
-            .replace('>', '﹥')
-            .replace('/', '∕')
 }
+
+fun String.replaceIllegalCharacters() =
+    this.replace('<', '﹤')
+        .replace('>', '﹥')
+        .replace('/', '∕')
 

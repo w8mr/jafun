@@ -1,5 +1,6 @@
 package nl.w8mr.jafun
 
+import nl.w8mr.jafun.compiler.replaceIllegalCharacters
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
 
@@ -38,8 +39,8 @@ class JVMBackend {
                             "(${instruction.method.parameters.joinToString("") { signature(it.type) }})" +
                                     signature(instruction.method.rtn)
                         when (instruction.field) {
-                            null -> invokeStatic(methodClassName, instruction.method.name, methodSignature)
-                            else -> invokeVirtual(methodClassName, instruction.method.name, methodSignature)
+                            null -> invokeStatic(methodClassName, instruction.method.name.replaceIllegalCharacters(), methodSignature)
+                            else -> invokeVirtual(methodClassName, instruction.method.name.replaceIllegalCharacters(), methodSignature)
                         }
                     }
                 }
