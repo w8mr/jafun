@@ -43,7 +43,13 @@
 - Check common type when expression
 - Smart type integer literals (BigInteger, Long, Int, Short, Byte)
 - Unsigned type (ULong, UInt, UShort, UByte)
-- Intruduce float literals
+- Introduce float literals
+- Generics
+- Marker interface on system classes
+- Union types
+- Interfaces without extending
+
+
 
 ## Kasmine
 - Remove hardcoded path

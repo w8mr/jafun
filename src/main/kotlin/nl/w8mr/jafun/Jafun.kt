@@ -29,7 +29,7 @@ fun compile(
         }
         is Parser.Success<*> -> {
             val parsed = parseResult.first
-            println("PARSED: \n${parsed!!.joinToString("\n\n") { it.prettyPrint() }}")
+            println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
             println()
             return compile(parsed, className, methodName, returnType, parameterTypes)
         }
@@ -67,7 +67,7 @@ fun     testBytes(
 
         is Parser.Success<*> -> {
             val parsed = parseResult.first
-            println("PARSED: \n${parsed!!.joinToString("\n\n") { it.prettyPrint() }}")
+            println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
             println()
             currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
                 add(

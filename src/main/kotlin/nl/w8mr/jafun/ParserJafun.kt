@@ -109,6 +109,7 @@ object ParserJafun {
                     when (current) {
                         is JFClass, is JFPackage -> handleNexts(nextIdResult, current.path)
                         is JFField -> handleNexts(nextIdResult, (current.type as JFClass).path)
+                        is JFVariableSymbol -> handleNexts(nextIdResult, (current.type as JFClass).path)
                         else -> error("Should be field or method")
                     }
                 }

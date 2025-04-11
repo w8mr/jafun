@@ -93,7 +93,7 @@ class CompilerTest {
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello")
                 loadConstant("World")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -112,7 +112,7 @@ class CompilerTest {
                 name = "main"
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello World")
-                invokeStatic("jafun/io/test/TestKt", "reverse", "(Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "reverse", "(Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -132,7 +132,7 @@ class CompilerTest {
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello")
                 loadConstant("World")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -153,7 +153,7 @@ class CompilerTest {
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello")
                 loadConstant("World")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 astore("str1")
                 aload("str1")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
@@ -175,11 +175,11 @@ class CompilerTest {
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello World")
                 loadConstant("1")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 loadConstant("2")
                 loadConstant("3")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -199,7 +199,7 @@ class CompilerTest {
                 signature = "([Ljava/lang/String;)V"
                 loadConstant("Hello")
                 loadConstant("World")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 pop()
                 `return`()
             }
@@ -351,7 +351,7 @@ class CompilerTest {
                 astore("str1")
                 aload("str1")
                 aload("str2")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                 `return`()
             }
@@ -710,9 +710,9 @@ class CompilerTest {
                 name = "main"
                 signature = "([Ljava/lang/String;)V"
                 loadConstant(5)
-                invokeStatic("jafun/io/test/TestKt", "euro", "(I)I")
+                invokeStatic("jafun/test/TestKt", "euro", "(I)I")
                 loadConstant(20)
-                invokeStatic("jafun/io/test/TestKt", "cent", "(I)I")
+                invokeStatic("jafun/test/TestKt", "cent", "(I)I")
                 invokeStatic("jafun/lang/IntKt", "+", "(II)I")
                 invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                 invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
@@ -985,7 +985,7 @@ class CompilerTest {
                 signature = "(Ljava/lang/String;)Ljava/lang/String;"
                 loadConstant("PREFIXED:")
                 aload("text")
-                invokeStatic("jafun/io/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
                 areturn()
             }
         }
@@ -1509,4 +1509,13 @@ class CompilerTest {
             arrayOf("Test"))
     }
 
+    @Test
+    fun simpleObject() {
+        test("""
+            val so = getSimpleObject5()
+            println so
+            val a = so.fetchA()
+            println a
+        """, "SimpleObject(a=5)\n5\n")
+    }
 }

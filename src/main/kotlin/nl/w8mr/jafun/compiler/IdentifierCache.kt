@@ -110,7 +110,7 @@ object IdentifierCache : SymbolMap {
                 split.size == 1 -> {
                     val name = split[0]
                     val typeSigs =
-                        listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.io.test.TestKt").mapNotNull {
+                        listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.test.TestKt").mapNotNull {
                             val jClass = Class.forName(it)
                             findInClass(jClass, name.replaceIllegalCharacters())
                         }
@@ -127,14 +127,14 @@ object IdentifierCache : SymbolMap {
             }
         }
     }
-    override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
+    override fun contains(path: String) = identifierMap[path] != null
 
 
     override fun add(
         path: String,
         typeSig: Type.OperandType<*>,
     ) {
-        identifierMap[path.replaceIllegalCharacters()] = listOf(typeSig)
+        identifierMap[path] = listOf(typeSig)
     }
 
     override fun incSymbolMapCount(): Int {

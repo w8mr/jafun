@@ -1,4 +1,4 @@
-package jafun.io.test
+package jafun.test
 
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.FunctionAssociativity
@@ -28,3 +28,9 @@ fun cent(n: Int) = n
 // fun test() = 5
 
 fun `﹤=﹥`(n: Int) = 1
+
+data class SimpleObject(val a: Int) {
+    fun fetchA(): Int = a
+}
+
+fun getSimpleObject5() = SimpleObject(5)

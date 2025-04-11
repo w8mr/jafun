@@ -6,16 +6,16 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
     private val identifierMap = mutableMapOf<String, List<Type.OperandType<*>>>()
 
     override fun find(path: String): List<Type.OperandType<*>> =
-        identifierMap[path.replaceIllegalCharacters()] ?: parent.find(path)
+        identifierMap[path] ?: parent.find(path)
 
-    override fun contains(path: String) = identifierMap[path.replaceIllegalCharacters()] != null
+    override fun contains(path: String) = identifierMap[path] != null
 
     override fun add(
         path: String,
         typeSig: Type.OperandType<*>,
     ) {
         // TODO: Add shadow check
-        identifierMap[path.replaceIllegalCharacters()] = listOf(typeSig)
+        identifierMap[path] = listOf(typeSig)
     }
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()

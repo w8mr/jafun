@@ -271,7 +271,7 @@ class AstParserTest {
 
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
-                println("PARSED: \n${parsed!!.joinToString("\n\n") { it.prettyPrint() }}")
+                println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
                 assertContentEquals(
                     expressions.toList(),
                     parsed,
@@ -288,7 +288,7 @@ class AstParserTest {
             Type.StringType,
             Type.StringType,
             Type.StringType,
-            parent = Type.JFClass("jafun/io/test/TestKt"),
+            parent = Type.JFClass("jafun/test/TestKt"),
             operator = false,
         )
 

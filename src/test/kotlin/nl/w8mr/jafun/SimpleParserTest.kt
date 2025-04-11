@@ -33,7 +33,7 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "<=>4",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32)), Type.JFClass("jafun/io/test/TestKt"), "﹤=﹥", Type.SInt32, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32)), Type.JFClass("jafun/test/TestKt"), "﹤=﹥", Type.SInt32, true, false, Associativity.PREFIX, 10),
             ),
             3,
         )
