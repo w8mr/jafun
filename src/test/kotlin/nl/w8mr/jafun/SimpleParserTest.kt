@@ -2,10 +2,8 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.ParserJafun
-import nl.w8mr.jafun.Token
 import nl.w8mr.jafun.Type
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.text.CharSequenceSource
@@ -113,7 +111,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.initValAssignment,
             """|val abc=5""".trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, ParserJafun.symbolMap.currentSymbolMap, false), ASTNode.IntegerLiteral(5)),
+            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
             9,
         )
     }
@@ -126,7 +124,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, ParserJafun.symbolMap.currentSymbolMap, false), ASTNode.IntegerLiteral(5)),
+            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
             13,
         )
     }
@@ -139,7 +137,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, ParserJafun.symbolMap.currentSymbolMap, true), ASTNode.IntegerLiteral(5)),
+            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
             13,
         )
     }
@@ -152,7 +150,7 @@ class SimpleParserTest {
             """|abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, ParserJafun.symbolMap.currentSymbolMap, true), ASTNode.IntegerLiteral(5)),
+            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
             8,
         )
     }
@@ -198,7 +196,7 @@ class SimpleParserTest {
         // val lexed = lexer.parse(input).filter { it !is Token.WS }
         val source = CharSequenceSource(input.trimMargin())
         val parsed = parser.apply(source)
-        ParserJafun.symbolMap.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
+        ParserJafun.symbolMap.reset()
         if (parsed is Parser.Failure) {
             println("Tree: \n${parser.parseTree(source).second}")
         }
@@ -221,7 +219,7 @@ class SimpleParserTest {
         val source = CharSequenceSource(input)
 
         val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
-        ParserJafun.symbolMap.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
+        ParserJafun.symbolMap.reset()
         assertEquals(
             expected,
             failureMessage,

@@ -14,6 +14,15 @@ class SymbolMapManager {
         )
     }
 
+    fun reset() {
+        currentSymbolMap  = LocalSymbolMap(IdentifierCache.reset()).apply {
+            add( // For main method
+                "arguments",
+                JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), this, false)
+            )
+        }
+    }
+
     fun find(path: String) = currentSymbolMap.find(path)
     fun findSingle(path: String) = currentSymbolMap.findSingle(path)
     fun findSingleOrNull(path: String) = currentSymbolMap.findSingleOrNull(path)
@@ -33,11 +42,11 @@ class SymbolMapManager {
         return variableSymbol
     }
 
-    fun push() {
+    private fun push() {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
     }
 
-    fun pop() {
+    private fun pop() {
         val oldSymbolMap = currentSymbolMap
         currentSymbolMap =
             if (oldSymbolMap is LocalSymbolMap) {
