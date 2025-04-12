@@ -2,7 +2,6 @@ package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
-import nl.w8mr.jafun.ParserJafun.currentSymbolMap
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
 import nl.w8mr.jafun.debug.IRPrintTree
 import nl.w8mr.jafun.debug.prettyPrint
@@ -69,7 +68,7 @@ fun     testBytes(
             val parsed = parseResult.first
             println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
             println()
-            currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
+            ParserJafun.symbolMap.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
                 add(
                     "arguments",
                     Type.JFVariableSymbol("param1", Type.Array(Type.JFClass("java/lang/String")), this, false)
@@ -134,7 +133,6 @@ fun compile(
     returnType: Type.OperandType<*> = Type.Unit,
     parameterTypes: List<Type.OperandType<*>> = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
 ): ByteArray {
-    currentSymbolMap = LocalSymbolMap(IdentifierCache.reset())
     val builder =
         IRBuilder.define {
             `class`(className) {

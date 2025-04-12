@@ -4,9 +4,6 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXL
 import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
-import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
-import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFMethod
@@ -42,6 +39,8 @@ import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 
 object ParserJafun {
+    val symbolMap = SymbolMapManager()
+
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.asLiteral()
     val ows = zeroOrMore(whitespace)
 
@@ -91,7 +90,7 @@ object ParserJafun {
                 currentPath: String
             ): List<Type.OperandType<*>> {
                 val nexts =
-                    currentSymbolMap.find("$currentPath.${nextIdResult.value.value}")
+                    symbolMap.find("$currentPath.${nextIdResult.value.value}")
                 return nexts.flatMap { next ->
                     when (next) {
                         is JFField, is JFClass, is JFPackage -> nextIdentifierPart(next)
@@ -119,7 +118,7 @@ object ParserJafun {
         }
 
         val id = identifier.bind()
-        val currents = currentSymbolMap.find(id.value)
+        val currents = symbolMap.find(id.value)
         currents.flatMap { current ->
             when (current) {
                 is JFMethod -> listOf(current)
@@ -146,11 +145,13 @@ object ParserJafun {
     val curlBlock =
         combi {
             -blockOpen
-            pushSymbolMap()
-            val expressions = expressions.bind()
-            -blockClose
-            popSymbolMap()
-            ASTNode.ExpressionList(expressions)
+            ASTNode.ExpressionList(
+                symbolMap.local {
+                    val expressions = expressions.bind()
+                    -blockClose
+                    expressions
+                }
+            )
         }
 
 
@@ -162,13 +163,7 @@ object ParserJafun {
             -literal('=')
             -owsnl
             val expression = expressionUntilNewline.bind()
-
-            if (identifier.value in currentSymbolMap) {
-                throw IllegalStateException("Variable ${identifier.value} already defined")
-            }
-            val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, false)
-            currentSymbolMap.add(identifier.value, variableSymbol)
-            ASTNode.ValAssignment(variableSymbol, expression)
+            ASTNode.ValAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), false), expression)
         }
 
     val initVarAssignment =
@@ -179,13 +174,7 @@ object ParserJafun {
             -literal('=')
             -owsnl
             val expression = expressionUntilNewline.bind()
-
-            if (identifier.value in currentSymbolMap) {
-                throw IllegalStateException("Variable ${identifier.value} already defined")
-            }
-            val variableSymbol = JFVariableSymbol(identifier.value, expression.type(), currentSymbolMap, true)
-            currentSymbolMap.add(identifier.value, variableSymbol)
-            ASTNode.VarAssignment(variableSymbol, expression)
+            ASTNode.VarAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), true), expression)
         }
 
     val varAssignment =
@@ -196,7 +185,7 @@ object ParserJafun {
             -owsnl
             val expression = expressionUntilNewline.bind()
 
-            val variableSymbol = currentSymbolMap.findSingle(identifier.value) as? JFVariableSymbol
+            val variableSymbol = symbolMap.findSingle(identifier.value) as? JFVariableSymbol
                 ?: throw IllegalStateException("Variable ${identifier.value} not defined")
             if (!variableSymbol.mutable) {
                 throw IllegalStateException("Variable ${identifier.value} is not mutable")
@@ -208,76 +197,68 @@ object ParserJafun {
     val whenExpression =
         combi {
             -("when" and owsnl)
-            pushSymbolMap()
-            val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
-            -blockOpen
-            val matches =
-                zeroOrMore((elseInWhen or expressionUntilArrow) and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
-            -blockClose
-            popSymbolMap()
+            val (subject, matches) = symbolMap.local() {
+                val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
+                -blockOpen
+                val matches =
+                    zeroOrMore((elseInWhen or expressionUntilArrow) and whenArrow and owsnl and expressionUntilNewline and wsnl).bind()
+                -blockClose
+                subject to matches
+            }
             ASTNode.When(subject, matches)
         }
 
     val whileExpression =
         combi {
             -("while" and owsnl)
-            pushSymbolMap()
-            -lParenTerm
-            val condition = expressionUntilRightParen.bind()
-            -rParenTerm
-            -owsnl
-            val expressions = curlBlock.bind()
-            popSymbolMap()
+            val (condition, expressions) = symbolMap.local {
+                -lParenTerm
+                val condition = expressionUntilRightParen.bind()
+                -rParenTerm
+                -owsnl
+                val expressions = curlBlock.bind()
+                condition to expressions
+            }
             ASTNode.While(condition, expressions)
         }
 
     val function =
         combi {
-            fun newParameterDef(
-                identifier: Identifier,
-                type: List<Type.OperandType<*>>,
-            ): JFVariableSymbol {
-                val variableSymbol =
-                    JFVariableSymbol(
-                        identifier.value,
-                        type.singleOrNull() ?: error("Type is required"),
-                        currentSymbolMap
-                    ) // TODO: handle complex types
-                currentSymbolMap.add(identifier.value, variableSymbol)
-
-                return variableSymbol
-            }
-
             -literal("fun")
             -wsnl
             val name = identifier.bind()
             -owsnl
-            -lParenTerm
-            val parameters =
-                (identifier and owsnl and ':' and owsnl and complexIdentifier map (::newParameterDef) sepByAllowEmpty commaTerm).bind()
-            -rParenTerm
-            val returnType = optional(':' and owsnl and identifier).bind()
-            -owsnl
+            val (symbol, block) = symbolMap.local {
+                -lParenTerm
+                val parameters =
+                    (identifier and owsnl and ':' and owsnl and complexIdentifier map { identifier, type ->
+                        symbolMap.newVariableSymbol(
+                        identifier.value, type.singleOrNull() ?: TODO("Handle complex type"), false)
+                    } sepByAllowEmpty commaTerm).bind()
+                -rParenTerm
+                val returnType = optional(':' and owsnl and identifier).bind()
+                -owsnl
 
-            val symbol =
-                JFMethod(
-                    parameters,
-                    JFClass("Script"),
-                    name.value,
-                    returnType?.value?.let { currentSymbolMap.findSingleOrNull(it) } ?: Unit,
-                    static = true,
-                    operator = name.operator,
-                    associativity = PREFIX,
-                )
-            currentSymbolMap.add(name.value, symbol)
+                val symbol =
+                    JFMethod(
+                        parameters,
+                        JFClass("Script"),
+                        name.value,
+                        returnType?.value?.let { symbolMap.findSingleOrNull(it) } ?: Unit,
+                        static = true,
+                        operator = name.operator,
+                        associativity = PREFIX,
+                    )
+                symbolMap.add(name.value, symbol)
 
-            val block = curlBlock.bind()
+                val block = curlBlock.bind()
+                symbol to block
+            }
 
             val symbolWithReturnType = symbol.copy(rtn = block.expressions.lastOrNull()?.type() ?: Unit)
-            currentSymbolMap.add(name.value, symbolWithReturnType)
+            symbolMap.add(name.value, symbolWithReturnType)
 
             ASTNode.Function(symbolWithReturnType, block.expressions)
-
         }
 
     fun prattParser(
@@ -352,7 +333,7 @@ object ParserJafun {
         //TODO: Cache parsers
         combi {
             val identifier = (identifier and owsnl).bind()
-            val symbols = currentSymbolMap.find(identifier.value)
+            val symbols = symbolMap.find(identifier.value)
             var okMark = mark()
             val result = symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                 val mark = mark()
@@ -418,29 +399,9 @@ object ParserJafun {
             else -> TODO()
         }
 
-    var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
-        add(
-            "arguments",
-            JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), this, false)
-        )
-    }
-
-    private fun pushSymbolMap() {
-        currentSymbolMap = LocalSymbolMap(currentSymbolMap)
-    }
-
-    private fun popSymbolMap() {
-        val oldSymbolMap = currentSymbolMap
-        currentSymbolMap =
-            if (oldSymbolMap is LocalSymbolMap) {
-                oldSymbolMap.parent
-            } else {
-                throw IllegalStateException("already at top of symbol map stack")
-            }
-    }
-
     fun parse(input: String): Pair<List<ASTNode.Expression>?, Parser.Result<List<ASTNode.Expression>>> {
         val source = CharSequenceSource(input)
         return expressions.parseTree(source)
     }
 }
+
