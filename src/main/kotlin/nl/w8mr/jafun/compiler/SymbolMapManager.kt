@@ -25,6 +25,11 @@ class SymbolMapManager {
     fun findSingle(path: String) = currentSymbolMap.findSingle(path)
     fun findSingleOrNull(path: String) = currentSymbolMap.findSingleOrNull(path)
 
+    fun find(type: Type.OperandType<*>?, path: String) = currentSymbolMap.find(type, path)
+    fun findSingle(type: Type.OperandType<*>, path: String) = currentSymbolMap.findSingle(type, path)
+    fun findSingleOrNull(type: Type.OperandType<*>, path: String) =
+        currentSymbolMap.findSingleOrNull(type, path)
+
     fun add(path: String, typeSig: Type.OperandType<*>) = currentSymbolMap.add(path, typeSig)
 
     fun newVariableSymbol(

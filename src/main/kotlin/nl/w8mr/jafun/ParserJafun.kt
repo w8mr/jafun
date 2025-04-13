@@ -88,10 +88,10 @@ object ParserJafun {
         fun CombinatorDSL<Char, List<Type.OperandType<*>>>.nextIdentifierPart(current: Type.OperandType<*>): List<Type.OperandType<*>> {
             fun CombinatorDSL<Char, List<Type.OperandType<*>>>.handleNexts(
                 nextIdResult: Success<Identifier>,
-                currentPath: String
+                current: Type.OperandType<*>
             ): List<Type.OperandType<*>> {
                 val nexts =
-                    symbolMap.find("$currentPath.${nextIdResult.value.value}")
+                    symbolMap.find(current, nextIdResult.value.value)
                 return nexts.flatMap { next ->
                     when (next) {
                         is JFField, is JFClass, is JFPackage -> nextIdentifierPart(next)
@@ -107,9 +107,9 @@ object ParserJafun {
             }.bindAsResult()) {
                 is Success<Identifier> -> {
                     when (current) {
-                        is JFClass, is JFPackage -> handleNexts(nextIdResult, current.path)
-                        is JFField -> handleNexts(nextIdResult, (current.type as JFClass).path)
-                        is JFVariableSymbol -> handleNexts(nextIdResult, (current.type as JFClass).path)
+                        is JFClass, is JFPackage -> handleNexts(nextIdResult, current)
+                        is JFField -> handleNexts(nextIdResult, (current.type as JFClass))
+                        is JFVariableSymbol -> handleNexts(nextIdResult, (current.type as JFClass))
                         else -> error("Should be field or method")
                     }
                 }
@@ -119,7 +119,7 @@ object ParserJafun {
         }
 
         val id = identifier.bind()
-        val currents = symbolMap.find(id.value)
+        val currents = symbolMap.find(null, id.value)
         currents.flatMap { current ->
             when (current) {
                 is JFMethod -> listOf(current)
@@ -328,13 +328,13 @@ object ParserJafun {
         }
 
     fun methodRhs(
-        lhsExpression: ASTNode.Expression?,
+        lhsExpression: ASTNode.Expression,
         minPrecedence: Int,
     ): Parser<Char, ASTNode.Expression> =
         //TODO: Cache parsers
         combi {
             val identifier = (identifier and owsnl).bind()
-            val symbols = symbolMap.find(identifier.value)
+            val symbols = symbolMap.find(lhsExpression.type(), identifier.value)
             var okMark = mark()
             val result = symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                 val mark = mark()

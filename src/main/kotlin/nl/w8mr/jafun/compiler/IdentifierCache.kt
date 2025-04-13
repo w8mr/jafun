@@ -6,6 +6,8 @@ import java.lang.Boolean
 
 object IdentifierCache : SymbolMap {
     private val identifierMap = mutableMapOf<String, List<Type.OperandType<*>>>()
+    private val identifierMap2 = mutableMapOf<Type.OperandType<*>?, MutableMap<String, List<Type.OperandType<*>>>>()
+
     private var symbolMapCounter: Int = 0
     override val symbolMapId: Int = 0
 
@@ -58,6 +60,14 @@ object IdentifierCache : SymbolMap {
         identifierMap["java.io"] = listOf(Type.JFPackage("java.io"))
         identifierMap["java.io.PrintStream"] = listOf(Type.JFClass("java.io.PrintStream"))
 
+        identifierMap2[null] = mutableMapOf("Int" to listOf(Type.SInt32))
+        identifierMap2[null] = mutableMapOf("String" to listOf(Type.StringType))
+
+        identifierMap2[null] = mutableMapOf("java" to listOf(Type.JFPackage("java")))
+        identifierMap2[Type.JFPackage("java")] = mutableMapOf("lang" to listOf(Type.JFPackage("java.lang")))
+        identifierMap2[Type.JFPackage("java.lang")] = mutableMapOf("System" to listOf(Type.JFClass("java.lang.System")))
+        identifierMap2[Type.JFClass("java.lang.System")] = mutableMapOf("out" to listOf(Type.JFField(Type.JFClass("java.lang.System"), "java.lang.System.out", "out", Type.JFClass("java.io.PrintStream"))))
+        identifierMap2[Type.JFClass("java.io.PrintStream")] = mutableMapOf("println" to listOf(systemOutPrintln))
     }
 
     private fun staticFieldMethod(
@@ -127,14 +137,39 @@ object IdentifierCache : SymbolMap {
             }
         }
     }
-    override fun contains(path: String) = identifierMap[path] != null
 
+    override fun find(type: Type.OperandType<*>?, path: String): List<Type.OperandType<*>> {
+        identifierMap2.computeIfAbsent(type) { type ->
+            mutableMapOf()
+        }
+        return identifierMap2[type]?.computeIfAbsent(path) { path ->
+            when (type) {
+                null -> listOf("jafun.io.ConsoleKt", "jafun.test.TestKt").flatMap { findInClass(Class.forName(it), path)?.let { listOf(it) } ?: emptyList() }
+                is Type.SInt32 -> listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt", "jafun.test.TestKt").flatMap { findInClass(Class.forName(it), path)?.let { listOf(it) } ?: emptyList() }
+                is Type.CharType -> findInClass(Class.forName("jafun.lang.CharKt"), path)?.let { listOf(it) } ?: emptyList()
+                is Type.StringType -> findInClass(Class.forName("jafun.lang.StringKt"), path)?.let { listOf(it) } ?: emptyList()
+                else -> emptyList()
+            }
+
+        } ?: emptyList()
+    }
+
+    override fun contains(path: String) = identifierMap[path] != null
 
     override fun add(
         path: String,
         typeSig: Type.OperandType<*>,
     ) {
         identifierMap[path] = listOf(typeSig)
+    }
+
+    override fun contains(type: Type.OperandType<*>, path: String): kotlin.Boolean {
+        return identifierMap2[type]?.containsKey(path) ?: false
+    }
+
+    override fun add(type: Type.OperandType<*>, path: String, typeSig: Type.OperandType<*>) {
+        // TODO: Add shadow check
+        identifierMap2[type] = mutableMapOf(path to listOf(typeSig))
     }
 
     override fun incSymbolMapCount(): Int {

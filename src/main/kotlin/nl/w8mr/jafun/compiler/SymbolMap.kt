@@ -20,12 +20,27 @@ interface SymbolMap {
         return symbol
     }
 
+    fun find(type: Type.OperandType<*>?, path: String): List<Type.OperandType<*>>
+    fun findSingle(type: Type.OperandType<*>?, path: String) = find(type, path).single()
+    fun findSingleOrNull(type: Type.OperandType<*>?, path: String) = find(type, path).singleOrNull()
+    fun findFirst(type: Type.OperandType<*>?, path: String) = find(type, path).first()
+    fun findFirstOrNull(type: Type.OperandType<*>?, path: String) = find(type, path).firstOrNull()
+
+
+    fun contains(type: Type.OperandType<*>, path: String): Boolean
+
+    fun add(
+        type: Type.OperandType<*>, path: String,
+        typeSig: Type.OperandType<*>,
+    )
+
     operator fun contains(path: String): Boolean
 
     fun add(
         path: String,
         typeSig: Type.OperandType<*>,
     )
+
 
     fun incSymbolMapCount(): Int
 

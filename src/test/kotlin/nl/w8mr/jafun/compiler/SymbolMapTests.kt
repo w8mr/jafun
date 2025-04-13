@@ -13,6 +13,7 @@ class SymbolMapTests {
         // Mock parent SymbolMap
         val parentSymbolMap = object : SymbolMap {
             private val data = mutableMapOf<String, List<Type.OperandType<*>>>()
+            private val data2 = mutableMapOf<Type.OperandType<*>?, Map<String, List<Type.OperandType<*>>>>()
 
             init {
                 add("parentPath", Type.StringType)
@@ -22,6 +23,14 @@ class SymbolMapTests {
                 return data[path] ?: emptyList()
             }
 
+            override fun find(type: Type.OperandType<*>?, path: String): List<Type.OperandType<*>> {
+                return data2[type]?.get(path) ?: emptyList()
+            }
+
+            override fun contains(type: Type.OperandType<*>, path: String): Boolean {
+                return data2[type]?.containsKey(path) ?: false
+            }
+
             override fun add(path: String, typeSig: Type.OperandType<*>) {
                 data[path] = listOf(typeSig)
             }
@@ -29,6 +38,9 @@ class SymbolMapTests {
             override fun incSymbolMapCount(): Int = 0
             override val symbolMapId: Int = 0
             override fun contains(path: String): Boolean = data.containsKey(path)
+            override fun add(type: Type.OperandType<*>, path: String, typeSig: Type.OperandType<*>) {
+                data2[type] = mapOf(path to listOf(typeSig))
+            }
         }
 
         localSymbolMap = LocalSymbolMap(parentSymbolMap)
