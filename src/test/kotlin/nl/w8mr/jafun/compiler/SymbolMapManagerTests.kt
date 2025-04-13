@@ -18,26 +18,26 @@ class SymbolMapManagerTests {
     @Test
     fun testInitialization() {
         val type = JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), symbolMapManager.currentSymbolMap, false)
-        assertTrue(symbolMapManager.currentSymbolMap.contains("arguments"))
-        assertEquals(listOf(type), symbolMapManager.currentSymbolMap.find("arguments"))
+        assertTrue(symbolMapManager.currentSymbolMap.contains(null, "arguments"))
+        assertEquals(listOf(type), symbolMapManager.currentSymbolMap.find(null, "arguments"))
     }
 
     @Test
     fun testReset() {
         val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
         symbolMapManager.add("myVar", type)
-        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         symbolMapManager.reset()
-        assertFalse(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertFalse(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
     }
 
     @Test
     fun testAddSymbol() {
-        assertFalse(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertFalse(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
         symbolMapManager.add("myVar", type)
-        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
-        assertEquals(type, symbolMapManager.currentSymbolMap.findSingle("myVar"))
+        assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
+        assertEquals(type, symbolMapManager.currentSymbolMap.findSingle(null, "myVar"))
     }
 
     @Test
@@ -46,7 +46,7 @@ class SymbolMapManagerTests {
         val variableSymbol = symbolMapManager.newVariableSymbol("myVar", type, true)
         assertEquals("myVar", variableSymbol.name)
         assertEquals(Type.SInt32, variableSymbol.type)
-        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         assertEquals(symbolMapManager.currentSymbolMap, variableSymbol.symbolMap)
         assertTrue(variableSymbol.mutable)
     }

@@ -16,29 +16,20 @@ class SymbolMapTests {
             private val data2 = mutableMapOf<Type.OperandType<*>?, Map<String, List<Type.OperandType<*>>>>()
 
             init {
-                add("parentPath", Type.StringType)
-            }
-
-            override fun find(path: String): List<Type.OperandType<*>> {
-                return data[path] ?: emptyList()
+                add(null, "parentPath", Type.StringType)
             }
 
             override fun find(type: Type.OperandType<*>?, path: String): List<Type.OperandType<*>> {
                 return data2[type]?.get(path) ?: emptyList()
             }
 
-            override fun contains(type: Type.OperandType<*>, path: String): Boolean {
+            override fun contains(type: Type.OperandType<*>?, path: String): Boolean {
                 return data2[type]?.containsKey(path) ?: false
-            }
-
-            override fun add(path: String, typeSig: Type.OperandType<*>) {
-                data[path] = listOf(typeSig)
             }
 
             override fun incSymbolMapCount(): Int = 0
             override val symbolMapId: Int = 0
-            override fun contains(path: String): Boolean = data.containsKey(path)
-            override fun add(type: Type.OperandType<*>, path: String, typeSig: Type.OperandType<*>) {
+            override fun add(type: Type.OperandType<*>?, path: String, typeSig: Type.OperandType<*>) {
                 data2[type] = mapOf(path to listOf(typeSig))
             }
         }
@@ -50,30 +41,30 @@ class SymbolMapTests {
     fun testAddAndFind() {
         val typeString = Type.StringType
         val typeInt = Type.SInt32
-        localSymbolMap.add("testPath", typeString)
-        assertTrue(localSymbolMap.contains("testPath"))
-        assertEquals(listOf(typeString), localSymbolMap.find("testPath"))
+        localSymbolMap.add(null, "testPath", typeString)
+        assertTrue(localSymbolMap.contains(null, "testPath"))
+        assertEquals(listOf(typeString), localSymbolMap.find(null, "testPath"))
     }
 
     @Test
     fun testFindFromParent() {
         val type = Type.StringType
-        assertEquals(listOf(type), localSymbolMap.find("parentPath"))
+        assertEquals(listOf(type), localSymbolMap.find(null, "parentPath"))
     }
 
     @Test
     fun testFindSingle() {
         val type = Type.StringType
-        localSymbolMap.add("singlePath", type)
-        assertEquals(type, localSymbolMap.findSingle("singlePath"))
+        localSymbolMap.add(null, "singlePath", type)
+        assertEquals(type, localSymbolMap.findSingle(null, "singlePath"))
     }
 
     @Test
     fun testFindSingleOrNull() {
         val type = Type.StringType
-        localSymbolMap.add("singleOrNullPath", type)
-        assertEquals(type, localSymbolMap.findSingleOrNull("singleOrNullPath"))
-        assertNull(localSymbolMap.findSingleOrNull("nonExistentPath"))
+        localSymbolMap.add(null, "singleOrNullPath", type)
+        assertEquals(type, localSymbolMap.findSingleOrNull(null, "singleOrNullPath"))
+        assertNull(localSymbolMap.findSingleOrNull(null, "nonExistentPath"))
     }
 
     @Test

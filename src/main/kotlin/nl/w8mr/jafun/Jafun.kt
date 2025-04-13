@@ -70,6 +70,7 @@ fun     testBytes(
             println()
             ParserJafun.symbolMap.currentSymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
                 add(
+                    null,
                     "arguments",
                     Type.JFVariableSymbol("param1", Type.Array(Type.JFClass("java/lang/String")), this, false)
                 )

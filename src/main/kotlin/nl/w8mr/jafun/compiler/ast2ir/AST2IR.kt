@@ -21,9 +21,9 @@ fun compileAsCodeBlock(
     return subBuilder.instructions
 }
 
-val integerValueOf = IdentifierCache.findMethod("java.lang.Integer.valueOf", listOf(Type.SInt32))
-val characterValueOf = IdentifierCache.findMethod("java.lang.Character.valueOf", listOf(Type.CharType))
-val booleanValueOf = IdentifierCache.findMethod("java.lang.Boolean.valueOf", listOf(Type.UInt1))
+val integerValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Integer"), "valueOf", listOf(Type.SInt32))
+val characterValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Character"), "valueOf", listOf(Type.CharType))
+val booleanValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Boolean"), "valueOf", listOf(Type.UInt1))
 
 
 fun loadArguments(
@@ -65,7 +65,7 @@ private fun createWhenConditionExpression(
     condition: ASTNode.Expression,
 ): ASTNode.Expression {
     return variable?.let { subjVar ->
-        val symbol = IdentifierCache.findMethod("==", listOf(subjVar.type, condition.type()))
+        val symbol = IdentifierCache.findMethod(null, "==", listOf(subjVar.type, condition.type()))
         ASTNode.Invocation(symbol, null, listOf(ASTNode.Variable(subjVar), condition))
     } ?: condition // If no subject variable, the condition is used directly
 }
