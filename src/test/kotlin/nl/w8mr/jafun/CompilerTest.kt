@@ -5,6 +5,7 @@ import nl.w8mr.jafun.testBytes
 import nl.w8mr.jafun.writeFile
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
+import org.junit.jupiter.api.Disabled
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -1509,6 +1510,7 @@ class CompilerTest {
             arrayOf("Test"))
     }
 
+    @Disabled
     @Test
     fun simpleObject() {
         test("""

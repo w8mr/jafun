@@ -11,6 +11,7 @@ import nl.w8mr.jafun.Type.JFPackage
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.Type.Unit
 import nl.w8mr.jafun.Token.Identifier
+import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.Parser.Failure

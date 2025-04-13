@@ -20,7 +20,7 @@ class Type {
 
     abstract class Generic(vararg val genericTypes : OperandType<*>) : OperandType<Any>
 
-    class Array(genericType : OperandType<*>) : Generic(genericType)
+    data class Array(val genericType : OperandType<*>) : Generic(genericType)
 
     object SInt32 : OperandType<Int> { override fun toString() = "Int32Type" }
 

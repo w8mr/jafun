@@ -1,0 +1,62 @@
+package nl.w8mr.jafun.compiler
+
+import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.Type.JFClass
+import nl.w8mr.jafun.Type.JFVariableSymbol
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+
+class SymbolMapManagerTests {
+    private lateinit var symbolMapManager: SymbolMapManager
+
+    @BeforeEach
+    fun setUp() {
+        symbolMapManager = SymbolMapManager()
+    }
+
+    @Test
+    fun testInitialization() {
+        val type = JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), symbolMapManager.currentSymbolMap, false)
+        assertTrue(symbolMapManager.currentSymbolMap.contains("arguments"))
+        assertEquals(listOf(type), symbolMapManager.currentSymbolMap.find("arguments"))
+    }
+
+    @Test
+    fun testReset() {
+        val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
+        symbolMapManager.add("myVar", type)
+        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
+        symbolMapManager.reset()
+        assertFalse(symbolMapManager.currentSymbolMap.contains("myVar"))
+    }
+
+    @Test
+    fun testAddSymbol() {
+        assertFalse(symbolMapManager.currentSymbolMap.contains("myVar"))
+        val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
+        symbolMapManager.add("myVar", type)
+        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertEquals(type, symbolMapManager.currentSymbolMap.findSingle("myVar"))
+    }
+
+    @Test
+    fun testNewVariableSymbol() {
+        val type = Type.SInt32
+        val variableSymbol = symbolMapManager.newVariableSymbol("myVar", type, true)
+        assertEquals("myVar", variableSymbol.name)
+        assertEquals(Type.SInt32, variableSymbol.type)
+        assertTrue(symbolMapManager.currentSymbolMap.contains("myVar"))
+        assertEquals(symbolMapManager.currentSymbolMap, variableSymbol.symbolMap)
+        assertTrue(variableSymbol.mutable)
+    }
+
+    @Test
+    fun testNewVariableSymbolThrowsExceptionOnDuplicate() {
+        val type = Type.SInt32
+        symbolMapManager.newVariableSymbol("myVar", type, true)
+        assertThrows(IllegalStateException::class.java) {
+            symbolMapManager.newVariableSymbol("myVar", type, true) 
+        }
+    }
+}

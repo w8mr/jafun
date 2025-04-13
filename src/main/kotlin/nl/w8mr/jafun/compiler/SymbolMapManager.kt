@@ -1,10 +1,8 @@
-package nl.w8mr.jafun
+package nl.w8mr.jafun.compiler
 
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFVariableSymbol
-import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
-import nl.w8mr.jafun.compiler.SymbolMap
 
 class SymbolMapManager {
     var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
@@ -27,7 +25,7 @@ class SymbolMapManager {
     fun findSingle(path: String) = currentSymbolMap.findSingle(path)
     fun findSingleOrNull(path: String) = currentSymbolMap.findSingleOrNull(path)
 
-    fun add(path: String, typeSig: Type.OperandType<*> ) = currentSymbolMap.add(path, typeSig)
+    fun add(path: String, typeSig: Type.OperandType<*>) = currentSymbolMap.add(path, typeSig)
 
     fun newVariableSymbol(
         name: String,
