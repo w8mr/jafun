@@ -100,13 +100,14 @@ fun compileExpressionNode(
         is ASTNode.Invocation -> {
             with(builder) {
                 if (node.field != null) {
-                    if (node.field.path == "this") {
-                        load("this", Type.Reference<Any?>(node.field.path))
-                    } else {
+//                    if (node.method.static) {
                         val fieldClassName = node.field.parent.path
                         val fieldTypeSig = Type.Reference<Any?>(node.field.path)
                         getStatic(fieldClassName, node.field.name, fieldTypeSig)
-                    }
+//                    } else {
+                            //load("2.so", Type.Reference<Any?>(node.field.path))
+//                      }
+//                    }
                 }
 
                 loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))

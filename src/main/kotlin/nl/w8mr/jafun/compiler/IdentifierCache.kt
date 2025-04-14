@@ -5,7 +5,7 @@ import nl.w8mr.jafun.ParserJafun
 import java.lang.Boolean
 
 object IdentifierCache : SymbolMap {
-    private val identifierMap2 = mutableMapOf<Type.OperandType<*>?, MutableMap<String, List<Type.OperandType<*>>>>()
+    private val identifierMap = mutableMapOf<Type.OperandType<*>?, MutableMap<String, List<Type.OperandType<*>>>>()
 
     private var symbolMapCounter: Int = 0
     override val symbolMapId: Int = 0
@@ -102,10 +102,10 @@ object IdentifierCache : SymbolMap {
         }
 
     override fun find(type: Type.OperandType<*>?, path: String): List<Type.OperandType<*>> {
-        identifierMap2.computeIfAbsent(type) { type ->
+        identifierMap.computeIfAbsent(type) { type ->
             mutableMapOf()
         }
-        return identifierMap2[type]?.computeIfAbsent(path) { path ->
+        return identifierMap[type]?.computeIfAbsent(path) { path ->
             when (type) {
                 null -> listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.test.TestKt").flatMap { findInClass(Class.forName(it), path)?.let { listOf(it) } ?: emptyList() }
                 is Type.SInt32 -> listOf("jafun.lang.IntKt", "jafun.io.ConsoleKt", "jafun.test.TestKt").flatMap { findInClass(Class.forName(it), path)?.let { listOf(it) } ?: emptyList() }
@@ -119,14 +119,14 @@ object IdentifierCache : SymbolMap {
     }
 
     override fun contains(type: Type.OperandType<*>?, path: String): kotlin.Boolean {
-        return identifierMap2[type]?.containsKey(path) ?: false
+        return identifierMap[type]?.containsKey(path) ?: false
     }
 
     override fun add(type: Type.OperandType<*>?, path: String, typeSig: Type.OperandType<*>) {
-        identifierMap2.computeIfAbsent(type) { type ->
+        identifierMap.computeIfAbsent(type) { type ->
             mutableMapOf()
         }
-        identifierMap2[type]?.computeIfAbsent(path) { path ->
+        identifierMap[type]?.computeIfAbsent(path) { path ->
             listOf(typeSig)
         }
     }
