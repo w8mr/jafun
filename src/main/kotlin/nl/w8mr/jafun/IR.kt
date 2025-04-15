@@ -1,7 +1,6 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.IR.OneOperand
-import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFMethod
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.IdentifierCache
@@ -16,6 +15,9 @@ interface Type : TypeSymbol {
     interface Parent: Type {
 
     }
+
+    interface InvocationTarget
+
     interface HasParent<T: Parent?>: Type {
         val parent: T
         val parentPath: String get() = parent?.path ?: ""
@@ -31,7 +33,7 @@ interface Type : TypeSymbol {
 
     data class JFPackage(override val name: String, override val parent: PackageParent? = null) : Type, HasParent<PackageParent?>, MethodParent, FieldParent, ClassParent, PackageParent
 
-    data class JFField(override val name: String, override val parent: FieldParent, val type: OperandType<*>? = null /* TODO: remove default null */) : Type, HasParent<FieldParent>
+    data class JFField(override val name: String, override val parent: FieldParent, val type: OperandType<*>?) : Type, HasParent<FieldParent>, InvocationTarget
 
     data class JFMethod(
         val parameters: List<JFVariableSymbol>,
@@ -51,12 +53,19 @@ interface Type : TypeSymbol {
         override val name get() = "${field.path}.${method.name}"
     }
 
+    data class JFVariableMethod(
+        val variable: JFVariableSymbol,
+        val method: JFMethod
+    ): Type {
+        override val name get() = "${variable.path}.${method.name}"
+    }
+
     data class JFVariableSymbol(
         override val name: String,
         val type: OperandType<*>,
         val symbolMap: SymbolMap = IdentifierCache,
         val mutable: Boolean = false
-    ) : Type {
+    ) : Type, InvocationTarget {
         override fun equals(other: Any?): Boolean =
             when (other) {
                 null -> false
@@ -119,7 +128,7 @@ class IR {
 
     data class Load<J>(val registerName: String, val type: OperandType<J>) : Instruction
 
-    data class Invoke(val method: JFMethod, val field: JFField?) : Instruction
+    data class Invoke(val method: JFMethod, val field: Type.InvocationTarget?) : Instruction
 
     data class GetStatic(val className: String, val fieldName: String, val type: OperandType<*>) : Instruction
 

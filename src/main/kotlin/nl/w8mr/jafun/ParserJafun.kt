@@ -11,6 +11,7 @@ import nl.w8mr.jafun.Type.JFPackage
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.Token.Identifier
 import nl.w8mr.jafun.Type.JFFieldMethod
+import nl.w8mr.jafun.Type.JFVariableMethod
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -95,12 +96,12 @@ object ParserJafun {
                 return nexts.flatMap { next ->
                     when (next) {
                         is JFField -> {
-                            val r = nextIdentifierPart((next.type as JFClass))
+                            nextIdentifierPart((next.type as JFClass))
                                 .filterIsInstance<JFMethod>()
                                 .filter { !it.static }
                                 .map { JFFieldMethod(next, it) }
-                            r
                         }
+
                         is JFClass, is JFPackage -> nextIdentifierPart(next)
                         is JFMethod -> listOf(next)
                         else -> error("Should be field or method")
@@ -116,7 +117,13 @@ object ParserJafun {
                     when (current) {
                         is JFClass, is JFPackage -> handleNexts(nextIdResult, current)
                         is JFField -> handleNexts(nextIdResult, (current.type as JFClass))
-                        is JFVariableSymbol -> handleNexts(nextIdResult, (current.type as JFClass))
+                        is JFVariableSymbol -> {
+                            handleNexts(nextIdResult, (current.type as JFClass))
+                                .filterIsInstance<JFMethod>()
+                                .filter { !it.static }
+                                .map { JFVariableMethod(current, it) }
+                        }
+
                         else -> error("Should be field or method")
                     }
                 }
@@ -336,6 +343,13 @@ object ParserJafun {
                         }
                         methodInvocation(symbol.method, symbol.field, arguments)
                     }
+                    is JFVariableMethod -> {
+                        val arguments = when (symbol.method.associativity) {
+                            PREFIX -> methodArguments(symbol.method, minPrecedence)
+                            else -> fail("Method does not have the right associativity")
+                        }
+                        methodInvocation(symbol.method, symbol.variable, arguments)
+                    } // TODO: remove duplication
                     else -> fail("Method or variable not found")
                 }
             }.singleOrNull() ?: fail("No single method found")
@@ -415,7 +429,7 @@ object ParserJafun {
 
     private fun methodInvocation(
         method: JFMethod,
-        field: JFField,
+        field: Type.InvocationTarget,
         arguments: List<ASTNode.Expression>,
     ): ASTNode.Expression =
         when {

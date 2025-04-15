@@ -28,7 +28,7 @@ sealed interface ASTNode {
         override fun type() = expressions.lastOrNull()?.type() ?: OperandType.Unit
     }
 
-    data class Invocation(val method: Type.JFMethod, val field: Type.JFField?, val arguments: List<Expression>) : Expression() {
+    data class Invocation(val method: Type.JFMethod, val field: Type.InvocationTarget?, val arguments: List<Expression>) : Expression() {
         override fun type() = method.rtn
     }
 

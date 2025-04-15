@@ -1,6 +1,7 @@
 package nl.w8mr.jafun.debug
 
 import nl.w8mr.jafun.ASTNode
+import nl.w8mr.jafun.Type
 
 /**
  * Generates a pretty-printed string representation of the ASTNode.
@@ -31,7 +32,7 @@ private fun Indenter.print(node: ASTNode) {
         }
 
         is ASTNode.Invocation -> {
-            -(node.field?.name ?: "")
+            -((node.field as? Type.JFField)?.name ?: "") //TODO Variable
             -(node.method.name)
             +"("
             if (node.arguments.isNotEmpty()) {

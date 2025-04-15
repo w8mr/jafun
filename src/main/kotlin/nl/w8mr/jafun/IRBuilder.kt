@@ -75,7 +75,7 @@ object IRBuilder {
 
         fun invoke(
             method: Type.JFMethod,
-            field: Type.JFField?,
+            field: Type.InvocationTarget?,
         ) {
             instructions.add(IR.Invoke(method, field))
         }

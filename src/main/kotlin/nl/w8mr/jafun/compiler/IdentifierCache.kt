@@ -126,12 +126,6 @@ object IdentifierCache : SymbolMap {
         return method
     }
 
-    fun findFromPath(path: String, parent: Type? = null): List<TypeSymbol> =
-        if (path.contains('.')) findFromPath(path.substringAfter('.'), find(parent, path.substringBefore('.')).singleOrNull() as? Type)
-        else find(parent, path)
-    fun findClass(path: String, parent: Type? = null) = findFromPath(path, parent).singleOrNull() as? Type.JFClass ?: error("$path is not a class")
-
-
     private fun arguments(parameterTypes: Array<out OperandType<*>>): List<Type.JFVariableSymbol> =
         parameterTypes.mapIndexed { index, param ->
             Type.JFVariableSymbol(
@@ -191,10 +185,12 @@ object IdentifierCache : SymbolMap {
             val precedence =
                 jMethod.annotations.filterIsInstance<FunctionPrecedence>().map(FunctionPrecedence::precedence)
                     .firstOrNull() ?: 10
+            val jfClass = findOrAddClass(jClass)
+
             val method =
                 Type.JFMethod(
                     params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t, IdentifierCache) },
-                    findClass(jClass.name),
+                    jfClass,
                     name,
                     rtn,
                     AccessFlag.STATIC in jMethod.accessFlags(),
