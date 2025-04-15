@@ -2,6 +2,7 @@ package nl.w8mr.jafun.debug
 
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 
 object IRPrintTree {
@@ -110,18 +111,14 @@ object IRPrintTree {
         }
 
 
-        fun <J> typeName(operandType: Type.OperandType<J>): String = when (operandType) {
-            is Type.Array -> "Array<${operandType.genericTypes[0]}>"
+        fun <J> typeName(operandType: OperandType<J>): String = when (operandType) {
+            is OperandType.Array -> "Array<${operandType.genericTypes[0]}>"
+            is OperandType.Reference<*> -> operandType.type
+            is OperandType.Generic -> TODO()
+            OperandType.SInt32 -> "Int32"
+            OperandType.StringType -> "String"
+            OperandType.UInt1 -> "Boolean"
+            OperandType.CharType -> "Char"
             is Type.JFClass -> operandType.path
-            is Type.JFMethod -> "${operandType.parent.path}.${operandType.name}"
-            is Type.JFVariableSymbol -> "${operandType.name}: ${typeName(operandType.type)}"
-            is Type.Reference<*> -> operandType.type
-            Type.SInt32 -> "Int32"
-            Type.StringType -> "String"
-            Type.UInt1 -> "Boolean"
-            Type.CharType -> "Char"
-            is Type.JFField -> "JFField"
-            is Type.JFPackage -> "JFPackage"
-            is Type.Generic -> TODO()
         }
 }

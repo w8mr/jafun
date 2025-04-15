@@ -1,7 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.Associativity
-import nl.w8mr.jafun.compiler.HasPath
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.ASTNode.Expression
@@ -10,12 +9,15 @@ import nl.w8mr.jafun.ASTNode.IntegerLiteral
 import nl.w8mr.jafun.ASTNode.StringLiteral
 import nl.w8mr.jafun.ASTNode.ValAssignment
 import nl.w8mr.jafun.ASTNode.Variable
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.Type.MethodParent
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 
 class AstParserTest {
     @Test
@@ -65,12 +67,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    Type.Unit,
-                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                    OperandType.Unit,
+                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
                 s("Hello World"),
             ),
         )
@@ -83,12 +85,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    Type.Unit,
-                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                    OperandType.Unit,
+                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
                 s("Hello World"),
             ),
         )
@@ -101,12 +103,12 @@ class AstParserTest {
             invocation(
                 method(
                     "println",
-                    Type.Unit,
-                    Type.JFVariableSymbol("param1", Type.StringType, IdentifierCache),
-                    parent = Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                    OperandType.Unit,
+                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
-                Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream", "out"),
+                Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
                 s("Hello World"),
             ),
         )
@@ -118,7 +120,7 @@ class AstParserTest {
         test(
             """
             |val num=1""",
-            ValAssignment(Type.JFVariableSymbol("num", Type.SInt32, IdentifierCache), i(1)),
+            ValAssignment(Type.JFVariableSymbol("num", OperandType.SInt32, IdentifierCache), i(1)),
         )
     }
 
@@ -128,8 +130,8 @@ class AstParserTest {
             """
             |val str = "Hello World"
             |println str""",
-            ValAssignment(Type.JFVariableSymbol("str", Type.StringType, IdentifierCache), s("Hello World")),
-            invocation(println, null, Variable(Type.JFVariableSymbol("str", Type.StringType, IdentifierCache))),
+            ValAssignment(Type.JFVariableSymbol("str", OperandType.StringType, IdentifierCache), s("Hello World")),
+            invocation(println, null, Variable(Type.JFVariableSymbol("str", OperandType.StringType, IdentifierCache))),
         )
     }
 
@@ -138,7 +140,7 @@ class AstParserTest {
         test(
             """fun test() { }""",
             function(
-                method("test", Type.Unit, operator = false),
+                method("test", OperandType.Unit, operator = false),
             ),
         )
     }
@@ -148,7 +150,7 @@ class AstParserTest {
         test(
             "fun test() { println 1 + 2 }",
             function(
-                method("test", Type.Unit, operator = false),
+                method("test", OperandType.Unit, operator = false),
                 invocation(
                     println,
                     null,
@@ -163,11 +165,11 @@ class AstParserTest {
         test(
             "fun test(a: Int) { println 1 + a }",
             function(
-                method("test", Type.Unit, Type.JFVariableSymbol("a", Type.SInt32, IdentifierCache)),
+                method("test", OperandType.Unit, Type.JFVariableSymbol("a", OperandType.SInt32, IdentifierCache)),
                 invocation(
                     println,
                     null,
-                    invocation(plus, null, i(1), Variable(Type.JFVariableSymbol("a", Type.SInt32, IdentifierCache))),
+                    invocation(plus, null, i(1), Variable(Type.JFVariableSymbol("a", OperandType.SInt32, IdentifierCache))),
                 ),
             ),
         )
@@ -178,7 +180,7 @@ class AstParserTest {
         test(
             "fun test() { 1 + 2 }",
             function(
-                method("test", Type.SInt32, operator = false),
+                method("test", OperandType.SInt32, operator = false),
                 invocation(plus, null, i(1), i(2)),
             ),
         )
@@ -189,9 +191,9 @@ class AstParserTest {
         test(
             "fun test() { fun inner() { println 1 + 2 } }",
             function(
-                method("test", Type.Unit, operator = false),
+                method("test", OperandType.Unit, operator = false),
                 function(
-                    method("inner", Type.Unit, operator = false),
+                    method("inner", OperandType.Unit, operator = false),
                     invocation(
                         println,
                         null,
@@ -209,14 +211,14 @@ class AstParserTest {
             |fun test() { println 1 + 2 }
             |test""",
             function(
-                method("test", Type.Unit, operator = false),
+                method("test", OperandType.Unit, operator = false),
                 invocation(
                     println,
                     null,
                     invocation(plus, null, i(1), i(2)),
                 ),
             ),
-            invocation(method("test", Type.Unit, operator = false), null),
+            invocation(method("test", OperandType.Unit, operator = false), null),
         )
     }
 
@@ -249,10 +251,10 @@ class AstParserTest {
             |}
             """,
             ASTNode.When(
-                ValAssignment(Type.JFVariableSymbol("a", Type.SInt32), i(2)),
+                ValAssignment(Type.JFVariableSymbol("a", OperandType.SInt32), i(2)),
                 listOf(
-                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", Type.SInt32)), i(2))) to s("False"),
-                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", Type.SInt32)), i(1))) to s("True"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", OperandType.SInt32)), i(2))) to s("False"),
+                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", OperandType.SInt32)), i(1))) to s("True"),
                 ),
             ),
         )
@@ -272,6 +274,7 @@ class AstParserTest {
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
                 println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
+                assertEquals(ASTNode.ExpressionList(expressions.toList()).prettyPrint(), parsed?.let {ASTNode.ExpressionList(it).prettyPrint()})
                 assertContentEquals(
                     expressions.toList(),
                     parsed,
@@ -285,73 +288,72 @@ class AstParserTest {
     private val join =
         method(
             "join",
-            Type.StringType,
-            Type.StringType,
-            Type.StringType,
-            parent = Type.JFClass("jafun.test.TestKt"),
+            OperandType.StringType,
+            OperandType.StringType,
+            OperandType.StringType,
+            parent = IdentifierCache.findClass("jafun.test.TestKt"),
             operator = false,
         )
 
     private val println =
         method(
             "println",
-            Type.Unit,
+            OperandType.Unit,
             objectType,
-            parent = Type.JFClass("jafun.io.ConsoleKt"),
+            parent = IdentifierCache.findClass("jafun.io.ConsoleKt"),
             operator = false,
         )
 
     private val plus =
         method(
             "+",
-            Type.SInt32,
-            Type.SInt32,
-            Type.SInt32,
+            OperandType.SInt32,
+            OperandType.SInt32,
+            OperandType.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 100,
-            parent = Type.JFClass("jafun.lang.IntKt"),
+            parent = IdentifierCache.findClass("jafun.lang.IntKt"),
             operator = true,
         )
 
     private val equals =
         method(
             "==",
-            Type.UInt1,
-            Type.SInt32,
-            Type.SInt32,
+            OperandType.UInt1,
+            OperandType.SInt32,
+            OperandType.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 40,
-            parent = Type.JFClass("jafun.lang.IntKt"),
+            parent = IdentifierCache.findClass("jafun.lang.IntKt"),
             operator = true,
         )
 
     private fun method(
         name: String,
-        returnType: Type.OperandType<*>,
+        returnType: OperandType<*>,
         vararg parameters: Type.JFVariableSymbol,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = Type.JFClass("Script"),
+        parent: MethodParent = Type.JFClass("Script"),
     ) = Type.JFMethod(
         parameters.toList(),
         parent,
         name,
         returnType,
         static,
-        false,
-        associativity,
-        precedence,
+        associativity = associativity,
+        precedence = precedence,
     )
 
     private fun method(
         name: String,
-        returnType: Type.OperandType<*>,
-        vararg parameters: Type.OperandType<*>,
+        returnType: OperandType<*>,
+        vararg parameters: OperandType<*>,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = Type.JFClass("Script"),
+        parent: MethodParent = Type.JFClass("Script"),
         operator: Boolean,
     ) = Type.JFMethod(
         parameters.toList().mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
@@ -366,11 +368,11 @@ class AstParserTest {
 
     private fun method(
         name: String,
-        returnType: Type.OperandType<*>,
+        returnType: OperandType<*>,
         static: Boolean = true,
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
-        parent: HasPath = Type.JFClass("Script"),
+        parent: MethodParent = Type.JFClass("Script"),
         operator: Boolean,
     ) = Type.JFMethod(
         emptyList(),

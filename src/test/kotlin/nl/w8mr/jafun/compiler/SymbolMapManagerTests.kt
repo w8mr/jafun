@@ -1,6 +1,6 @@
 package nl.w8mr.jafun.compiler
 
-import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import org.junit.jupiter.api.Assertions.*
@@ -17,14 +17,14 @@ class SymbolMapManagerTests {
 
     @Test
     fun testInitialization() {
-        val type = JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), symbolMapManager.currentSymbolMap, false)
+        val type = JFVariableSymbol("arguments", OperandType.Array(JFClass("java/lang/String")), symbolMapManager.currentSymbolMap, false)
         assertTrue(symbolMapManager.currentSymbolMap.contains(null, "arguments"))
         assertEquals(listOf(type), symbolMapManager.currentSymbolMap.find(null, "arguments"))
     }
 
     @Test
     fun testReset() {
-        val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
+        val type = JFVariableSymbol("myVar", OperandType.SInt32, symbolMapManager.currentSymbolMap, true)
         symbolMapManager.add("myVar", type)
         assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         symbolMapManager.reset()
@@ -34,7 +34,7 @@ class SymbolMapManagerTests {
     @Test
     fun testAddSymbol() {
         assertFalse(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
-        val type = JFVariableSymbol("myVar", Type.SInt32, symbolMapManager.currentSymbolMap, true)
+        val type = JFVariableSymbol("myVar", OperandType.SInt32, symbolMapManager.currentSymbolMap, true)
         symbolMapManager.add("myVar", type)
         assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         assertEquals(type, symbolMapManager.currentSymbolMap.findSingle(null, "myVar"))
@@ -42,10 +42,10 @@ class SymbolMapManagerTests {
 
     @Test
     fun testNewVariableSymbol() {
-        val type = Type.SInt32
+        val type = OperandType.SInt32
         val variableSymbol = symbolMapManager.newVariableSymbol("myVar", type, true)
         assertEquals("myVar", variableSymbol.name)
-        assertEquals(Type.SInt32, variableSymbol.type)
+        assertEquals(OperandType.SInt32, variableSymbol.type)
         assertTrue(symbolMapManager.currentSymbolMap.contains(null, "myVar"))
         assertEquals(symbolMapManager.currentSymbolMap, variableSymbol.symbolMap)
         assertTrue(variableSymbol.mutable)
@@ -53,7 +53,7 @@ class SymbolMapManagerTests {
 
     @Test
     fun testNewVariableSymbolThrowsExceptionOnDuplicate() {
-        val type = Type.SInt32
+        val type = OperandType.SInt32
         symbolMapManager.newVariableSymbol("myVar", type, true)
         assertThrows(IllegalStateException::class.java) {
             symbolMapManager.newVariableSymbol("myVar", type, true) 

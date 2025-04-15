@@ -8,6 +8,3 @@ annotation class FunctionAssociativity(val associativity: Associativity)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionPrecedence(val precedence: Int)
 
-interface HasPath {
-    val path: String
-}

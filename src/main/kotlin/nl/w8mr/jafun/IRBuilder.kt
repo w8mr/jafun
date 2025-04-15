@@ -13,8 +13,8 @@ object IRBuilder {
 
     data class MethodContext(
         val name: String,
-        val returnType: Type.OperandType<*>,
-        val parameterTypes: List<Type.OperandType<*>>,
+        val returnType: OperandType<*>,
+        val parameterTypes: List<OperandType<*>>,
         val instructions: MutableList<IR.Instruction> = mutableListOf(),
         val parent: ClassContext,
     )
@@ -34,8 +34,8 @@ object IRBuilder {
     class ClassDSL(val context: ClassContext, val parent: BuilderDSL) {
         fun method(
             name: String,
-            returnType: Type.OperandType<*>,
-            parameterTypes: List<Type.OperandType<*>>,
+            returnType: OperandType<*>,
+            parameterTypes: List<OperandType<*>>,
             init: MethodDSL.() -> Unit,
         ) {
             val methodContext = MethodContext(name, returnType, parameterTypes, parent = context)
@@ -54,21 +54,21 @@ object IRBuilder {
 
         fun <J> loadConstant(
             operand1: J,
-            type: Type.OperandType<J>,
+            type: OperandType<J>,
         ) {
             instructions.add(IR.LoadConstant(operand1, type))
         }
 
         fun <J> store(
             registerName: String,
-            type: Type.OperandType<J>,
+            type: OperandType<J>,
         ) {
             instructions.add(IR.Store(registerName, type))
         }
 
         fun <J> load(
             registerName: String,
-            type: Type.OperandType<J>,
+            type: OperandType<J>,
         ) {
             instructions.add(IR.Load(registerName, type))
         }
@@ -83,7 +83,7 @@ object IRBuilder {
         fun getStatic(
             className: String,
             fieldName: String,
-            type: Type.Reference<*>,
+            type: OperandType.Reference<*>,
         ) {
             instructions.add(IR.GetStatic(className, fieldName, type))
         }
@@ -97,7 +97,7 @@ object IRBuilder {
         }
 
         @Suppress("ktlint:standard:function-naming")
-        fun <J> `return`(type: Type.OperandType<J>) {
+        fun <J> `return`(type: OperandType<J>) {
             instructions.add(IR.Return(type))
         }
 

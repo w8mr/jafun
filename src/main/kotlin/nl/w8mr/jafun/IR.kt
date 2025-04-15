@@ -3,56 +3,60 @@ package nl.w8mr.jafun
 import nl.w8mr.jafun.IR.OneOperand
 import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFMethod
-import nl.w8mr.jafun.Type.OperandType
 import nl.w8mr.jafun.compiler.Associativity
-import nl.w8mr.jafun.compiler.HasPath
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMap
 
-class Type {
-    sealed interface OperandType<J> {
-        fun operand1(instruction: OneOperand<*>) = instruction.operand1 as J
+interface TypeSymbol
+
+interface Type : TypeSymbol {
+    val name: String
+    val path: String get() = "${(this as? HasParent<*>)?.parent?.path?.let{"$it."}?:""}$name"
+
+    interface Parent: Type {
+
+    }
+    interface HasParent<T: Parent?>: Type {
+        val parent: T
+        val parentPath: String get() = parent?.path ?: ""
+
     }
 
-    object StringType : OperandType<String> { override fun toString() = "StringType" }
+    interface MethodParent: Parent
+    interface FieldParent: Parent
+    interface ClassParent: Parent
+    interface PackageParent: Parent
 
-    open class Reference<T>(val type: String) : OperandType<T>
+    data class JFClass(override val name: String, override val parent: ClassParent? = null) : Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent
 
-    abstract class Generic(vararg val genericTypes : OperandType<*>) : OperandType<Any>
+    data class JFPackage(override val name: String, override val parent: PackageParent? = null) : Type, HasParent<PackageParent?>, MethodParent, FieldParent, ClassParent, PackageParent
 
-    data class Array(val genericType : OperandType<*>) : Generic(genericType)
-
-    object SInt32 : OperandType<Int> { override fun toString() = "Int32Type" }
-
-    object UInt1 : OperandType<Boolean> { override fun toString() = "BooleanType" }
-
-    object CharType : OperandType<Char> { override fun toString() = "CharType" }
-
-    object Unit : Reference<jafun.Unit>("jafun.Unit") { override fun toString() = "UnitType" }
-
-    data class JFClass(override val path: String) : OperandType<Any?>, HasPath
-
-    data class JFPackage(override val path: String) : OperandType<Any?>, HasPath
-
-    data class JFField(val parent: JFClass, override val path: String, val name: String, val type: OperandType<*>? = null /* TODO: remove default null */) : OperandType<Any?>, HasPath
+    data class JFField(override val name: String, override val parent: FieldParent, val type: OperandType<*>? = null /* TODO: remove default null */) : Type, HasParent<FieldParent>
 
     data class JFMethod(
         val parameters: List<JFVariableSymbol>,
-        val parent: HasPath,
-        val name: String,
+        override val parent: MethodParent,
+        override val name: String,
         val rtn: OperandType<*>,
         val static: Boolean = false,
         val operator: Boolean = false,
         val associativity: Associativity = Associativity.PREFIX,
         val precedence: Int = 10,
-    ) : OperandType<Any?>
+    ) : Type, HasParent<MethodParent>
+
+    data class JFFieldMethod(
+        val field: JFField,
+        val method: JFMethod
+    ): Type {
+        override val name get() = "${field.path}.${method.name}"
+    }
 
     data class JFVariableSymbol(
-        val name: String,
+        override val name: String,
         val type: OperandType<*>,
         val symbolMap: SymbolMap = IdentifierCache,
         val mutable: Boolean = false
-    ) : OperandType<Any?> {
+    ) : Type {
         override fun equals(other: Any?): Boolean =
             when (other) {
                 null -> false
@@ -68,12 +72,45 @@ class Type {
     }
 
 }
+
+sealed interface OperandType<J> : TypeSymbol {
+    fun operand1(instruction: OneOperand<*>) = instruction.operand1 as J
+
+
+    object StringType : OperandType<String> {
+        override fun toString() = "StringType"
+    }
+
+    open class Reference<T>(val type: String) : OperandType<T>
+
+    abstract class Generic(vararg val genericTypes: OperandType<*>) : OperandType<Any>
+
+    data class Array(val genericType: OperandType<*>) : Generic(genericType)
+
+    object SInt32 : OperandType<Int> {
+        override fun toString() = "Int32Type"
+    }
+
+    object UInt1 : OperandType<Boolean> {
+        override fun toString() = "BooleanType"
+    }
+
+    object CharType : OperandType<Char> {
+        override fun toString() = "CharType"
+    }
+
+    object Unit : Reference<jafun.Unit>("jafun.Unit") {
+        override fun toString() = "UnitType"
+    }
+
+}
+
 class IR {
     sealed interface Instruction
 
     sealed interface OneOperand<J> : Instruction {
         val operand1: J
-        val type: Type.OperandType<J>
+        val type: OperandType<J>
     }
 
     data class LoadConstant<J>(override val operand1: J, override val type: OperandType<J>) : OneOperand<J>

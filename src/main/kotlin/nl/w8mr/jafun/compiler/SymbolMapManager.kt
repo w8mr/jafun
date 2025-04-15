@@ -1,14 +1,16 @@
 package nl.w8mr.jafun.compiler
 
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFVariableSymbol
+import nl.w8mr.jafun.TypeSymbol
 
 class SymbolMapManager {
     var currentSymbolMap: SymbolMap = LocalSymbolMap(IdentifierCache.reset()).apply {
         add(null,  // For main method
             "arguments",
-            JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), this, false)
+            JFVariableSymbol("arguments", OperandType.Array(JFClass("java/lang/String")), this, false)
         )
     }
 
@@ -16,7 +18,7 @@ class SymbolMapManager {
         currentSymbolMap  = LocalSymbolMap(IdentifierCache.reset()).apply {
             add(null, // For main method
                 "arguments",
-                JFVariableSymbol("arguments", Type.Array(JFClass("java/lang/String")), this, false)
+                JFVariableSymbol("arguments", OperandType.Array(JFClass("java/lang/String")), this, false)
             )
         }
     }
@@ -24,16 +26,16 @@ class SymbolMapManager {
     fun findSingle(path: String) = currentSymbolMap.findSingle(null, path)
     fun findSingleOrNull(path: String) = currentSymbolMap.findSingleOrNull(null, path)
 
-    fun find(type: Type.OperandType<*>?, path: String) = currentSymbolMap.find(type, path)
-    fun findSingle(type: Type.OperandType<*>, path: String) = currentSymbolMap.findSingle(type, path)
-    fun findSingleOrNull(type: Type.OperandType<*>, path: String) =
+    fun find(type: TypeSymbol?, path: String) = currentSymbolMap.find(type, path)
+    fun findSingle(type: Type, path: String) = currentSymbolMap.findSingle(type, path)
+    fun findSingleOrNull(type: Type, path: String) =
         currentSymbolMap.findSingleOrNull(type, path)
 
-    fun add(path: String, typeSig: Type.OperandType<*>) = currentSymbolMap.add(null, path, typeSig)
+    fun add(path: String, typeSig: Type) = currentSymbolMap.add(null, path, typeSig)
 
     fun newVariableSymbol(
         name: String,
-        type: Type.OperandType<*>,
+        type: OperandType<*>,
         mutable: Boolean
     ): JFVariableSymbol {
         if (currentSymbolMap.contains(null, name)) {

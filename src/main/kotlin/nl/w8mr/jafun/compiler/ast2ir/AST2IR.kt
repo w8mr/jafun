@@ -3,6 +3,7 @@ package nl.w8mr.jafun.compiler.ast2ir
 import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compileMethod
 import nl.w8mr.jafun.compiler.IdentifierCache
@@ -21,15 +22,15 @@ fun compileAsCodeBlock(
     return subBuilder.instructions
 }
 
-val integerValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Integer"), "valueOf", listOf(Type.SInt32))
-val characterValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Character"), "valueOf", listOf(Type.CharType))
-val booleanValueOf = IdentifierCache.findMethod(Type.JFClass("java.lang.Boolean"), "valueOf", listOf(Type.UInt1))
+val integerValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Integer"), "valueOf", listOf(OperandType.SInt32))
+val characterValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Character"), "valueOf", listOf(OperandType.CharType))
+val booleanValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Boolean"), "valueOf", listOf(OperandType.UInt1))
 
 
 fun loadArguments(
     builder: IRBuilder.CodeBlockDSL,
     arguments: List<ASTNode.Expression>,
-    parameters: List<Type.OperandType<*>>,
+    parameters: List<OperandType<*>>,
 ) {
     arguments.zip(parameters).forEach { (argument, parameter) ->
         if (argument.type() == parameter) {
@@ -40,16 +41,16 @@ fun loadArguments(
             when (parameter) {
                 is Type.JFClass -> {
                     when (argType) {
-                        is Type.StringType, is Type.JFClass -> {}
-                        Type.SInt32 -> builder.invoke(integerValueOf, null)
-                        Type.CharType -> builder.invoke(characterValueOf, null)
-                        Type.UInt1 -> builder.invoke(booleanValueOf, null)
+                        is OperandType.StringType, is Type.JFClass -> {}
+                        OperandType.SInt32 -> builder.invoke(integerValueOf, null)
+                        OperandType.CharType -> builder.invoke(characterValueOf, null)
+                        OperandType.UInt1 -> builder.invoke(booleanValueOf, null)
                         else -> TODO("Unhandled type mismatch during argument loading: $argType vs $parameter")
                     }
                 }
-                is Type.Array -> {
+                is OperandType.Array -> {
                     when (argType) {
-                        is Type.Array -> {}
+                        is OperandType.Array -> {}
                         else -> TODO("Unhandled type mismatch during argument loading: $argType vs $parameter")
                     }
                 }
@@ -78,16 +79,16 @@ fun compileExpressionNode(
 ) {
     when (node) {
         is ASTNode.StringLiteral -> {
-            builder.loadConstant(node.value, Type.StringType)
+            builder.loadConstant(node.value, OperandType.StringType)
         }
         is ASTNode.CharLiteral -> {
-            builder.loadConstant(node.value, Type.CharType)
+            builder.loadConstant(node.value, OperandType.CharType)
         }
         is ASTNode.IntegerLiteral -> {
-            builder.loadConstant(node.value, Type.SInt32)
+            builder.loadConstant(node.value, OperandType.SInt32)
         }
         is ASTNode.BooleanLiteral -> {
-            builder.loadConstant(node.value, Type.UInt1)
+            builder.loadConstant(node.value, OperandType.UInt1)
         }
         is ASTNode.ExpressionList -> {
             val lastIndex = node.expressions.size - 1
@@ -100,19 +101,14 @@ fun compileExpressionNode(
         is ASTNode.Invocation -> {
             with(builder) {
                 if (node.field != null) {
-//                    if (node.method.static) {
-                        val fieldClassName = node.field.parent.path
-                        val fieldTypeSig = Type.Reference<Any?>(node.field.path)
-                        getStatic(fieldClassName, node.field.name, fieldTypeSig)
-//                    } else {
-                            //load("2.so", Type.Reference<Any?>(node.field.path))
-//                      }
-//                    }
+                    val fieldClassName = node.field.parentPath
+                    val fieldTypeSig = OperandType.Reference<Any>((node.field.type as? Type.JFClass)?.path ?: error("shoul de clas"))
+                    getStatic(fieldClassName, node.field.name, fieldTypeSig)
                 }
 
                 loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))
                 invoke(node.method, node.field)
-                if (!returnValue && (node.method.rtn != Type.Unit)) pop()
+                if (!returnValue && (node.method.rtn != OperandType.Unit)) pop()
             }
         }
         is ASTNode.When -> {

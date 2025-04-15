@@ -17,8 +17,8 @@ fun compile(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    returnType: Type.OperandType<*> = Type.Unit,
-    parameterTypes: List<Type.OperandType<*>> = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
+    returnType: OperandType<*> = OperandType.Unit,
+    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val parseResult = ParserJafun.parse(code)
     when (parseResult.second) {
@@ -44,16 +44,16 @@ fun test(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    returnType: Type.OperandType<*> = Type.Unit,
-    parameterTypes: List<Type.OperandType<*>> = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
+    returnType: OperandType<*> = OperandType.Unit,
+    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
 ) = testBytes(code, className, methodName, returnType, parameterTypes).first
 
 fun     testBytes(
     code: String,
     className: String = "Script",
     methodName: String = "main",
-    returnType: Type.OperandType<*> = Type.Unit,
-    parameterTypes: List<Type.OperandType<*>> = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
+    returnType: OperandType<*> = OperandType.Unit,
+    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
     params: Array<String>? = null,
 ): Pair<String, ByteArray> {
 
@@ -72,7 +72,8 @@ fun     testBytes(
                 add(
                     null,
                     "arguments",
-                    Type.JFVariableSymbol("param1", Type.Array(Type.JFClass("java/lang/String")), this, false)
+                    Type.JFVariableSymbol("param1", OperandType.Array(Type.JFClass("String", Type.JFPackage("lang", Type.JFPackage("java")))), this, false)
+
                 )
             } // TODO: look into this.
             val builder =
@@ -131,8 +132,8 @@ fun compile(
     statements: List<ASTNode.Expression>,
     className: String = "Script",
     methodName: String = "main",
-    returnType: Type.OperandType<*> = Type.Unit,
-    parameterTypes: List<Type.OperandType<*>> = listOf(Type.Array(Type.Reference<String>("java.lang.String"))),
+    returnType: OperandType<*> = OperandType.Unit,
+    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
 ): ByteArray {
     val builder =
         IRBuilder.define {
@@ -148,8 +149,8 @@ fun compileMethod(
     builder: IRBuilder.ClassDSL,
     statements: List<ASTNode.Expression>,
     methodName: String,
-    returnType: Type.OperandType<*>,
-    parameterTypes: List<Type.OperandType<*>>,
+    returnType: OperandType<*>,
+    parameterTypes: List<OperandType<*>>,
 ) {
 
     with(builder) {
@@ -158,9 +159,9 @@ fun compileMethod(
                 val lastIndex = statements.size - 1
                 statements.forEachIndexed { index, statement ->
                     if ((lastIndex == index)) {
-                        if (returnType is Type.Unit) {
+                        if (returnType is OperandType.Unit) {
                             compileAsStatement(statement, this)
-                            `return`(Type.Unit)
+                            `return`(OperandType.Unit)
                         } else {
                             compileAsExpression(statement, this)
                             `return`(statement.type())
@@ -186,5 +187,5 @@ fun compileAsExpression(
     builder: IRBuilder.CodeBlockDSL,
 ) {
     compileExpressionNode(expression, builder, true)
-    if (expression.type() == Type.Unit) builder.getStatic("jafun.Unit", "INSTANCE", Type.Unit)
+    if (expression.type() == OperandType.Unit) builder.getStatic("jafun.Unit", "INSTANCE", OperandType.Unit)
 }

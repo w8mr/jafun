@@ -3,6 +3,7 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.ASTNode
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.parsek.Parser
@@ -18,8 +19,26 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "==4",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32), Type.JFVariableSymbol("param2", Type.SInt32)), Type.JFClass("jafun.lang.IntKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.CharType), Type.JFVariableSymbol("param2", Type.CharType)), Type.JFClass("jafun.lang.CharKt"), "==", Type.UInt1, true, true, Associativity.INFIXL, 40),
+                Type.JFMethod(
+                    listOf(Type.JFVariableSymbol("param1", OperandType.SInt32), Type.JFVariableSymbol("param2", OperandType.SInt32)),
+                    IdentifierCache.findClass("jafun.lang.IntKt"),
+                    "==",
+                    OperandType.UInt1,
+                    true,
+                    true,
+                    Associativity.INFIXL,
+                    40
+                ),
+                Type.JFMethod(
+                    listOf(Type.JFVariableSymbol("param1", OperandType.CharType), Type.JFVariableSymbol("param2", OperandType.CharType)),
+                    IdentifierCache.findClass("jafun.lang.CharKt"),
+                    "==",
+                    OperandType.UInt1,
+                    true,
+                    true,
+                    Associativity.INFIXL,
+                    40
+                ),
             ),
             2,
         )
@@ -32,7 +51,13 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "<=>4",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.SInt32)), Type.JFClass("jafun.test.TestKt"), "<=>", Type.SInt32, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(
+                    listOf(Type.JFVariableSymbol("param1", OperandType.SInt32)),
+                    IdentifierCache.findClass("jafun.test.TestKt"),
+                    "<=>",
+                    OperandType.SInt32,
+                    true
+                ),
             ),
             3,
         )
@@ -44,7 +69,13 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "println()",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.JFClass("java.lang.Object"))), Type.JFClass("jafun.io.ConsoleKt"), "println", Type.Unit, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(
+                    listOf(Type.JFVariableSymbol("param1", Type.JFClass("java.lang.Object"))),
+                    IdentifierCache.findClass("jafun.io.ConsoleKt"),
+                    "println",
+                    OperandType.Unit,
+                    true
+                ),
             ),
             7,
         )
@@ -56,7 +87,15 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "java.lang.System.out.println()",
             listOf(
-                Type.JFMethod(listOf(Type.JFVariableSymbol("param1", Type.StringType)), Type.JFField(Type.JFClass("java.lang.System"), "java.io.PrintStream","out"),  "println", Type.Unit, false, false, Associativity.PREFIX, 10),
+                Type.JFFieldMethod(
+                    Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
+                    Type.JFMethod(
+                    listOf(Type.JFVariableSymbol("param1", OperandType.StringType)),
+                    IdentifierCache.findClass("java.io.PrintStream"),
+                    "println",
+                    OperandType.Unit
+                    )
+                ),
             ),
             28,
         )
@@ -64,7 +103,7 @@ class SimpleParserTest {
 
     @Test
     fun `Simple Variable`() {
-        val varSymbol = ParserJafun.symbolMap.newVariableSymbol("abcd", Type.SInt32, true)
+        val varSymbol = ParserJafun.symbolMap.newVariableSymbol("abcd", OperandType.SInt32, true)
         testSingleParser(
             ParserJafun.methodLhs(0),
             "abcd+3",
@@ -75,7 +114,7 @@ class SimpleParserTest {
 
     @Test
     fun `Simple Variable not found`() {
-        ParserJafun.symbolMap.newVariableSymbol("abcd", Type.SInt32, true)
+        ParserJafun.symbolMap.newVariableSymbol("abcd", OperandType.SInt32, true)
         testSingleParserFailed(
             ParserJafun.methodLhs(0),
             "bcd+3",
@@ -111,7 +150,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.initValAssignment,
             """|val abc=5""".trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
+            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
             9,
         )
     }
@@ -124,7 +163,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
+            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
             13,
         )
     }
@@ -137,20 +176,20 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
+            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
             13,
         )
     }
 
     @Test
     fun `var re-assignment whitespace`() {
-        ParserJafun.symbolMap.newVariableSymbol("abc", Type.SInt32, true)
+        ParserJafun.symbolMap.newVariableSymbol("abc", OperandType.SInt32, true)
         testSingleParser(
             ParserJafun.varAssignment,
             """|abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", Type.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
+            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
             8,
         )
     }
@@ -161,7 +200,7 @@ class SimpleParserTest {
             ParserJafun.function,
             """|fun test(){}""".trimMargin(),
             ASTNode.Function(
-                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", Type.Unit, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),
             12,
@@ -180,7 +219,7 @@ class SimpleParserTest {
                 |}
             """.trimMargin(),
             ASTNode.Function(
-                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", Type.Unit, true, false, Associativity.PREFIX, 10),
+                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),
             21,
