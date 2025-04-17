@@ -1,6 +1,6 @@
+
 plugins {
-    kotlin("jvm") version "2.1.10"
-    application
+    kotlin("multiplatform") version "2.1.10"
     `maven-publish`
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
@@ -13,27 +13,39 @@ repositories {
     mavenLocal()
 }
 
-dependencies {
-    implementation("nl.w8mr.parsek:core:0.1.1")
-    implementation(project(":kasmine"))
-    implementation(kotlin("reflect"))
-    testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-
-tasks.withType<Test> {
-}
-
 kotlin {
-    jvmToolchain(21)
-}
-
-application {
-    mainClass.set("MainKt")
+    jvm {
+        java {
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(21))
+            }
+        }
+    }
+    js {
+        browser()
+        nodejs()
+    }
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(kotlin("stdlib-common"))
+                implementation("nl.w8mr.parsek:core:0.1.1")
+                implementation("nl.w8mr.kasmine:core:0.0.4")
+                implementation(kotlin("reflect"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+                implementation(kotlin("stdlib"))
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+    }
 }
 
 ktlint {
