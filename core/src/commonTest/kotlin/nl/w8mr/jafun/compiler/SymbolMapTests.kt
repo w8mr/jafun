@@ -30,7 +30,7 @@ class SymbolMapTests {
                     return data[type]?.get(path) ?: emptyList()
                 }
 
-                override fun findOrAddClass(clazz: ClassInfo): Type.JFClass {
+                override fun findOrAddClass(className: String, packageName: String, simpleName: String): Type.JFClass {
                     TODO("Not yet implemented")
                 }
 

@@ -27,9 +27,5 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
         typeMap[path] = listOf(typeSig)
     }
 
-    override fun findOrAddClass(clazz: ClassInfo): Type.JFClass {
-        return parent.findOrAddClass(clazz)
-    }
-
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
 }

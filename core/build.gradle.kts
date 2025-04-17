@@ -24,7 +24,6 @@ kotlin {
                 implementation(kotlin("stdlib-common"))
                 implementation("nl.w8mr.parsek:core:0.1.1")
                 implementation("nl.w8mr.kasmine:core:0.0.4")
-                implementation(kotlin("reflect"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
             }
         }
@@ -36,6 +35,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(kotlin("stdlib"))
+                implementation(kotlin("reflect"))
             }
         }
         val jvmTest by getting {
