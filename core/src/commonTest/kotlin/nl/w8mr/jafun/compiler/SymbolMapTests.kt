@@ -1,9 +1,10 @@
 package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.OperandType
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -11,7 +12,7 @@ import kotlin.test.assertTrue
 class SymbolMapTests {
     private lateinit var localSymbolMap: LocalSymbolMap
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         // Mock parent SymbolMap
         val parentSymbolMap =
@@ -27,6 +28,10 @@ class SymbolMapTests {
                     path: String,
                 ): List<TypeSymbol> {
                     return data[type]?.get(path) ?: emptyList()
+                }
+
+                override fun findOrAddClass(clazz: ClassInfo): Type.JFClass {
+                    TODO("Not yet implemented")
                 }
 
                 override fun contains(

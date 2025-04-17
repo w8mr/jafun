@@ -3,8 +3,6 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
-import nl.w8mr.jafun.compiler.IdentifierCache.addClass
-import nl.w8mr.jafun.compiler.IdentifierCache.addPackage
 
 interface SymbolMap {
     fun findMethod(
@@ -67,17 +65,7 @@ interface SymbolMap {
         parent: Type? = null,
     ) = findFromPath(path, parent).singleOrNull() as? Type.JFClass ?: error("$path is not a class")
 
-    fun findOrAddClass(clazz: Class<*>): Type.JFClass {
-        val found = findFromPath(clazz.name, null) as? Type.JFClass
-        if (found != null) {
-            return found
-        } else {
-            val new: Type.JFClass =
-                clazz.packageName.split('.').fold(null) { parent: Type.JFPackage?, name -> parent.addPackage(name) }
-                    ?.addClass(clazz.simpleName) ?: error("")
-            return new
-        }
-    }
+    fun findOrAddClass(clazz: ClassInfo): Type.JFClass
 
     fun contains(
         type: TypeSymbol?,

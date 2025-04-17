@@ -109,7 +109,7 @@ sealed interface OperandType<J> : TypeSymbol {
         override fun toString() = "CharType"
     }
 
-    object Unit : Reference<jafun.Unit>("jafun.Unit") {
+    object Unit : Reference<kotlin.Unit>("kotlin.Unit") {
         override fun toString() = "UnitType"
     }
 }

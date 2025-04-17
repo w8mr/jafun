@@ -1,53 +1,66 @@
+import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.KotlinMultiplatform
+import com.vanniktech.maven.publish.JavadocJar
+
+group = "nl.w8mr.jafun"
+version = "0.0.1"
+
 
 plugins {
     kotlin("multiplatform") version "2.1.10"
-    `maven-publish`
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
+    id("com.vanniktech.maven.publish") version "0.31.0"
 }
 
-group = "nl.w8mr"
-version = "1.0-SNAPSHOT"
-
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
-
-kotlin {
-    jvm {
-        java {
-            toolchain {
-                languageVersion.set(JavaLanguageVersion.of(21))
-            }
-        }
+subprojects {
+    repositories {
+        mavenCentral()
     }
-    js {
-        browser()
-        nodejs()
-    }
-    sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib-common"))
-                implementation("nl.w8mr.parsek:core:0.1.1")
-                implementation("nl.w8mr.kasmine:core:0.0.4")
-                implementation(kotlin("reflect"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-            }
-        }
-        val jvmMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib"))
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
-        }
-    }
-}
 
-ktlint {
-    version.set("1.2.1")
+    apply(plugin = "org.jetbrains.kotlin.multiplatform")
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    mavenPublishing {
+        configure(KotlinMultiplatform(
+            javadocJar = JavadocJar.Empty(),
+            sourcesJar = true,
+            androidVariantsToPublish = emptyList<String>(),
+        ))
+        publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+
+        coordinates("nl.w8mr.jafun", "core", "0.0.1")
+
+        pom {
+            name.set("Jafun")
+            description.set("A functional language for the JVM")
+            inceptionYear.set("2024")
+            url.set("https://github.com/w8mr/jafun")
+
+            licenses {
+                license {
+                    name.set("MIT License")
+                    url.set("https://opensource.org/license/mit")
+                    distribution.set("https://opensource.org/license/mit")
+                }
+            }
+            issueManagement {
+                system.set("Github")
+                url.set("https://github.com/w8mr/jafun/issues")
+            }
+
+            developers {
+                developer {
+                    id.set("w8mr")
+                    name.set("Elmar Wachtmeester")
+                    url.set("https://github.com/w8mr")
+                }
+            }
+
+            scm {
+                url.set("https://github.com/w8mr/jafun/")
+                connection.set("https://github.com/w8mr/jafun.git")
+                developerConnection.set("scm:git:ssh://git@github.com:w8mr/jafun.git")
+            }
+        }
+        signAllPublications()
+    }
 }

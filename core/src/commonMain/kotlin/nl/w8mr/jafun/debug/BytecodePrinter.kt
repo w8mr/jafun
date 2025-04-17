@@ -46,7 +46,7 @@ fun Indenter.print(instruction: Instruction) =
         is NoArgument -> print(instruction)
         is OneArgument<*> -> print(instruction)
         is TwoArgument<*, *> -> print(instruction)
-        else -> TODO("Implement for ${instruction.javaClass.simpleName}")
+        else -> TODO("Implement for ${instruction::class.simpleName}")
     }
 
 fun Indenter.print(instruction: NoArgument) {
@@ -119,5 +119,5 @@ fun Indenter.print(any: Any) =
         is MethodRef -> print(any)
         is FieldRef -> print(any)
         is InstructionBlock -> any.instructions.forEach { print(it) }
-        else -> TODO("Implement for ${any.javaClass.simpleName}")
+        else -> TODO("Implement for ${any::class.simpleName}")
     }

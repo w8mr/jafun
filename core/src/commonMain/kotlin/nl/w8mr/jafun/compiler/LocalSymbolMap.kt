@@ -1,5 +1,6 @@
 package nl.w8mr.jafun.compiler
 
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
 
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = IdentifierCache.incSymbolMapCount()) : SymbolMap {
@@ -22,12 +23,12 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
         path: String,
         typeSig: TypeSymbol,
     ) {
-        identifierMap.computeIfAbsent(type) { type ->
-            mutableMapOf()
-        }
-        identifierMap[type]?.computeIfAbsent(path) { path ->
-            listOf(typeSig)
-        }
+        val typeMap = identifierMap.getOrPut(type) { mutableMapOf() }
+        typeMap[path] = listOf(typeSig)
+    }
+
+    override fun findOrAddClass(clazz: ClassInfo): Type.JFClass {
+        return parent.findOrAddClass(clazz)
     }
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()

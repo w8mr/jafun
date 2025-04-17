@@ -3,8 +3,8 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFVariableSymbol
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class SymbolMapManagerTests {
     private lateinit var symbolMapManager: SymbolMapManager
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         symbolMapManager = SymbolMapManager()
     }
