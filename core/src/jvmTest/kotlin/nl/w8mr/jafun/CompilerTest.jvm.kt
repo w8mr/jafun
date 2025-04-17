@@ -2,8 +2,11 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.writeFile
 import nl.w8mr.kasmine.ClassBuilder
+import nl.w8mr.kasmine.DynamicClassLoader
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.PrintStream
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -22,6 +25,50 @@ actual fun compareDecompiled(
     assertEquals(result, tested.first)
     assertContentEquals(expected, tested.second)
 }
+
+actual fun runAndCatchOutput(
+    bytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?
+): String {
+    val oldOut = System.out
+    val output = ByteArrayOutputStream()
+    System.setOut(PrintStream(output))
+    try {
+        runMethod(bytes, className, methodName, params)
+        System.setOut(oldOut)
+    } catch (t: Throwable) {
+        System.setOut(oldOut)
+        println(t.message)
+        t.printStackTrace()
+    }
+    val result = String(output.toByteArray())
+    return result
+}
+
+fun runMethod(
+    bytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?,
+) {
+    val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
+    val scriptClass = loader.define(className, bytes)
+    scriptClass.getMethod(methodName, Array<String>::class.java).invoke(null, params)
+}
+
+actual fun writeFile(
+    className: String,
+    bytes: ByteArray,
+) {
+    val dir = File("./build/classes/jafun/test")
+    dir.mkdirs()
+    val file = File(dir, "$className.class")
+    file.writeBytes(bytes)
+}
+
+
 
 fun String.runCommand(workingDir: File): String? {
     try {

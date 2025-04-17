@@ -1,10 +1,19 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
+import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.OperandType
-import nl.w8mr.jafun.testBytes
-import nl.w8mr.jafun.writeFile
+import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.buildClass
+import nl.w8mr.jafun.compileMethod
+import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.LocalSymbolMap
+import nl.w8mr.jafun.debug.IRPrintTree
+import nl.w8mr.jafun.debug.prettyPrint
+import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
+import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -15,6 +24,70 @@ expect fun compareDecompiled(
     result: String,
     tested: Pair<String, ByteArray>
 )
+
+expect fun runAndCatchOutput(
+    bytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?
+): String
+
+expect fun writeFile(
+    className: String,
+    bytes: ByteArray,
+)
+
+fun testBytes(
+    code: String,
+    className: String = "Script",
+    methodName: String = "main",
+    returnType: OperandType<*> = OperandType.Unit,
+    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
+    params: Array<String>? = null,
+): Pair<String, ByteArray> {
+    val parseResult = ParserJafun.parse(code)
+    when (parseResult.second) {
+        is Parser.Failure<*> -> {
+            println(parseResult.second)
+            error("Parser failed")
+        }
+
+        is Parser.Success<*> -> {
+            val parsed = parseResult.first
+            println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
+            println()
+            ParserJafun.symbolMap.currentSymbolMap =
+                LocalSymbolMap(IdentifierCache.reset()).apply {
+                    add(
+                        null,
+                        "arguments",
+                        Type.JFVariableSymbol(
+                            "param1",
+                            OperandType.Array(Type.JFClass("String", Type.JFPackage("lang", Type.JFPackage("java")))),
+                            this,
+                            false,
+                        ),
+                    )
+                } // TODO: look into this.
+            val builder =
+                IRBuilder.define {
+                    `class`(className) {
+                        compileMethod(this, parsed, methodName, returnType, parameterTypes)
+                    }
+                }
+
+            println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
+            val clazz = buildClass(className, builder)
+            println("Bytecode: \n${clazz.classDef.print()}")
+            val bytes = clazz.write()
+
+            writeFile(className, bytes)
+            val result = runAndCatchOutput(bytes, className, methodName, params)
+            println("OUTPUT: $result")
+            return result to bytes
+        }
+    }
+}
 
 class CompilerTest {
     companion object {
@@ -41,6 +114,7 @@ class CompilerTest {
         }
 
     }
+
 
     @Test
     fun helloWorldParens() {
