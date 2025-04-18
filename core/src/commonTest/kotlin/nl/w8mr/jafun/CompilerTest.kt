@@ -1,5 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
+import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
@@ -26,17 +27,20 @@ expect fun compareDecompiled(
     actualBytes: ByteArray
 )
 
-expect fun runAndCatchOutput(
-    bytes: ByteArray,
-    className: String,
-    methodName: String,
-    params: Array<String>?
-): String
-
 expect fun writeFile(
     className: String,
     bytes: ByteArray,
 )
+
+expect fun runAndAssertOutput(
+    actualBytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?,
+    expectedOutput: String
+): String
+
+
 
 
 class CompilerTest {
@@ -47,11 +51,6 @@ class CompilerTest {
             params: Array<String>? = null,
             bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
         ) {
-            val className = "Script"
-            val methodName = "main"
-            val returnType: OperandType<*> = OperandType.Unit
-            val parameterTypes: List<OperandType<*>> =
-                listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String")))
 
             val parseResult = ParserJafun.parse(code)
             when (parseResult.second) {
@@ -64,49 +63,69 @@ class CompilerTest {
                     val parsed = parseResult.first
                     println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
                     println()
-                    ParserJafun.symbolMap.currentSymbolMap =
-                        LocalSymbolMap(IdentifierCache.reset()).apply {
-                            add(
-                                null,
-                                "arguments",
-                                Type.JFVariableSymbol(
-                                    "param1",
-                                    OperandType.Array(
-                                        Type.JFClass(
-                                            "String",
-                                            Type.JFPackage("lang", Type.JFPackage("java"))
-                                        )
-                                    ),
-                                    this,
-                                    false,
-                                ),
-                            )
-                        } // TODO: look into this.
-                    val builder =
-                        IRBuilder.define {
-                            `class`(className) {
-                                compileMethod(this, parsed, methodName, returnType, parameterTypes)
-                            }
-                        }
+                    val className = "Script"
+                    val methodName = "main"
 
-                    println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
-                    val clazz = buildClass(className, builder)
-                    println("Bytecode: \n${clazz.classDef.print()}")
-                    val actualBytes = clazz.write()
+                    val classContext = ast2ir(className, parsed, methodName)
+
+                    val actualBytes = ir2jvmByteCode(className, classContext)
 
                     writeFile(className, actualBytes)
-                    val result = runAndCatchOutput(actualBytes, className, methodName, params)
-                    println("OUTPUT: $result")
+                    val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
 
                     val expectedBytes = bytecode?.let { classBuilder(bytecode).write() } ?: actualBytes
                     if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
                         compareDecompiled(expectedBytes, bytecode, result, result, actualBytes)
                     } else {
-                        assertEquals(expectedOutput, result)
                         assertContentEquals(expectedBytes, actualBytes)
                     }
                 }
             }
+        }
+
+        private fun ir2jvmByteCode(className: String, classContext: IRBuilder.ClassContext): ByteArray {
+            val clazz = buildClass(className, classContext)
+            println("Bytecode: \n${clazz.classDef.print()}")
+            val actualBytes = clazz.write()
+            return actualBytes
+        }
+
+        private fun ast2ir(
+            className: String,
+            parsed: List<ASTNode.Expression>,
+            methodName: String
+        ): IRBuilder.ClassContext {
+            ParserJafun.symbolMap.currentSymbolMap =
+                LocalSymbolMap(IdentifierCache.reset()).apply {
+                    add(
+                        null,
+                        "arguments",
+                        Type.JFVariableSymbol(
+                            "param1",
+                            OperandType.Array(
+                                Type.JFClass(
+                                    "String",
+                                    Type.JFPackage("lang", Type.JFPackage("java"))
+                                )
+                            ),
+                            this,
+                            false,
+                        ),
+                    )
+                } // TODO: look into this.
+            val returnType: OperandType<*> = OperandType.Unit
+            val parameterTypes: List<OperandType<*>> =
+                listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String")))
+            val builder =
+                IRBuilder.define {
+                    `class`(className) {
+                        compileMethod(this, parsed, methodName, returnType, parameterTypes)
+                    }
+                }
+
+            println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
+            val classContext = builder.classes[className] ?: error("Class not found: $className")
+            return classContext
         }
     }
 

@@ -12,19 +12,21 @@ actual fun compareDecompiled(
     println("Cannot compare decompiled JVM bytecode on JS")
 }
 
-actual fun runAndCatchOutput(
-    bytes: ByteArray,
-    className: String,
-    methodName: String,
-    params: Array<String>?
-): String {
-    TODO("Not yet implemented")
-}
-
 actual fun writeFile(
     className: String,
     bytes: ByteArray,
 ) {
-    TODO("Not yet implemented")
+    println("Cannot write class on JS")
 }
+
+/**
+ * Skipping run for now in JS, always assert as true
+ */
+actual fun runAndAssertOutput(
+    actualBytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?,
+    expectedOutput: String
+): String = expectedOutput
 

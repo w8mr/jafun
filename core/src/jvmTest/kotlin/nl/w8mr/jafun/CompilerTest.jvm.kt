@@ -26,7 +26,7 @@ actual fun compareDecompiled(
     assertContentEquals(expected, actualBytes)
 }
 
-actual fun runAndCatchOutput(
+fun runAndCatchOutput(
     bytes: ByteArray,
     className: String,
     methodName: String,
@@ -66,6 +66,19 @@ actual fun writeFile(
     dir.mkdirs()
     val file = File(dir, "$className.class")
     file.writeBytes(bytes)
+}
+
+actual fun runAndAssertOutput(
+    actualBytes: ByteArray,
+    className: String,
+    methodName: String,
+    params: Array<String>?,
+    expectedOutput: String
+): String {
+    val result = runAndCatchOutput(actualBytes, className, methodName, params)
+    println("OUTPUT: $result")
+    assertEquals(expectedOutput, result)
+    return result
 }
 
 

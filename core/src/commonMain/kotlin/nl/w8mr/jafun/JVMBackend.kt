@@ -128,18 +128,18 @@ fun compileJVM(
     className: String,
     builder: IRBuilder.BuilderContext,
 ): ByteArray {
-    val clazz = buildClass(className, builder)
+    val clazz = buildClass(className, builder.classes[className] ?: error("Class not found: $className"))
 
     return clazz.write()
 }
 
 fun buildClass(
     className: String,
-    builder: IRBuilder.BuilderContext,
+    classContext: IRBuilder.ClassContext,
 ): ClassBuilder =
     classBuilder {
         name = className
-        builder.classes[className]?.methods?.forEach { m ->
+        classContext.methods?.forEach { m ->
             method {
                 name = m.name
                 signature = "(${m.parameterTypes.joinToString("", transform = ::signature)})" +

@@ -1,11 +1,7 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
-import nl.w8mr.jafun.debug.IRPrintTree
 import nl.w8mr.jafun.debug.prettyPrint
-import nl.w8mr.jafun.debug.print
 import nl.w8mr.parsek.Parser
 
 fun compile(
