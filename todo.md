@@ -24,13 +24,20 @@
 ## Compiler backend
 - Create separate package for IR2Jvm
 
+## Compiler
+- Move towards one node type (with interfaces for levels)
+- Move towards non stack based nodes
+- Separate stack based ndoes in separate level
+- Statement node
+- Scope node
+
 ## Testing
 - Create better dsl for testing separate outputs (ast, ir, bytecode, output (print), output function)
 - Merge AST tests
 - Create more AoC tests
 
 ## Symbol table
-- Restructure to use classes instead of strings for lookup
+- Restructure to use classes instead of strings for lookup &#x2611;
 - Lookup runtime classes
 - Add Packages
 
@@ -52,12 +59,10 @@
 
 
 ## Kasmine
-- Remove hardcoded path
-- Publish as library
-
+- Remove hardcoded path &#x2611;
+- Publish as library &#x2611;
 
 ## Prelude
-
 
 ## Classes
 
