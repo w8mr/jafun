@@ -462,6 +462,7 @@ object ParserJafun {
         }
 
     fun parse(input: String): Pair<List<ASTNode.Expression>?, Parser.Result<List<ASTNode.Expression>>> {
+        symbolMap.reset()
         val source = CharSequenceSource(input)
         return expressions.parseTree(source)
     }

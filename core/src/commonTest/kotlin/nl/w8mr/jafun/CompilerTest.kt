@@ -51,7 +51,6 @@ class CompilerTest {
             params: Array<String>? = null,
             bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
         ) {
-
             val parseResult = ParserJafun.parse(code)
             when (parseResult.second) {
                 is Parser.Failure<*> -> {
