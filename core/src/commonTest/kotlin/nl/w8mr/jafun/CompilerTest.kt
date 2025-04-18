@@ -21,8 +21,9 @@ import kotlin.test.assertEquals
 expect fun compareDecompiled(
     expected: ByteArray,
     bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)?,
-    result: String,
-    tested: Pair<String, ByteArray>
+    expectedResult: String,
+    actualResult : String,
+    actualBytes: ByteArray
 )
 
 expect fun runAndCatchOutput(
@@ -37,84 +38,77 @@ expect fun writeFile(
     bytes: ByteArray,
 )
 
-fun testBytes(
-    code: String,
-    className: String = "Script",
-    methodName: String = "main",
-    returnType: OperandType<*> = OperandType.Unit,
-    parameterTypes: List<OperandType<*>> = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
-    params: Array<String>? = null,
-): Pair<String, ByteArray> {
-    val parseResult = ParserJafun.parse(code)
-    when (parseResult.second) {
-        is Parser.Failure<*> -> {
-            println(parseResult.second)
-            error("Parser failed")
-        }
-
-        is Parser.Success<*> -> {
-            val parsed = parseResult.first
-            println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
-            println()
-            ParserJafun.symbolMap.currentSymbolMap =
-                LocalSymbolMap(IdentifierCache.reset()).apply {
-                    add(
-                        null,
-                        "arguments",
-                        Type.JFVariableSymbol(
-                            "param1",
-                            OperandType.Array(Type.JFClass("String", Type.JFPackage("lang", Type.JFPackage("java")))),
-                            this,
-                            false,
-                        ),
-                    )
-                } // TODO: look into this.
-            val builder =
-                IRBuilder.define {
-                    `class`(className) {
-                        compileMethod(this, parsed, methodName, returnType, parameterTypes)
-                    }
-                }
-
-            println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
-            val clazz = buildClass(className, builder)
-            println("Bytecode: \n${clazz.classDef.print()}")
-            val bytes = clazz.write()
-
-            writeFile(className, bytes)
-            val result = runAndCatchOutput(bytes, className, methodName, params)
-            println("OUTPUT: $result")
-            return result to bytes
-        }
-    }
-}
 
 class CompilerTest {
     companion object {
         fun test(
             code: String,
-            result: String,
+            expectedOutput: String,
             params: Array<String>? = null,
             bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
         ) {
-            val tested =
-                testBytes(
-                    code,
-                    returnType = OperandType.Unit,
-                    parameterTypes = listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String"))),
-                    params = params,
-                )
-            val expected = bytecode?.let { classBuilder(bytecode).write() } ?: tested.second
-            if ((result != tested.first) || (expected.zip(tested.second).any { it.first != it.second })) {
-                compareDecompiled(expected, bytecode, result, tested)
-            } else {
-                assertEquals(result, tested.first)
-                assertContentEquals(expected, tested.second)
+            val className = "Script"
+            val methodName = "main"
+            val returnType: OperandType<*> = OperandType.Unit
+            val parameterTypes: List<OperandType<*>> =
+                listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String")))
+
+            val parseResult = ParserJafun.parse(code)
+            when (parseResult.second) {
+                is Parser.Failure<*> -> {
+                    println(parseResult.second)
+                    error("Parser failed")
+                }
+
+                is Parser.Success<*> -> {
+                    val parsed = parseResult.first
+                    println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
+                    println()
+                    ParserJafun.symbolMap.currentSymbolMap =
+                        LocalSymbolMap(IdentifierCache.reset()).apply {
+                            add(
+                                null,
+                                "arguments",
+                                Type.JFVariableSymbol(
+                                    "param1",
+                                    OperandType.Array(
+                                        Type.JFClass(
+                                            "String",
+                                            Type.JFPackage("lang", Type.JFPackage("java"))
+                                        )
+                                    ),
+                                    this,
+                                    false,
+                                ),
+                            )
+                        } // TODO: look into this.
+                    val builder =
+                        IRBuilder.define {
+                            `class`(className) {
+                                compileMethod(this, parsed, methodName, returnType, parameterTypes)
+                            }
+                        }
+
+                    println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
+                    val clazz = buildClass(className, builder)
+                    println("Bytecode: \n${clazz.classDef.print()}")
+                    val actualBytes = clazz.write()
+
+                    writeFile(className, actualBytes)
+                    val result = runAndCatchOutput(actualBytes, className, methodName, params)
+                    println("OUTPUT: $result")
+
+                    val expectedBytes = bytecode?.let { classBuilder(bytecode).write() } ?: actualBytes
+                    if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
+                        compareDecompiled(expectedBytes, bytecode, result, result, actualBytes)
+                    } else {
+                        assertEquals(expectedOutput, result)
+                        assertContentEquals(expectedBytes, actualBytes)
+                    }
+                }
             }
         }
-
     }
-
 
     @Test
     fun helloWorldParens() {

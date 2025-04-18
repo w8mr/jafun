@@ -5,10 +5,11 @@ import nl.w8mr.kasmine.ClassBuilder
 actual fun compareDecompiled(
     expected: ByteArray,
     bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)?,
-    result: String,
-    tested: Pair<String, ByteArray>
+    expectedResult: String,
+    actualResult : String,
+    actualBytes: ByteArray
 ) {
-    TODO("Not yet implemented")
+    println("Cannot compare decompiled JVM bytecode on JS")
 }
 
 actual fun runAndCatchOutput(

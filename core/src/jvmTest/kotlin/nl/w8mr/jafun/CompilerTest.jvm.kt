@@ -1,6 +1,5 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.writeFile
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.DynamicClassLoader
 import java.io.ByteArrayOutputStream
@@ -14,16 +13,17 @@ import kotlin.test.assertEquals
 actual fun compareDecompiled(
     expected: ByteArray,
     bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)?,
-    result: String,
-    tested: Pair<String, ByteArray>
+    expectedResult: String,
+    actualResult : String,
+    actualBytes: ByteArray
 ) {
     val resultDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
     writeFile("Script", expected)
     val expectedDecompiled = "javap -v Script.class".runCommand(File("./build/classes/jafun/test"))
     if (bytecode == null) println(resultDecompiled)
     assertEquals(expectedDecompiled, resultDecompiled)
-    assertEquals(result, tested.first)
-    assertContentEquals(expected, tested.second)
+    assertEquals(expectedResult, actualResult)
+    assertContentEquals(expected, actualBytes)
 }
 
 actual fun runAndCatchOutput(
