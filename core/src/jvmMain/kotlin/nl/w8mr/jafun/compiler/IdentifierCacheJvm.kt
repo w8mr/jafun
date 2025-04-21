@@ -2,9 +2,6 @@ package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.TypeSymbol
-import nl.w8mr.jafun.compiler.IdentifierCache.findClass
-import nl.w8mr.jafun.compiler.IdentifierCache.jvmType
 import java.lang.reflect.AccessFlag
 
 actual fun IdentifierCache.findInClass(

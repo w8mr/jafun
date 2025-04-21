@@ -206,12 +206,13 @@ object IdentifierCache : SymbolMap {
             "void" to OperandType.Unit,
             "char" to OperandType.CharType,
             "java.lang.String" to OperandType.StringType,
+            "Ljava.lang.String;" to OperandType.StringType,
         )
 
     fun jvmType(returnName: String) = jvmTypes[returnName] ?: jfArray(returnName) ?: jfClass(returnName)
 
     private fun jfClass(name: String) =
-        if (name.startsWith('L') && name.endsWith(';')) Type.JFClass(name.substring(1, name.length - 1)) else Type.JFClass(name)
+        if (name.startsWith('L') && name.endsWith(';')) Type.JFClass(name.substring(1, name.length - 1)) else Type.JFClass(name) // TODO: build correct class naem
 
     private fun jfArray(returnName: String): OperandType.Array? =
         if (returnName.startsWith('[')) OperandType.Array(jvmType(returnName.substring(1))) else null // TODO: check implementation

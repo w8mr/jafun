@@ -92,8 +92,6 @@ sealed interface ExpressionNode {
     interface Phase2Expression : Phase2_3Expression
     interface Phase3Expression : Phase2_3Expression
 
-}
-
     interface Phase1 : ExpressionNode // CST
 
     interface Phase2 : ExpressionNode // AST
@@ -101,5 +99,6 @@ sealed interface ExpressionNode {
     interface Phase3 : ExpressionNode // TreeIR
 
     interface Phase4 : ExpressionNode // StackIR
+}
 
 

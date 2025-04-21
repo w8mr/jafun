@@ -159,7 +159,7 @@ class JVMBackend {
                                             "(I)Ljava/lang/Integer;"
                                         )
                                     }
-                                    else -> TODO("Setup conversion")
+                                    else -> TODO("Conversion not defined for SInt32 -> ${instruction.to}")
                                 }
                             }
                             is OperandType.UInt1 -> {
@@ -171,7 +171,7 @@ class JVMBackend {
                                             "(Z)Ljava/lang/Boolean;"
                                         )
                                     }
-                                    else -> TODO("Setup conversion")
+                                    else -> TODO("Conversion not defined for UInt1 -> ${instruction.to}")
                                 }
                             }
                             is OperandType.CharType -> {
@@ -183,7 +183,7 @@ class JVMBackend {
                                             "(C)Ljava/lang/Character;"
                                         )
                                     }
-                                    else -> TODO("Setup conversion")
+                                    else -> TODO("Conversion not defined for CharType -> ${instruction.to}")
                                 }
                             }
                             is Type.JFClass -> {
@@ -192,13 +192,13 @@ class JVMBackend {
                                         when {
                                             instruction.to.path == "java.lang.Object" -> {}
                                             instruction.from.path == instruction.to.path -> {}
-                                            else -> TODO("Setup conversion")
+                                            else -> TODO("Conversion not defined for ${instruction.from.path} -> ${instruction.to.path}")
                                         }
                                     }
-                                    else -> TODO("Setup conversion")
+                                    else -> TODO("Conversion not defined for ${instruction.from.path} -> ${instruction.to}")
                                 }
                             }
-                            else -> TODO("Setup conversion")
+                            else -> TODO("Conversion not defined for ${instruction.from} -> ${instruction.to}")
 
                         }
                     }

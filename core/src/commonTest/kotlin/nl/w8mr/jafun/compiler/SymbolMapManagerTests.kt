@@ -20,7 +20,7 @@ class SymbolMapManagerTests {
 
     @Test
     fun testInitialization() {
-        val type = JFVariableSymbol("arguments", OperandType.Array(JFClass("java.lang.String")), symbolMapManager.currentSymbolMap, false)
+        val type = JFVariableSymbol("arguments", OperandType.Array(OperandType.StringType), symbolMapManager.currentSymbolMap, false)
         assertTrue(symbolMapManager.currentSymbolMap.contains(null, "arguments"))
         assertEquals(listOf(type), symbolMapManager.currentSymbolMap.find(null, "arguments"))
     }
