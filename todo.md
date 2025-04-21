@@ -25,11 +25,10 @@
 - Create separate package for IR2Jvm
 
 ## Compiler
-- Move towards one node type (with interfaces for levels)
-- Move towards non stack based nodes
+- Move towards one node type (with interfaces for levels) &#x2611;
+- Move towards non stack based nodes &#x2611;
 - Separate stack based ndoes in separate level
-- Statement node
-- Scope node
+- Scope node (check if needed)
 
 ## Testing
 - Create better dsl for testing separate outputs (ast, ir, bytecode, output (print), output function)

@@ -1,19 +1,12 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.IRBuilder
-import nl.w8mr.jafun.OperandType
-import nl.w8mr.jafun.ParserJafun
-import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.buildClass
-import nl.w8mr.jafun.compileMethod
+import nl.w8mr.jafun.compiler.Compiler
+import nl.w8mr.jafun.compiler.Compiler.PluginType.AST
+import nl.w8mr.jafun.compiler.Compiler.PluginType.CST
 import nl.w8mr.jafun.compiler.ExpressionNode
-import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
-import nl.w8mr.jafun.debug.prettyPrint
-import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
-import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -50,81 +43,46 @@ class CompilerTest {
             params: Array<String>? = null,
             bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
         ) {
-            val parseResult = ParserJafun.parse(code)
-            when (parseResult.second) {
-                is Parser.Failure<*> -> {
-                    println(parseResult.second)
-                    error("Parser failed")
-                }
+            val compiler = Compiler()
 
-                is Parser.Success<*> -> {
-                    val parsed = parseResult.first
-                    println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
-                    println()
-                    val className = "Script"
-                    val methodName = "main"
+            val cstPlugin = registerCstPlugin(compiler)
+            val astPlugin = registerAstPlugin(compiler)
 
-                    val classContext = ast2ir(className, parsed, methodName)
+            val className = "Script"
+            val methodName = "main"
+            val actualBytes = compiler.compile(code, className, methodName)
 
-                    val actualBytes = ir2jvmByteCode(className, classContext)
+            println("CAPTURED: ${listOf(cstPlugin.cst, astPlugin.ast)}")
 
-                    writeFile(className, actualBytes)
-                    val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
+            writeFile(className, actualBytes)
+            val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
 
-                    val expectedBytes = bytecode?.let { classBuilder(bytecode).write() } ?: actualBytes
-                    if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
-                        compareDecompiled(expectedBytes, bytecode, result, result, actualBytes)
-                    } else {
-                        assertContentEquals(expectedBytes, actualBytes)
-                    }
-                }
+            val expectedBytes = bytecode?.let { classBuilder(bytecode).write() } ?: actualBytes
+            if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
+                compareDecompiled(expectedBytes, bytecode, result, result, actualBytes)
+            } else {
+                assertContentEquals(expectedBytes, actualBytes)
+            }
+
+        }
+
+        data class CSTPlugin(var cst: List<ExpressionNode.Phase2Expression>? = null) : Compiler.CSTPlugin {
+            override fun handle(input: List<ExpressionNode.Phase2Expression>): List<ExpressionNode.Phase2Expression> {
+                cst = input
+                return input
             }
         }
+        private fun registerCstPlugin(compiler: Compiler) =
+            CSTPlugin(). apply { compiler.registerPlugin(CST, this) }
 
-        private fun ir2jvmByteCode(className: String, classContext: IRBuilder.ClassContext): ByteArray {
-            val clazz = buildClass(className, classContext)
-            println("Bytecode: \n${clazz.classDef.print()}")
-            val actualBytes = clazz.write()
-            return actualBytes
+        data class ASTPlugin(var ast: IRBuilder.ClassContext? = null) : Compiler.ASTPlugin {
+            override fun handle(input: IRBuilder.ClassContext): IRBuilder.ClassContext {
+                ast = input
+                return input
+            }
         }
-
-        private fun ast2ir(
-            className: String,
-            parsed: List<ExpressionNode.Phase2Expression>,
-            methodName: String
-        ): IRBuilder.ClassContext {
-            ParserJafun.symbolMap.currentSymbolMap =
-                LocalSymbolMap(IdentifierCache.reset()).apply {
-                    add(
-                        null,
-                        "arguments",
-                        Type.JFVariableSymbol(
-                            "param1",
-                            OperandType.Array(
-                                Type.JFClass(
-                                    "String",
-                                    Type.JFPackage("lang", Type.JFPackage("java"))
-                                )
-                            ),
-                            this,
-                            false,
-                        ),
-                    )
-                } // TODO: look into this.
-            val returnType: OperandType<*> = OperandType.Unit
-            val parameterTypes: List<OperandType<*>> =
-                listOf(OperandType.Array(OperandType.StringType))
-            val builder =
-                IRBuilder.define {
-                    `class`(className) {
-                        compileMethod(this, parsed, methodName, returnType, parameterTypes)
-                    }
-                }
-
-            println("IR: \n${builder.classes[className]?.prettyPrint()}")
-            val classContext = builder.classes[className] ?: error("Class not found: $className")
-            return classContext
-        }
+        private fun registerAstPlugin(compiler: Compiler) =
+            ASTPlugin().apply { compiler.registerPlugin(AST, this) }
     }
 
     @Test
