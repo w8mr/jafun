@@ -1,5 +1,7 @@
 package nl.w8mr.jafun.debug
 
+import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
 
@@ -8,7 +10,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode
  * @param indentSize The number of spaces to use for each indentation level.
  * @return The formatted string.
  */
-fun ExpressionNode.prettyPrint(indentSize: Int = 2): String {
+fun Printable.prettyPrint(indentSize: Int = 2): String {
     val indenter = Indenter(indentSize)
     indenter.print(this) // Start the recursive printing
     return indenter.toString()
@@ -20,43 +22,88 @@ fun ExpressionNode.prettyPrint(indentSize: Int = 2): String {
  * Extension function for Indenter to recursively print ASTNode structures.
  * This function modifies the Indenter's internal buffer.
  */
-private fun Indenter.print(node: ExpressionNode) {
-    when (node) {
+private fun Indenter.print(element: Printable) {
+    fun typeName(operandType: OperandType<*>): String =
+        when (operandType) {
+            is OperandType.Array -> "Array<${operandType.genericTypes[0]}>"
+            is OperandType.Generic -> TODO()
+            OperandType.SInt32 -> "Int32"
+            OperandType.StringType -> "String"
+            OperandType.UInt1 -> "Boolean"
+            OperandType.CharType -> "Char"
+            OperandType.Unit -> "Unit"
+            is Type.JFClass -> operandType.path
+        }
+
+    when (element) {
+        is IRBuilder.ClassContext -> {
+            -"class "
+            -element.name
+            +" {"
+            indent {
+                element.methods.forEach { method ->
+                    print(method)
+                }
+            }
+            +"}"
+        }
+
+        is IRBuilder.MethodContext -> {
+            -"method "
+            -element.name
+            -"("
+            -element.parameterTypes.joinToString(", ") { typeName(it) }
+            -"): "
+            -typeName(element.returnType)
+            +" {"
+            indent {
+                element.instructions.forEach { instruction ->
+                    print(instruction)
+                }
+            }
+            +"}"
+        }
+        is Type.JFVariableSymbol -> {
+            +element.name
+            -": "
+            -typeName(element.type)
+        }
+
         // Expression Nodes
-        is ExpressionNode.StringLiteral -> +"StringLiteral(\"${node.value}\")"
-        is ExpressionNode.CharLiteral -> +"CharLiteral(\'${node.value}\')"
-        is ExpressionNode.IntegerLiteral -> +"Int32Literal(${node.value})"
-        is ExpressionNode.BooleanLiteral -> +"BooleanLiteral(${node.value})"
+        is ExpressionNode.StringLiteral -> +"StringLiteral(\"${element.value}\")"
+        is ExpressionNode.CharLiteral -> +"CharLiteral(\'${element.value}\')"
+        is ExpressionNode.IntegerLiteral -> +"Int32Literal(${element.value})"
+        is ExpressionNode.BooleanLiteral -> +"BooleanLiteral(${element.value})"
 
         is ExpressionNode.ExpressionList -> {
-            node.expressions.forEach { print(it) }
+            element.expressions.forEach { print(it) }
         }
 
         is ExpressionNode.Invocation -> {
-            -((node.field as? Type.JFField)?.name ?: "") // TODO Variable
-            -(node.method.name)
+            -((element.field as? Type.JFField)?.name ?: "") // TODO Variable
+            -(element.method.name)
             +"("
-            if (node.arguments.isNotEmpty()) {
+            if (element.arguments.isNotEmpty()) {
                 indent {
-                    node.arguments.forEachIndexed { index, arg ->
+                    element.arguments.forEachIndexed { index, arg ->
                         print(arg) // Print the current arg
                     }
                 }
             }
             -")" // Closing parenthesis
-            +": ${node.method.rtn}" // Return type on the same line, then newline via '+'
+            +": ${element.method.rtn}" // Return type on the same line, then newline via '+'
         }
 
         is ExpressionNode.When -> {
             -"when"
-            if (node.subject != null) {
+            if (element.subject != null) {
                 -" ("
-                print(node.subject)
+                print(element.subject)
                 -")"
             }
             +" {"
             indent {
-                node.matches.forEach { (condition, code) ->
+                element.matches.forEach { (condition, code) ->
                     -""
                     print(condition)
                     +" -> {"
@@ -71,7 +118,7 @@ private fun Indenter.print(node: ExpressionNode) {
         is ExpressionNode.WhenPhase3 -> {
             +"when {"
             indent {
-                node.matches.forEach { (condition, code) ->
+                element.matches.forEach { (condition, code) ->
                     -""
                     print(condition)
                     +" -> {"
@@ -87,59 +134,65 @@ private fun Indenter.print(node: ExpressionNode) {
         is ExpressionNode.While -> {
             -"while"
             -" ("
-            print(node.condition)
+            print(element.condition)
             -")"
             +" {"
             indent {
-                print(node.expressions)
+                print(element.expressions)
             }
             +"}"
         }
         is ExpressionNode.WhilePhase3 -> {
             -"while"
             -" ("
-            print(node.condition)
+            print(element.condition)
             -")"
             +" {"
             indent {
-                print(node.expressions)
+                print(element.expressions)
             }
             +"}"
         }
 
         is ExpressionNode.ValAssignment -> {
-            -"val ${node.variableSymbol.name}: ${node.variableSymbol.type} ="
+            -"val ${element.variableSymbol.name}: ${element.variableSymbol.type} ="
             +""
             indent {
-                print(node.expression)
+                print(element.expression)
             }
         }
 
         is ExpressionNode.VarAssignment -> {
-            -"var ${node.variableSymbol.name}: ${node.variableSymbol.type} ="
+            -"var ${element.variableSymbol.name}: ${element.variableSymbol.type} ="
             +""
             indent {
-                print(node.expression)
+                print(element.expression)
             }
         }
 
         is ExpressionNode.Variable -> {
-            +"${node.variableSymbol.name}: ${node.variableSymbol.type}"
+            +"${element.variableSymbol.name}: ${element.variableSymbol.type}"
         }
 
         is ExpressionNode.Function -> {
-            -"fun ${node.symbol.name}("
-            -node.symbol.parameters.joinToString(", ") { "${it.name}: ${it.type}" }
+            -"fun ${element.symbol.name}("
+            -element.symbol.parameters.joinToString(", ") { "${it.name}: ${it.type}" }
             -")"
-            -": ${node.symbol.rtn}"
+            -": ${element.symbol.rtn}"
             +" {"
             indent {
-                node.block.forEach { print(it) }
+                element.block.forEach { print(it) }
             }
             +"}"
         }
 
+        is ExpressionNode.Convert -> {
+            -"("
+            print(element.expression)
+            -") as "
+            +element.to
+        }
         // Handle non-Expression GenericNode types if necessary, using default toString
-        else -> +"${node::class.simpleName}(...)" // Generic fallback
+        else -> TODO("Create printable implementation for ${element::class.simpleName}") // +"${element::class.simpleName}(...)" // Generic fallback
     }
 }

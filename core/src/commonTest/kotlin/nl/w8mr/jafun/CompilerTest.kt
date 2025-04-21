@@ -9,7 +9,6 @@ import nl.w8mr.jafun.compileMethod
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
-import nl.w8mr.jafun.debug.IRPrintTree
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.ClassBuilder
@@ -122,7 +121,7 @@ class CompilerTest {
                     }
                 }
 
-            println("IR: \n${IRPrintTree.print(builder.classes[className]!!)}")
+            println("IR: \n${builder.classes[className]?.prettyPrint()}")
             val classContext = builder.classes[className] ?: error("Class not found: $className")
             return classContext
         }

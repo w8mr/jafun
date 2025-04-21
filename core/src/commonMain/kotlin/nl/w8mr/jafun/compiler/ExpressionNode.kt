@@ -2,8 +2,9 @@ package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.debug.Printable
 
-sealed interface ExpressionNode {
+sealed interface ExpressionNode: Printable {
 
     data class StringLiteral(val value: String) : Phase2Expression {
         override fun type() = OperandType.StringType

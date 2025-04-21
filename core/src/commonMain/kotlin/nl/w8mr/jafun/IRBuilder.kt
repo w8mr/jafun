@@ -1,6 +1,7 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.debug.Printable
 
 object IRBuilder {
     fun define(init: BuilderDSL.() -> Unit): BuilderContext {
@@ -11,7 +12,10 @@ object IRBuilder {
 
     data class BuilderContext(val classes: MutableMap<String, ClassContext> = mutableMapOf())
 
-    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext)
+    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext): Printable{
+        override fun toString(): String =
+            "ClassContext(name=$name, methods=$methods)"
+    }
 
     data class MethodContext(
         val name: String,
@@ -19,7 +23,10 @@ object IRBuilder {
         val parameterTypes: List<OperandType<*>>,
         val instructions: MutableList<ExpressionNode.Phase2_3Expression> = mutableListOf(),
         val parent: ClassContext,
-    )
+    ): Printable {
+        override fun toString(): String =
+            "MethodContext(name=$name, returnType=$returnType, parameterType=$parameterTypes, instructions=$instructions"
+    }
 
     class BuilderDSL(val context: BuilderContext) {
         @Suppress("ktlint:standard:function-naming")
