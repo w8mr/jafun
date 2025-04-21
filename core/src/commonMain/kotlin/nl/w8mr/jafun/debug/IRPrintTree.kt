@@ -115,12 +115,13 @@ object IRPrintTree {
     fun <J> typeName(operandType: OperandType<J>): String =
         when (operandType) {
             is OperandType.Array -> "Array<${operandType.genericTypes[0]}>"
-            is OperandType.Reference<*> -> operandType.type
             is OperandType.Generic -> TODO()
             OperandType.SInt32 -> "Int32"
             OperandType.StringType -> "String"
             OperandType.UInt1 -> "Boolean"
             OperandType.CharType -> "Char"
+            OperandType.Unit -> "Unit"
+
             is Type.JFClass -> operandType.path
         }
 }

@@ -87,8 +87,6 @@ sealed interface OperandType<J> : TypeSymbol {
         override fun toString() = "StringType"
     }
 
-    open class Reference<T>(val type: String) : OperandType<T>
-
     abstract class Generic(vararg val genericTypes: OperandType<*>) : OperandType<Any>
 
     data class Array(val genericType: OperandType<*>) : Generic(genericType)
@@ -105,7 +103,7 @@ sealed interface OperandType<J> : TypeSymbol {
         override fun toString() = "CharType"
     }
 
-    object Unit : Reference<jafun.Unit>("jafun.Unit") {
+    object Unit : OperandType<jafun.Unit> {
         override fun toString() = "UnitType"
     }
 }

@@ -114,7 +114,7 @@ class CompilerTest {
                 } // TODO: look into this.
             val returnType: OperandType<*> = OperandType.Unit
             val parameterTypes: List<OperandType<*>> =
-                listOf(OperandType.Array(OperandType.Reference<String>("java.lang.String")))
+                listOf(OperandType.Array(OperandType.StringType))
             val builder =
                 IRBuilder.define {
                     `class`(className) {

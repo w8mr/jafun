@@ -26,13 +26,13 @@ class JVMBackend {
                             is Type.JFVariableSymbol -> {
                                 val variableName = "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
                                 when (instruction.field.type) {
-                                    is OperandType.Reference -> aload(variableName)
                                     is OperandType.SInt32 -> iload(variableName)
                                     is OperandType.StringType -> aload(variableName)
                                     is OperandType.UInt1 -> iload(variableName)
                                     is OperandType.CharType -> iload(variableName)
-                                    is OperandType.Array -> TODO()
+                                    is OperandType.Array -> aload(variableName)
                                     is OperandType.Generic -> TODO()
+                                    is OperandType.Unit -> TODO()
                                     is Type.JFClass -> aload(variableName)
                                 }
 
@@ -58,13 +58,13 @@ class JVMBackend {
                         if (!asStatement) dup()
                         val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
                         when (instruction.expression.type()) {
-                            is OperandType.Reference -> astore(variableName)
                             is OperandType.SInt32 -> istore(variableName)
                             is OperandType.StringType -> astore(variableName)
                             is OperandType.UInt1 -> istore(variableName)
                             is OperandType.CharType -> istore(variableName)
-                            is OperandType.Array -> TODO()
+                            is OperandType.Array -> astore(variableName)
                             is OperandType.Generic -> TODO()
+                            is OperandType.Unit -> TODO()
                             is Type.JFClass -> astore(variableName)
                         }
                     }
@@ -73,26 +73,26 @@ class JVMBackend {
                         if (!asStatement) dup()
                         val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
                         when (instruction.expression.type()) {
-                            is OperandType.Reference -> astore(variableName)
                             is OperandType.SInt32 -> istore(variableName)
                             is OperandType.StringType -> astore(variableName)
                             is OperandType.UInt1 -> istore(variableName)
                             is OperandType.CharType -> istore(variableName)
-                            is OperandType.Array -> TODO()
+                            is OperandType.Array -> astore(variableName)
                             is OperandType.Generic -> TODO()
+                            is OperandType.Unit -> TODO()
                             is Type.JFClass -> astore(variableName)
                         }
                     }
                     is ExpressionNode.Variable -> {
                         val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
                         when (instruction.variableSymbol.type) {
-                            is OperandType.Reference -> aload(variableName)
                             is OperandType.SInt32 -> iload(variableName)
                             is OperandType.StringType -> aload(variableName)
                             is OperandType.UInt1 -> iload(variableName)
                             is OperandType.CharType -> iload(variableName)
                             is OperandType.Array -> aload(variableName)
                             is OperandType.Generic -> TODO()
+                            is OperandType.Unit -> TODO()
                             is Type.JFClass -> aload(variableName)
                         }
                     }
@@ -225,24 +225,18 @@ fun buildClass(
                 val context = JVMBackend.Context(this)
                 val lastIndex = m.instructions.size - 1
                 m.instructions.forEachIndexed { index, instruction ->
-                    val asStatement = (index != lastIndex)
-                    context.compile(instruction, asStatement)
-                   // if ((index != lastIndex)  && (instruction.type()!= OperandType.Unit)) pop()
+                    context.compile(instruction, asStatement = (index != lastIndex))
                 }
                 when (m.returnType) {
-                    is OperandType.Unit -> if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) == m.returnType) `return`() else {
-                        pop()
+                    is OperandType.Unit -> {
+                        if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) != m.returnType) pop()
                         `return`()
                     }
-                    is OperandType.Reference -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
-                    is OperandType.SInt32 -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
-                    is OperandType.StringType -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
-                    is OperandType.UInt1 -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
-                    is OperandType.CharType -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
-                    is OperandType.Array -> TODO()
-                    is OperandType.Generic -> TODO()
-                    is Type.JFClass -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
-
+                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType ->
+                        if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
+                    is OperandType.StringType ->
+                        if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                    else -> TODO()
                 }
             }
         }
@@ -253,7 +247,6 @@ fun signature(type: OperandType<*>): String =
         is OperandType.Array -> "[${signature(type.genericTypes[0])}"
         is OperandType.Unit -> "V"
         is OperandType.StringType -> "Ljava/lang/String;"
-        is OperandType.Reference -> "L${type.type.replace('.', '/')};"
         is OperandType.SInt32 -> "I"
         is OperandType.CharType -> "C"
         is OperandType.UInt1 -> "Z"
