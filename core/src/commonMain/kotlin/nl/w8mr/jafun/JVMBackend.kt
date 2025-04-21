@@ -1,15 +1,9 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ExpressionNode
-import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.replaceIllegalCharacters
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
-
-val integerValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Integer"), "valueOf", listOf(OperandType.SInt32))
-val characterValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Character"), "valueOf", listOf(OperandType.CharType))
-val booleanValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Boolean"), "valueOf", listOf(OperandType.UInt1))
-
 
 class JVMBackend {
     class Context(val method: ClassBuilder.MethodDSL.DSL) {
@@ -223,7 +217,7 @@ fun buildClass(
 ): ClassBuilder =
     classBuilder {
         name = className
-        classContext.methods?.forEach { m ->
+        classContext.methods.forEach { m ->
             method {
                 name = m.name
                 signature = "(${m.parameterTypes.joinToString("", transform = ::signature)})" +

@@ -94,7 +94,7 @@ fun compileExpressionNode(
             val lastIndex = node.matches.size - 1
             var unreachable = false
 
-            val conditionAndBodyPairs = node.matches.mapIndexedNotNull { index, (condition, expression) ->
+            val conditionAndBodyPairs = node.matches.mapIndexed { index, (condition, expression) ->
                 when(condition) {
                     ExpressionNode.BooleanLiteral(true) -> {
 
@@ -137,10 +137,5 @@ fun compileExpressionNode(
         is ExpressionNode.Phase2_3Expression -> {
             builder.add(node)
         }
-        is ExpressionNode.Phase3Expression -> {
-            builder.add(node)
-        }
-        is ExpressionNode.Phase2Expression -> TODO("Need compile step")
-
     }
 }
