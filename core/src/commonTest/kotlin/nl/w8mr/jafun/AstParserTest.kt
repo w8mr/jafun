@@ -1,12 +1,11 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.ASTNode
-import nl.w8mr.jafun.ASTNode.Expression
-import nl.w8mr.jafun.ASTNode.Function
-import nl.w8mr.jafun.ASTNode.IntegerLiteral
-import nl.w8mr.jafun.ASTNode.StringLiteral
-import nl.w8mr.jafun.ASTNode.ValAssignment
-import nl.w8mr.jafun.ASTNode.Variable
+import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.ExpressionNode.Function
+import nl.w8mr.jafun.compiler.ExpressionNode.IntegerLiteral
+import nl.w8mr.jafun.compiler.ExpressionNode.StringLiteral
+import nl.w8mr.jafun.compiler.ExpressionNode.ValAssignment
+import nl.w8mr.jafun.compiler.ExpressionNode.Variable
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
@@ -230,11 +229,11 @@ class AstParserTest {
             |    1 == 1 -> "True"
             |}
             """,
-            ASTNode.When(
+            ExpressionNode.When(
                 null,
                 listOf(
-                    ASTNode.Invocation(equals, null, listOf(i(1), i(2))) to s("False"),
-                    ASTNode.Invocation(equals, null, listOf(i(1), i(1))) to s("True"),
+                    ExpressionNode.Invocation(equals, null, listOf(i(1), i(2))) to s("False"),
+                    ExpressionNode.Invocation(equals, null, listOf(i(1), i(1))) to s("True"),
                 ),
             ),
         )
@@ -245,15 +244,15 @@ class AstParserTest {
         test(
             """
             |when (val a = 2) { 
-            |    a == 2 -> "False"
-            |    a == 1 -> "True"
+            |    2 -> "False"
+            |    1 -> "True"
             |}
             """,
-            ASTNode.When(
+            ExpressionNode.When(
                 ValAssignment(Type.JFVariableSymbol("a", OperandType.SInt32), i(2)),
                 listOf(
-                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", OperandType.SInt32)), i(2))) to s("False"),
-                    ASTNode.Invocation(equals, null, listOf(Variable(Type.JFVariableSymbol("a", OperandType.SInt32)), i(1))) to s("True"),
+                    IntegerLiteral(2) to s("False"),
+                    IntegerLiteral(1) to s("True"),
                 ),
             ),
         )
@@ -261,7 +260,7 @@ class AstParserTest {
 
     private fun test(
         code: String,
-        vararg expressions: Expression,
+        vararg expressions: ExpressionNode.Phase2_3Expression,
     ) {
         val parseResult = ParserJafun.parse(code.trimMargin())
         when (parseResult.second) {
@@ -274,8 +273,8 @@ class AstParserTest {
                 val parsed = parseResult.first
                 println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
                 assertEquals(
-                    ASTNode.ExpressionList(expressions.toList()).prettyPrint(),
-                    parsed?.let { ASTNode.ExpressionList(it).prettyPrint() },
+                    ExpressionNode.ExpressionList(expressions.toList()).prettyPrint(),
+                    parsed?.let { ExpressionNode.ExpressionList(it).prettyPrint() },
                 )
                 assertContentEquals(
                     expressions.toList(),
@@ -394,8 +393,8 @@ class AstParserTest {
     private fun invocation(
         method: Type.JFMethod,
         field: Type.JFField?,
-        vararg parameters: Expression,
-    ) = ASTNode.Invocation(
+        vararg parameters: ExpressionNode.Phase2_3Expression,
+    ) = ExpressionNode.Invocation(
         method,
         field,
         parameters.toList(),
@@ -403,6 +402,6 @@ class AstParserTest {
 
     private fun function(
         method: Type.JFMethod,
-        vararg expressions: Expression,
+        vararg expressions: ExpressionNode.Phase2_3Expression,
     ) = Function(method, expressions.toList())
 }

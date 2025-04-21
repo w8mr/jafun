@@ -1,10 +1,10 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.Associativity
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.text.CharSequenceSource
@@ -107,7 +107,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.methodLhs(0),
             "abcd+3",
-            ASTNode.Variable(varSymbol),
+            ExpressionNode.Variable(varSymbol),
             4,
         )
     }
@@ -128,7 +128,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.curlBlock,
             "{}",
-            ASTNode.ExpressionList(emptyList()),
+            ExpressionNode.ExpressionList(emptyList()),
             2,
         )
     }
@@ -140,7 +140,7 @@ class SimpleParserTest {
             """|{  
                |}
             """,
-            ASTNode.ExpressionList(emptyList()),
+            ExpressionNode.ExpressionList(emptyList()),
             5,
         )
     }
@@ -150,7 +150,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.initValAssignment,
             """|val abc=5""".trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
+            ExpressionNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
             9,
         )
     }
@@ -163,7 +163,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ASTNode.IntegerLiteral(5)),
+            ExpressionNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
             13,
         )
     }
@@ -176,7 +176,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
+            ExpressionNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
             13,
         )
     }
@@ -189,7 +189,7 @@ class SimpleParserTest {
             """|abc = 
                |5
             """.trimMargin(),
-            ASTNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ASTNode.IntegerLiteral(5)),
+            ExpressionNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
             8,
         )
     }
@@ -199,7 +199,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.function,
             """|fun test(){}""".trimMargin(),
-            ASTNode.Function(
+            ExpressionNode.Function(
                 Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),
@@ -218,7 +218,7 @@ class SimpleParserTest {
                 |{ 
                 |}
             """.trimMargin(),
-            ASTNode.Function(
+            ExpressionNode.Function(
                 Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),

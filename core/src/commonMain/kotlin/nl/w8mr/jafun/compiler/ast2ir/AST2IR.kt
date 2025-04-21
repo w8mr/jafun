@@ -1,134 +1,79 @@
 package nl.w8mr.jafun.compiler.ast2ir
 
-import nl.w8mr.jafun.ASTNode
-import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compileMethod
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 
-private fun getSubBuilder(builder: IRBuilder.CodeBlockDSL): IRBuilder.CodeBlockDSL = IRBuilder.CodeBlockDSL(mutableListOf(), builder.parent)
-
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
-    expression: ASTNode.Expression,
-    returnValue: Boolean = true,
-): List<IR.Instruction> {
-    val subBuilder = getSubBuilder(builder)
-    compileExpressionNode(expression, subBuilder, returnValue)
-    return subBuilder.instructions
-}
-
-val integerValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Integer"), "valueOf", listOf(OperandType.SInt32))
-val characterValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Character"), "valueOf", listOf(OperandType.CharType))
-val booleanValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Boolean"), "valueOf", listOf(OperandType.UInt1))
-
-fun loadArguments(
-    builder: IRBuilder.CodeBlockDSL,
-    arguments: List<ASTNode.Expression>,
-    parameters: List<OperandType<*>>,
-) {
-    arguments.zip(parameters).forEach { (argument, parameter) ->
-        if (argument.type() == parameter) {
-            compileExpressionNode(argument, builder, true)
-        } else {
-            val argType = argument.type()
-            compileExpressionNode(argument, builder, true)
-            when (parameter) {
-                is Type.JFClass -> {
-                    when (argType) {
-                        is OperandType.StringType, is Type.JFClass -> {}
-                        OperandType.SInt32 -> builder.invoke(integerValueOf, null)
-                        OperandType.CharType -> builder.invoke(characterValueOf, null)
-                        OperandType.UInt1 -> builder.invoke(booleanValueOf, null)
-                        else -> TODO("Unhandled type mismatch during argument loading: $argType vs $parameter")
-                    }
-                }
-                is OperandType.Array -> {
-                    when (argType) {
-                        is OperandType.Array -> {}
-                        else -> TODO("Unhandled type mismatch during argument loading: $argType vs $parameter")
-                    }
-                }
-                else -> TODO("Unhandled type mismatch during argument loading: $argType vs $parameter")
-            }
-        }
+    expression: ExpressionNode.Phase2_3Expression,
+): ExpressionNode.Phase2_3Expression {
+    val instructions = IRBuilder.CodeBlockDSL(mutableListOf(), builder.parent).apply {
+        compileExpressionNode(expression, this)
+    }.instructions
+    return when (instructions.size) {
+        0 -> ExpressionNode.ExpressionList(emptyList())
+        1 -> instructions[0]
+        else -> ExpressionNode.ExpressionList(instructions)
     }
 }
 
+
+fun loadArguments(
+    builder: IRBuilder.CodeBlockDSL,
+    arguments: List<ExpressionNode.Phase2_3Expression>,
+    parameters: List<OperandType<*>>,
+) = arguments.zip(parameters).map { (argument, parameter) ->
+        if (argument.type() == parameter) {
+            compileAsCodeBlock(builder, argument)
+        } else if ((argument.type() == OperandType.StringType) && (parameter is Type.JFClass) && (parameter.name=="java.lang.Object")) {
+            compileAsCodeBlock(builder, argument)
+        }
+        else {
+            ExpressionNode.Convert(
+                compileAsCodeBlock(builder, argument),
+                argument.type(),
+                parameter
+            )
+        }
+    }
+
+
 private fun createWhenConditionExpression(
     variable: Type.JFVariableSymbol?,
-    condition: ASTNode.Expression,
-): ASTNode.Expression {
+    condition: ExpressionNode.Phase2_3Expression,
+): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
         val symbol = IdentifierCache.findMethod(null, "==", listOf(subjVar.type, condition.type()))
-        ASTNode.Invocation(symbol, null, listOf(ASTNode.Variable(subjVar), condition))
+        ExpressionNode.Invocation(symbol, null, listOf(ExpressionNode.Variable(subjVar), condition))
     } ?: condition // If no subject variable, the condition is used directly
 }
 
 fun compileExpressionNode(
-    node: ASTNode.Expression,
+    node: ExpressionNode.Phase2_3Expression,
     builder: IRBuilder.CodeBlockDSL,
-    returnValue: Boolean = true,
 ) {
     when (node) {
-        is ASTNode.StringLiteral -> {
-            builder.loadConstant(node.value, OperandType.StringType)
+        is ExpressionNode.Invocation -> {
+            val arguments = loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))
+            builder.add(ExpressionNode.Invocation(node.method, node.field, arguments))
         }
-        is ASTNode.CharLiteral -> {
-            builder.loadConstant(node.value, OperandType.CharType)
-        }
-        is ASTNode.IntegerLiteral -> {
-            builder.loadConstant(node.value, OperandType.SInt32)
-        }
-        is ASTNode.BooleanLiteral -> {
-            builder.loadConstant(node.value, OperandType.UInt1)
-        }
-        is ASTNode.ExpressionList -> {
-            val lastIndex = node.expressions.size - 1
-            node.expressions.forEachIndexed { index, statement ->
-                val compileReturnValue = returnValue && (lastIndex == index)
-                // Recursive call to the new centralized function
-                compileExpressionNode(statement, builder, compileReturnValue)
-            }
-        }
-        is ASTNode.Invocation -> {
-            with(builder) {
-                if (node.field != null) {
-                    when (node.field) {
-                        is Type.JFField -> {
-                            val fieldClassName = node.field.parentPath
-                            val fieldTypeSig =
-                                OperandType.Reference<Any>(
-                                    (node.field.type as? Type.JFClass)?.path ?: error("shoul de clas"),
-                                )
-                            getStatic(fieldClassName, node.field.name, fieldTypeSig)
-                        }
-                        is Type.JFVariableSymbol -> {
-                            load("${node.field.symbolMap.symbolMapId}.${node.field.name}", node.field.type)
-                        }
-                    }
-                }
-
-                loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))
-                invoke(node.method, node.field)
-                if (!returnValue && (node.method.rtn != OperandType.Unit)) pop()
-            }
-        }
-        is ASTNode.When -> {
+        is ExpressionNode.When -> {
             val subjectVariable =
                 node.subject?.let { subj ->
                     when (subj) {
-                        is ASTNode.Variable -> subj.variableSymbol
-                        is ASTNode.ValAssignment -> {
+                        is ExpressionNode.Variable -> subj.variableSymbol
+                        is ExpressionNode.ValAssignment -> {
                             // Compile the assignment statement (no return value needed here)
-                            compileExpressionNode(subj, builder, false)
+                            compileExpressionNode(subj, builder)
                             subj.variableSymbol
                         }
-                        is ASTNode.VarAssignment -> { // Added VarAssignment case
-                            compileExpressionNode(subj, builder, false)
+                        is ExpressionNode.VarAssignment -> { // Added VarAssignment case
+                            compileExpressionNode(subj, builder)
                             subj.variableSymbol
                         }
                         else -> {
@@ -137,67 +82,38 @@ fun compileExpressionNode(
                                 Type.JFVariableSymbol(
                                     "tmp",
                                     subj.type(),
-                                    LocalSymbolMap(IdentifierCache), // Assuming LocalSymbolMap is appropriate
+                                    LocalSymbolMap(IdentifierCache), // TODO: Need to check how to get the right scope here
                                 )
                             // Compile the assignment to the temporary variable
-                            compileExpressionNode(ASTNode.ValAssignment(tmpVariable, subj), builder, false)
+                            compileExpressionNode(ExpressionNode.ValAssignment(tmpVariable, subj), builder)
                             tmpVariable
                         }
                     }
                 }
 
             val lastIndex = node.matches.size - 1
-            var elseBranchInstructions: List<IR.Instruction>? = null
-            val conditionAndBodyPairs = mutableListOf<Pair<List<IR.Instruction>, List<IR.Instruction>>>()
+            var unreachable = false
 
-            node.matches.forEachIndexed { index, (condition, expression) ->
-                when {
-                    // Check for explicit 'else' (BooleanLiteral(true) as the last condition)
-                    (index == lastIndex) && (condition == ASTNode.BooleanLiteral(true)) -> {
-                        elseBranchInstructions = compileAsCodeBlock(builder, expression, returnValue)
+            val conditionAndBodyPairs = node.matches.mapIndexedNotNull { index, (condition, expression) ->
+                when(condition) {
+                    ExpressionNode.BooleanLiteral(true) -> {
+
+                        val bodyInstructions = compileAsCodeBlock(builder, expression)
+                        if (index != lastIndex) unreachable = true
+                        ExpressionNode.BooleanLiteral(true) to bodyInstructions
                     }
                     else -> {
                         // Create the actual condition expression (e.g., subject == value)
                         val conditionExpression = createWhenConditionExpression(subjectVariable, condition)
-                        val conditionInstructions = compileAsCodeBlock(builder, conditionExpression, true)
-                        val bodyInstructions = compileAsCodeBlock(builder, expression, returnValue)
-                        conditionAndBodyPairs.add(conditionInstructions to bodyInstructions)
+                        val conditionInstructions = compileAsCodeBlock(builder, conditionExpression)
+                        val bodyInstructions = compileAsCodeBlock(builder, expression)
+                        conditionInstructions to bodyInstructions
                     }
                 }
             }
-            builder.`when`(conditionAndBodyPairs, elseBranchInstructions)
+            builder.add(ExpressionNode.WhenPhase3(conditionAndBodyPairs))
         }
-
-        is ASTNode.While -> {
-            val conditionInstructions = compileAsCodeBlock(builder, node.condition, true)
-            val expressionInstructions = compileAsCodeBlock(builder, node.expressions, false)
-            builder.`while`(conditionInstructions, expressionInstructions)
-        }
-        is ASTNode.ValAssignment -> {
-            compileExpressionNode(node.expression, builder, true)
-            if (returnValue) builder.dup() // Keep the value on stack if assignment should return it
-            builder.store(
-                "${node.variableSymbol.symbolMap.symbolMapId}.${node.variableSymbol.name}",
-                node.variableSymbol.type,
-            )
-        }
-        is ASTNode.VarAssignment -> {
-            compileExpressionNode(node.expression, builder, true) // Expression must be evaluated
-            if (returnValue) builder.dup() // Keep the value on stack if assignment should return it
-            builder.store(
-                "${node.variableSymbol.symbolMap.symbolMapId}.${node.variableSymbol.name}",
-                node.variableSymbol.type,
-            )
-        }
-        is ASTNode.Variable -> {
-            if (returnValue) {
-                builder.load("${node.variableSymbol.symbolMap.symbolMapId}.${node.variableSymbol.name}", node.variableSymbol.type)
-            } else {
-                // If not returning value, loading it might be unnecessary side effect, depends on context.
-                // For now, assume load only happens if value is needed.
-            }
-        }
-        is ASTNode.Function -> {
+        is ExpressionNode.Function -> {
             compileMethod(
                 builder.parent.parent, // This assumes specific builder nesting
                 node.block,
@@ -206,5 +122,25 @@ fun compileExpressionNode(
                 node.symbol.parameters.map(Type.JFVariableSymbol::type),
             )
         }
+        is ExpressionNode.ValAssignment -> {
+            builder.add(ExpressionNode.ValAssignment(node.variableSymbol, compileAsCodeBlock(builder, node.expression)))
+        }
+        is ExpressionNode.VarAssignment -> {
+            builder.add(ExpressionNode.VarAssignment(node.variableSymbol, compileAsCodeBlock(builder, node.expression)))
+        }
+        is ExpressionNode.ExpressionList -> {
+            builder.add(ExpressionNode.ExpressionList(node.expressions.map { compileAsCodeBlock(builder, it) }))
+        }
+        is ExpressionNode.While -> {
+            builder.add(ExpressionNode.WhilePhase3(compileAsCodeBlock(builder, node.condition), compileAsCodeBlock(builder, node.expressions)))
+        }
+        is ExpressionNode.Phase2_3Expression -> {
+            builder.add(node)
+        }
+        is ExpressionNode.Phase3Expression -> {
+            builder.add(node)
+        }
+        is ExpressionNode.Phase2Expression -> TODO("Need compile step")
+
     }
 }

@@ -1,5 +1,6 @@
 package nl.w8mr.jafun
 
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.parsek.Parser
@@ -27,7 +28,7 @@ fun compile(
 }
 
 fun compile(
-    statements: List<ASTNode.Expression>,
+    statements: List<ExpressionNode.Phase2Expression>,
     className: String,
     methodName: String,
     returnType: OperandType<*>,
@@ -45,7 +46,7 @@ fun compile(
 
 fun compileMethod(
     builder: IRBuilder.ClassDSL,
-    statements: List<ASTNode.Expression>,
+    expression: List<ExpressionNode.Phase2_3Expression>,
     methodName: String,
     returnType: OperandType<*>,
     parameterTypes: List<OperandType<*>>,
@@ -53,37 +54,12 @@ fun compileMethod(
     with(builder) {
         method(methodName, returnType, parameterTypes) {
             codeBlock {
-                val lastIndex = statements.size - 1
-                statements.forEachIndexed { index, statement ->
-                    if ((lastIndex == index)) {
-                        if (returnType is OperandType.Unit) {
-                            compileAsStatement(statement, this)
-                            `return`(OperandType.Unit)
-                        } else {
-                            compileAsExpression(statement, this)
-                            `return`(statement.type())
-                        }
-                    } else {
-                        compileAsStatement(statement, this)
-                    }
+                expression.size - 1
+                expression.forEachIndexed { index, statement ->
+                    compileExpressionNode(statement, this)
                 }
             }
         }
     }
-}
-
-fun compileAsStatement(
-    expression: ASTNode.Expression,
-    builder: IRBuilder.CodeBlockDSL,
-) {
-    compileExpressionNode(expression, builder, false)
-}
-
-fun compileAsExpression(
-    expression: ASTNode.Expression,
-    builder: IRBuilder.CodeBlockDSL,
-) {
-    compileExpressionNode(expression, builder, true)
-    if (expression.type() == OperandType.Unit) builder.getStatic("kotlin.Unit", "INSTANCE", OperandType.Unit)
 }
 

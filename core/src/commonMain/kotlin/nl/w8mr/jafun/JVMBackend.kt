@@ -1,33 +1,52 @@
 package nl.w8mr.jafun
 
+import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.replaceIllegalCharacters
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
 
+val integerValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Integer"), "valueOf", listOf(OperandType.SInt32))
+val characterValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Character"), "valueOf", listOf(OperandType.CharType))
+val booleanValueOf = IdentifierCache.findMethod(IdentifierCache.findClass("java.lang.Boolean"), "valueOf", listOf(OperandType.UInt1))
+
+
 class JVMBackend {
     class Context(val method: ClassBuilder.MethodDSL.DSL) {
-        fun compile(instruction: IR.Instruction): Unit =
+        fun compile(instruction: ExpressionNode.Phase2_3Expression, asStatement: Boolean = false): Unit =
             with(method) {
                 when (instruction) {
-                    is IR.LoadConstant<*> ->
-                        when (instruction.type) {
-                            is OperandType.StringType -> loadConstant(instruction.type.operand1(instruction))
-                            is OperandType.SInt32 -> loadConstant(instruction.type.operand1(instruction))
-                            is OperandType.UInt1 ->
-                                loadConstant(
-                                    when (instruction.type.operand1(instruction)) {
-                                        false -> 0
-                                        true -> 1
-                                    },
+                    is ExpressionNode.IntegerLiteral -> loadConstant(instruction.value)
+                    is ExpressionNode.StringLiteral -> loadConstant(instruction.value)
+                    is ExpressionNode.BooleanLiteral -> loadConstant(if (instruction.value) 1 else 0)
+                    is ExpressionNode.CharLiteral -> loadConstant(instruction.value)
+                    is ExpressionNode.Invocation -> {
+                        when (instruction.field) {
+                            is Type.JFField -> {
+                                getStatic(
+                                    instruction.field.parentPath.replace('.', '/'),
+                                    instruction.field.name,
+                                    signature(instruction.field.type ?: error("Type is null")),
                                 )
-                            is OperandType.CharType -> loadConstant(instruction.type.operand1(instruction).code)
+                            }
+                            is Type.JFVariableSymbol -> {
+                                val variableName = "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
+                                when (instruction.field.type) {
+                                    is OperandType.Reference -> aload(variableName)
+                                    is OperandType.SInt32 -> iload(variableName)
+                                    is OperandType.StringType -> aload(variableName)
+                                    is OperandType.UInt1 -> iload(variableName)
+                                    is OperandType.CharType -> iload(variableName)
+                                    is OperandType.Array -> TODO()
+                                    is OperandType.Generic -> TODO()
+                                    is Type.JFClass -> aload(variableName)
+                                }
 
-                            is OperandType.Reference -> TODO()
-                            is OperandType.Array -> TODO()
-                            is OperandType.Generic -> TODO()
-                            is Type.JFClass -> TODO()
+                            }
+                            else -> {}
                         }
-                    is IR.Invoke -> {
+
+                        instruction.arguments.forEach { compile(it) }
                         with(method) {
                             val methodClassName = instruction.method.parentPath.replace('.', '/')
                             val methodSignature =
@@ -38,87 +57,152 @@ class JVMBackend {
                                 else -> invokeVirtual(methodClassName, instruction.method.name.replaceIllegalCharacters(), methodSignature)
                             }
                         }
+                        if ((asStatement) && (instruction.method.rtn!= OperandType.Unit)) pop()
                     }
-                    is IR.Pop -> pop()
-                    is IR.Dup -> dup()
-                    is IR.Store<*> ->
-                        when (instruction.type) {
-                            is OperandType.Reference -> astore(instruction.registerName)
-                            is OperandType.SInt32 -> istore(instruction.registerName)
-                            is OperandType.StringType -> astore(instruction.registerName)
-                            is OperandType.UInt1 -> istore(instruction.registerName)
-                            is OperandType.CharType -> istore(instruction.registerName)
+                    is ExpressionNode.ValAssignment -> {
+                        compile(instruction.expression)
+                        if (!asStatement) dup()
+                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                        when (instruction.expression.type()) {
+                            is OperandType.Reference -> astore(variableName)
+                            is OperandType.SInt32 -> istore(variableName)
+                            is OperandType.StringType -> astore(variableName)
+                            is OperandType.UInt1 -> istore(variableName)
+                            is OperandType.CharType -> istore(variableName)
                             is OperandType.Array -> TODO()
                             is OperandType.Generic -> TODO()
-                            is Type.JFClass -> astore(instruction.registerName)
+                            is Type.JFClass -> astore(variableName)
                         }
-                    is IR.Load<*> ->
-                        when (instruction.type) {
-                            is OperandType.Reference -> aload(instruction.registerName)
-                            is OperandType.SInt32 -> iload(instruction.registerName)
-                            is OperandType.StringType -> aload(instruction.registerName)
-                            is OperandType.UInt1 -> iload(instruction.registerName)
-                            is OperandType.CharType -> iload(instruction.registerName)
-                            is OperandType.Array -> aload(instruction.registerName)
-                            is OperandType.Generic -> TODO()
-                            is Type.JFClass -> aload(instruction.registerName)
-                        }
-                    is IR.Return<*> ->
-                        when (instruction.type) {
-                            is OperandType.Unit -> `return`() // TODO: check how to handle unit.
-                            is OperandType.Reference -> areturn()
-                            is OperandType.SInt32 -> ireturn()
-                            is OperandType.StringType -> areturn()
-                            is OperandType.UInt1 -> ireturn()
-                            is OperandType.CharType -> ireturn()
+                    }
+                    is ExpressionNode.VarAssignment -> {
+                        compile(instruction.expression)
+                        if (!asStatement) dup()
+                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                        when (instruction.expression.type()) {
+                            is OperandType.Reference -> astore(variableName)
+                            is OperandType.SInt32 -> istore(variableName)
+                            is OperandType.StringType -> astore(variableName)
+                            is OperandType.UInt1 -> istore(variableName)
+                            is OperandType.CharType -> istore(variableName)
                             is OperandType.Array -> TODO()
                             is OperandType.Generic -> TODO()
-                            is Type.JFClass -> areturn()
+                            is Type.JFClass -> astore(variableName)
                         }
-
-                    is IR.GetStatic ->
-                        getStatic(
-                            instruction.className.replace('.', '/'),
-                            instruction.fieldName,
-                            signature(instruction.type),
-                        )
-                    is IR.When -> {
+                    }
+                    is ExpressionNode.Variable -> {
+                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                        when (instruction.variableSymbol.type) {
+                            is OperandType.Reference -> aload(variableName)
+                            is OperandType.SInt32 -> iload(variableName)
+                            is OperandType.StringType -> aload(variableName)
+                            is OperandType.UInt1 -> iload(variableName)
+                            is OperandType.CharType -> iload(variableName)
+                            is OperandType.Array -> aload(variableName)
+                            is OperandType.Generic -> TODO()
+                            is Type.JFClass -> aload(variableName)
+                        }
+                    }
+                    is ExpressionNode.WhenPhase3 -> {
                         val after = createTarget()
-                        instruction.cases.forEach { case ->
-                            when (case) {
-                                is IR.When.WhenConditionCase -> {
-                                    case.condition.forEach { compile(it) }
+                        instruction.matches.forEach { match ->
+                            when (match.first) {
+                                ExpressionNode.BooleanLiteral(true) -> {
+                                    compile(match.second, asStatement)
+                                }
+                                else -> {
+                                    compile(match.first)
                                     val next = createTarget()
                                     ifequal(next)
-                                    case.execution.forEach { compile(it) }
+                                    compile(match.second, asStatement)
                                     goto(after)
                                     insertInstructionBlock(next)
-                                }
-                                is IR.When.WhenElseCase -> {
-                                    case.execution.forEach { compile(it) }
                                 }
                             }
                         }
                         insertInstructionBlock(after)
                     }
-                    is IR.DoWhile -> {
+                    is ExpressionNode.ExpressionList -> {
+                        
+                        val lastIndex = instruction.expressions.size - 1
+                        instruction.expressions.forEachIndexed { index, it ->
+                            compile(it, asStatement || (index != lastIndex))
+                        }
+
+                    }
+                    is ExpressionNode.DoWhile -> {
                         val body = createTarget()
                         insertInstructionBlock(body)
-                        instruction.expressions.forEach { compile(it) }
-                        instruction.condition.forEach { compile(it) }
+                        compile(instruction.expressions, false) // TODO: evaluate: Should DoWhile be an expression?
+                        compile(instruction.condition)
                         ifnotequal(body)
                     }
 
-                    is IR.While -> {
+                    is ExpressionNode.WhilePhase3 -> {
                         val after = createTarget()
                         val body = createTarget()
                         insertInstructionBlock(body)
-                        instruction.condition.forEach { compile(it) }
+                        compile(instruction.condition)
                         ifequal(after)
-                        instruction.expressions.forEach { compile(it) }
+                        compile(instruction.expressions, true)
                         goto(body)
                         insertInstructionBlock(after)
                     }
+                    is ExpressionNode.Convert -> {
+                        compile(instruction.expression)
+                        when (instruction.from) {
+                            is OperandType.SInt32 -> {
+                                when (instruction.to) {
+                                    is Type.JFClass -> {
+                                        invokeStatic(
+                                            "java/lang/Integer",
+                                            "valueOf",
+                                            "(I)Ljava/lang/Integer;"
+                                        )
+                                    }
+                                    else -> TODO("Setup conversion")
+                                }
+                            }
+                            is OperandType.UInt1 -> {
+                                when (instruction.to) {
+                                    is Type.JFClass -> {
+                                        invokeStatic(
+                                            "java/lang/Boolean",
+                                            "valueOf",
+                                            "(Z)Ljava/lang/Boolean;"
+                                        )
+                                    }
+                                    else -> TODO("Setup conversion")
+                                }
+                            }
+                            is OperandType.CharType -> {
+                                when (instruction.to) {
+                                    is Type.JFClass -> {
+                                        invokeStatic(
+                                            "java/lang/Character",
+                                            "valueOf",
+                                            "(C)Ljava/lang/Character;"
+                                        )
+                                    }
+                                    else -> TODO("Setup conversion")
+                                }
+                            }
+                            is Type.JFClass -> {
+                                when (instruction.to) {
+                                    is Type.JFClass -> {
+                                        when {
+                                            instruction.to.path == "java.lang.Object" -> {}
+                                            instruction.from.path == instruction.to.path -> {}
+                                            else -> TODO("Setup conversion")
+                                        }
+                                    }
+                                    else -> TODO("Setup conversion")
+                                }
+                            }
+                            else -> TODO("Setup conversion")
+
+                        }
+                    }
+                    else -> TODO()
                 }
             }
     }
@@ -145,7 +229,27 @@ fun buildClass(
                 signature = "(${m.parameterTypes.joinToString("", transform = ::signature)})" +
                     signature(m.returnType)
                 val context = JVMBackend.Context(this)
-                m.instructions.forEach { context.compile(it) }
+                val lastIndex = m.instructions.size - 1
+                m.instructions.forEachIndexed { index, instruction ->
+                    val asStatement = (index != lastIndex)
+                    context.compile(instruction, asStatement)
+                   // if ((index != lastIndex)  && (instruction.type()!= OperandType.Unit)) pop()
+                }
+                when (m.returnType) {
+                    is OperandType.Unit -> if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) == m.returnType) `return`() else {
+                        pop()
+                        `return`()
+                    }
+                    is OperandType.Reference -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                    is OperandType.SInt32 -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
+                    is OperandType.StringType -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                    is OperandType.UInt1 -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
+                    is OperandType.CharType -> if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
+                    is OperandType.Array -> TODO()
+                    is OperandType.Generic -> TODO()
+                    is Type.JFClass -> if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+
+                }
             }
         }
     }

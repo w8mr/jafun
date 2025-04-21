@@ -38,7 +38,7 @@ class SymbolMapTests {
                     type: TypeSymbol?,
                     path: String,
                 ): Boolean {
-                    return data[type]?.containsKey(path) ?: false
+                    return data[type]?.containsKey(path) == true
                 }
 
                 override fun incSymbolMapCount(): Int = 0

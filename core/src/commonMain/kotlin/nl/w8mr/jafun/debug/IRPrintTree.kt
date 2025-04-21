@@ -1,9 +1,9 @@
 package nl.w8mr.jafun.debug
 
-import nl.w8mr.jafun.IR
 import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.compiler.ExpressionNode
 
 object IRPrintTree {
     fun print(ir: Any) =
@@ -48,7 +48,7 @@ object IRPrintTree {
                         +"}"
                     }
 
-                is IR.Invoke ->
+                is ExpressionNode.Invocation ->
                     with(ir) {
                         -"Invoke "
                         -ir.method.parent.path
@@ -75,48 +75,39 @@ object IRPrintTree {
                         -": "
                         -typeName(ir.type)
                     }
-                is IR.When ->
+                is ExpressionNode.WhenPhase3 ->
                     with(ir) {
                         -"When {"
                         indent {
-                            cases.forEach { case ->
-                                when (case) {
-                                    is IR.When.WhenConditionCase -> {
-                                        case.condition.forEach {
-                                            print(this, it)
-                                        }
-                                        +" -> {"
-                                        indent {
-                                            case.execution.forEach {
-                                                print(this, it)
-                                            }
-                                        }
-                                        +"}"
-                                    }
-
-                                    is IR.When.WhenElseCase -> {
-                                        +"else -> {"
-                                        case.execution.forEach {
-                                            print(this, it)
-                                        }
-                                        +"}"
+                            matches.forEach { match ->
+                                match.first.let {
+                                    print(this, it)
+                                }
+                                +" -> {"
+                                indent {
+                                    match.second.let {
+                                        print(this, it)
                                     }
                                 }
+                                +"}"
                             }
                         }
 
                         +"}"
                     }
-                is IR.While ->
+                is ExpressionNode.WhilePhase3 ->
                     with(ir) {
                         -"While {"
                         indent {
-                            ir.expressions.forEach { expression ->
+                            ir.expressions.let { expression ->
                                 print(this, expression)
                             }
                         }
                         +"}"
                     }
+                is ExpressionNode.ExpressionList -> {
+                    ir.expressions.forEach { expression -> print(this, expression) }
+                }
                 else -> +ir.toString() // TODO While && When
             }
         }

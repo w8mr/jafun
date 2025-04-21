@@ -1,5 +1,7 @@
 package nl.w8mr.jafun
 
+import nl.w8mr.jafun.compiler.ExpressionNode
+
 object IRBuilder {
     fun define(init: BuilderDSL.() -> Unit): BuilderContext {
         val builderContext = BuilderContext()
@@ -15,7 +17,7 @@ object IRBuilder {
         val name: String,
         val returnType: OperandType<*>,
         val parameterTypes: List<OperandType<*>>,
-        val instructions: MutableList<IR.Instruction> = mutableListOf(),
+        val instructions: MutableList<ExpressionNode.Phase2_3Expression> = mutableListOf(),
         val parent: ClassContext,
     )
 
@@ -50,82 +52,9 @@ object IRBuilder {
         }
     }
 
-    class CodeBlockDSL(val instructions: MutableList<IR.Instruction> = mutableListOf(), val parent: MethodDSL) {
-        fun <J> loadConstant(
-            operand1: J,
-            type: OperandType<J>,
-        ) {
-            instructions.add(IR.LoadConstant(operand1, type))
-        }
-
-        fun <J> store(
-            registerName: String,
-            type: OperandType<J>,
-        ) {
-            instructions.add(IR.Store(registerName, type))
-        }
-
-        fun <J> load(
-            registerName: String,
-            type: OperandType<J>,
-        ) {
-            instructions.add(IR.Load(registerName, type))
-        }
-
-        fun invoke(
-            method: Type.JFMethod,
-            field: Type.InvocationTarget?,
-        ) {
-            instructions.add(IR.Invoke(method, field))
-        }
-
-        fun getStatic(
-            className: String,
-            fieldName: String,
-            type: OperandType.Reference<*>,
-        ) {
-            instructions.add(IR.GetStatic(className, fieldName, type))
-        }
-
-        fun pop() {
-            instructions.add(IR.Pop)
-        }
-
-        fun dup() {
-            instructions.add(IR.Dup)
-        }
-
-        @Suppress("ktlint:standard:function-naming")
-        fun <J> `return`(type: OperandType<J>) {
-            instructions.add(IR.Return(type))
-        }
-
-        fun `when`(
-            matches: List<Pair<List<IR.Instruction>, List<IR.Instruction>>>,
-            elseBlock: List<IR.Instruction>?,
-        ) {
-            instructions.add(
-                IR.When(
-                    matches.map {
-                        IR.When.WhenConditionCase(it.first, it.second)
-                    } + (elseBlock?.let { listOf(IR.When.WhenElseCase(it)) } ?: emptyList()),
-                ),
-            )
-        }
-
-        @Suppress("ktlint:standard:function-naming")
-        fun `doWhile`(
-            condition: List<IR.Instruction>,
-            expression: List<IR.Instruction>,
-        ) {
-            instructions.add(IR.DoWhile(condition, expression))
-        }
-
-        fun `while`(
-            condition: List<IR.Instruction>,
-            expression: List<IR.Instruction>,
-        ) {
-            instructions.add(IR.While(condition, expression))
+    class CodeBlockDSL(val instructions: MutableList<ExpressionNode.Phase2_3Expression> = mutableListOf(), val parent: MethodDSL) {
+        fun add(node: ExpressionNode.Phase2_3Expression) {
+            instructions.add(node)
         }
     }
 }

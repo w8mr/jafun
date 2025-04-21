@@ -1,7 +1,5 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.IR.OneOperand
-import nl.w8mr.jafun.Type.JFMethod
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMap
@@ -85,8 +83,6 @@ interface Type : TypeSymbol {
 }
 
 sealed interface OperandType<J> : TypeSymbol {
-    fun operand1(instruction: OneOperand<*>) = instruction.operand1 as J
-
     object StringType : OperandType<String> {
         override fun toString() = "StringType"
     }
@@ -109,44 +105,7 @@ sealed interface OperandType<J> : TypeSymbol {
         override fun toString() = "CharType"
     }
 
-    object Unit : Reference<kotlin.Unit>("kotlin.Unit") {
+    object Unit : Reference<jafun.Unit>("jafun.Unit") {
         override fun toString() = "UnitType"
     }
-}
-
-class IR {
-    sealed interface Instruction
-
-    sealed interface OneOperand<J> : Instruction {
-        val operand1: J
-        val type: OperandType<J>
-    }
-
-    data class LoadConstant<J>(override val operand1: J, override val type: OperandType<J>) : OneOperand<J>
-
-    data class Store<J>(val registerName: String, val type: OperandType<J>) : Instruction
-
-    data class Load<J>(val registerName: String, val type: OperandType<J>) : Instruction
-
-    data class Invoke(val method: JFMethod, val field: Type.InvocationTarget?) : Instruction
-
-    data class GetStatic(val className: String, val fieldName: String, val type: OperandType<*>) : Instruction
-
-    data object Pop : Instruction
-
-    data object Dup : Instruction
-
-    data class Return<J>(val type: OperandType<J>) : Instruction
-
-    data class When(val cases: List<WhenCase>) : Instruction {
-        sealed interface WhenCase
-
-        data class WhenConditionCase(val condition: List<Instruction>, val execution: List<Instruction>) : WhenCase
-
-        data class WhenElseCase(val execution: List<Instruction>) : WhenCase
-    }
-
-    data class DoWhile(val condition: List<Instruction>, val expressions: List<Instruction>) : Instruction
-
-    data class While(val condition: List<Instruction>, val expressions: List<Instruction>) : Instruction
 }

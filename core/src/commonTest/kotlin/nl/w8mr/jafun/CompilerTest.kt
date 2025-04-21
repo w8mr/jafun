@@ -1,12 +1,12 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.buildClass
 import nl.w8mr.jafun.compileMethod
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.debug.IRPrintTree
@@ -91,7 +91,7 @@ class CompilerTest {
 
         private fun ast2ir(
             className: String,
-            parsed: List<ASTNode.Expression>,
+            parsed: List<ExpressionNode.Phase2Expression>,
             methodName: String
         ): IRBuilder.ClassContext {
             ParserJafun.symbolMap.currentSymbolMap =
@@ -984,6 +984,56 @@ class CompilerTest {
     }
 
     @Test
+    fun stackNeutralInFunctionTest() {
+        test(
+            """
+                fun test() {
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                }
+                println test()
+                """,
+            "3\n",
+        ) {
+            name = "Script"
+
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                invokeStatic("Script", "test", "()I")
+                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                `return`()
+            }
+
+            method {
+                name = "test"
+                signature = "()I"
+                (1..9).forEach {
+                    loadConstant(1)
+                    loadConstant(2)
+                    invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                    pop()
+                }
+                loadConstant(1)
+                loadConstant(2)
+                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                `ireturn`()
+            }
+
+        }
+    }
+
+
+    @Test
     fun funReturnIntValue() {
         test(
             """
@@ -1167,6 +1217,7 @@ class CompilerTest {
                 loadConstant("One")
                 goto(6)
                 loadConstant("Else")
+                pop()
                 `return`()
             }
         }

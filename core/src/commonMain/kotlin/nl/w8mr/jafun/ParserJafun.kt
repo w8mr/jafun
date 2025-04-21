@@ -12,6 +12,7 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXL
 import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -57,22 +58,22 @@ object ParserJafun {
     // TODO: Escape characters
     val lineStringContent =
         zeroOrMore(char(" is not valid string Char") { it != '"' && it != '\\' })
-    val stringLiteral_term = ('"' and lineStringContent and '"').map(ASTNode::StringLiteral)
+    val stringLiteral_term = ('"' and lineStringContent and '"').map(ExpressionNode::StringLiteral)
     // TODO: Multiline string
 
     val charLiteral_term =
-        ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map { ASTNode.CharLiteral(it[0]) }
+        ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map { ExpressionNode.CharLiteral(it[0]) }
 
     val decimalDigit = char { it in '0'..'9' }
     val decimalDigitNoZero = char { it in '1'..'9' }
     val decimalDigitOrSeparator = decimalDigit or char('_')
     val integerLiteral_term =
         ((repeat(char('-'), 1, 0) and decimalDigitNoZero and any(decimalDigitOrSeparator)) or decimalDigit).map {
-            ASTNode.IntegerLiteral(it.replace("_", "").toInt())
+            ExpressionNode.IntegerLiteral(it.replace("_", "").toInt())
         }
 
-    val trueLiteral = "true" value ASTNode.BooleanLiteral(true)
-    val falseLiteral = "false" value ASTNode.BooleanLiteral(false)
+    val trueLiteral = "true" value ExpressionNode.BooleanLiteral(true)
+    val falseLiteral = "false" value ExpressionNode.BooleanLiteral(false)
     val booleanLiteral_term = trueLiteral or falseLiteral
 
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
@@ -164,7 +165,7 @@ object ParserJafun {
     val curlBlock =
         combi {
             -blockOpen
-            ASTNode.ExpressionList(
+            ExpressionNode.ExpressionList(
                 symbolMap.local {
                     val expressions = expressions.bind()
                     -blockClose
@@ -181,7 +182,7 @@ object ParserJafun {
             -literal('=')
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ASTNode.ValAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), false), expression)
+            ExpressionNode.ValAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), false), expression)
         }
 
     val initVarAssignment =
@@ -192,7 +193,7 @@ object ParserJafun {
             -literal('=')
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ASTNode.VarAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), true), expression)
+            ExpressionNode.VarAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), true), expression)
         }
 
     val varAssignment =
@@ -209,10 +210,10 @@ object ParserJafun {
             if (!variableSymbol.mutable) {
                 throw IllegalStateException("Variable ${identifier.value} is not mutable")
             }
-            ASTNode.VarAssignment(variableSymbol, expression)
+            ExpressionNode.VarAssignment(variableSymbol, expression)
         }
 
-    val elseInWhen = "else".value(ASTNode.BooleanLiteral(true)) and owsnl
+    val elseInWhen = "else".value(ExpressionNode.BooleanLiteral(true)) and owsnl
     val whenExpression =
         combi {
             -("when" and owsnl)
@@ -225,7 +226,7 @@ object ParserJafun {
                     -blockClose
                     subject to matches
                 }
-            ASTNode.When(subject, matches)
+            ExpressionNode.When(subject, matches)
         }
 
     val whileExpression =
@@ -240,7 +241,7 @@ object ParserJafun {
                     val expressions = curlBlock.bind()
                     condition to expressions
                 }
-            ASTNode.While(condition, expressions)
+            ExpressionNode.While(condition, expressions)
         }
 
     val function =
@@ -285,13 +286,13 @@ object ParserJafun {
             val symbolWithReturnType = symbol.copy(rtn = block.expressions.lastOrNull()?.type() ?: OperandType.Unit)
             symbolMap.add(name.value, symbolWithReturnType)
 
-            ASTNode.Function(symbolWithReturnType, block.expressions)
+            ExpressionNode.Function(symbolWithReturnType, block.expressions)
         }
 
     fun prattParser(
         stopTerm: Parser<Char, *> = newline or ';',
         minPrecedence: Int = 0,
-    ): Parser<Char, ASTNode.Expression> =
+    ): Parser<Char, ExpressionNode.Phase2Expression> =
         // TODO: Cache parsers
         combi {
             var current =
@@ -333,14 +334,14 @@ object ParserJafun {
             current.bind()
         }
 
-    fun methodLhs(minPrecedence: Int): Parser<Char, ASTNode.Expression> =
+    fun methodLhs(minPrecedence: Int): Parser<Char, ExpressionNode.Phase2Expression> =
         // TODO: Cache parsers
         combi {
             val symbols = complexIdentifier.bind()
             symbols.map { symbol ->
                 when (symbol) {
                     is JFVariableSymbol ->
-                        ASTNode.Variable(symbol)
+                        ExpressionNode.Variable(symbol)
                     is JFMethod -> {
                         val arguments =
                             when (symbol.associativity) {
@@ -371,9 +372,9 @@ object ParserJafun {
         }
 
     fun methodRhs(
-        lhsExpression: ASTNode.Expression,
+        lhsExpression: ExpressionNode.Phase2Expression,
         minPrecedence: Int,
-    ): Parser<Char, ASTNode.Expression> =
+    ): Parser<Char, ExpressionNode.Phase2Expression> =
         // TODO: Cache parsers
         combi {
             val identifier = (identifier and owsnl).bind()
@@ -404,17 +405,17 @@ object ParserJafun {
             result
         }
 
-    private fun ASTNode.Expression?.asList() =
+    private fun ExpressionNode.Phase2Expression?.asList() =
         when (this) {
             null -> emptyList()
             else -> listOf(this)
         }
 
-    private fun CombinatorDSL<Char, ASTNode.Expression>.methodArguments(
+    private fun CombinatorDSL<Char, ExpressionNode.Phase2Expression>.methodArguments(
         method: JFMethod,
         minPrecedence: Int,
-        lhsExpression: ASTNode.Expression? = null,
-    ): List<ASTNode.Expression> {
+        lhsExpression: ExpressionNode.Phase2Expression? = null,
+    ): List<ExpressionNode.Phase2Expression> {
         val count = method.parameters.size - (if (lhsExpression == null) 0 else 1)
         val newPrecedence =
             when {
@@ -444,24 +445,24 @@ object ParserJafun {
 
     private fun methodInvocation(
         method: JFMethod,
-        arguments: List<ASTNode.Expression>,
-    ): ASTNode.Expression =
+        arguments: List<ExpressionNode.Phase2Expression>,
+    ): ExpressionNode.Phase2Expression =
         when {
-            method.static -> ASTNode.Invocation(method, null, arguments)
+            method.static -> ExpressionNode.Invocation(method, null, arguments)
             else -> error("Method is not static")
         }
 
     private fun methodInvocation(
         method: JFMethod,
         field: Type.InvocationTarget,
-        arguments: List<ASTNode.Expression>,
-    ): ASTNode.Expression =
+        arguments: List<ExpressionNode.Phase2Expression>,
+    ): ExpressionNode.Phase2Expression =
         when {
-            !method.static -> ASTNode.Invocation(method, field, arguments)
+            !method.static -> ExpressionNode.Invocation(method, field, arguments)
             else -> error("Method is static")
         }
 
-    fun parse(input: String): Pair<List<ASTNode.Expression>?, Parser.Result<List<ASTNode.Expression>>> {
+    fun parse(input: String): Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>> {
         symbolMap.reset()
         val source = CharSequenceSource(input)
         return expressions.parseTree(source)

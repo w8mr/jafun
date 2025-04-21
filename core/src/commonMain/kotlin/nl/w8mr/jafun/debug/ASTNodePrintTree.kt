@@ -1,14 +1,14 @@
 package nl.w8mr.jafun.debug
 
-import nl.w8mr.jafun.ASTNode
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.compiler.ExpressionNode
 
 /**
  * Generates a pretty-printed string representation of the ASTNode.
  * @param indentSize The number of spaces to use for each indentation level.
  * @return The formatted string.
  */
-fun ASTNode.prettyPrint(indentSize: Int = 2): String {
+fun ExpressionNode.prettyPrint(indentSize: Int = 2): String {
     val indenter = Indenter(indentSize)
     indenter.print(this) // Start the recursive printing
     return indenter.toString()
@@ -20,19 +20,19 @@ fun ASTNode.prettyPrint(indentSize: Int = 2): String {
  * Extension function for Indenter to recursively print ASTNode structures.
  * This function modifies the Indenter's internal buffer.
  */
-private fun Indenter.print(node: ASTNode) {
+private fun Indenter.print(node: ExpressionNode) {
     when (node) {
         // Expression Nodes
-        is ASTNode.StringLiteral -> +"StringLiteral(\"${node.value}\")"
-        is ASTNode.CharLiteral -> +"CharLiteral(\'${node.value}\')"
-        is ASTNode.IntegerLiteral -> +"Int32Literal(${node.value})"
-        is ASTNode.BooleanLiteral -> +"BooleanLiteral(${node.value})"
+        is ExpressionNode.StringLiteral -> +"StringLiteral(\"${node.value}\")"
+        is ExpressionNode.CharLiteral -> +"CharLiteral(\'${node.value}\')"
+        is ExpressionNode.IntegerLiteral -> +"Int32Literal(${node.value})"
+        is ExpressionNode.BooleanLiteral -> +"BooleanLiteral(${node.value})"
 
-        is ASTNode.ExpressionList -> {
+        is ExpressionNode.ExpressionList -> {
             node.expressions.forEach { print(it) }
         }
 
-        is ASTNode.Invocation -> {
+        is ExpressionNode.Invocation -> {
             -((node.field as? Type.JFField)?.name ?: "") // TODO Variable
             -(node.method.name)
             +"("
@@ -47,7 +47,7 @@ private fun Indenter.print(node: ASTNode) {
             +": ${node.method.rtn}" // Return type on the same line, then newline via '+'
         }
 
-        is ASTNode.When -> {
+        is ExpressionNode.When -> {
             -"when"
             if (node.subject != null) {
                 -" ("
@@ -68,8 +68,34 @@ private fun Indenter.print(node: ASTNode) {
             }
             +"}" // Closing brace
         }
+        is ExpressionNode.WhenPhase3 -> {
+            +"when {"
+            indent {
+                node.matches.forEach { (condition, code) ->
+                    -""
+                    print(condition)
+                    +" -> {"
+                    indent {
+                        print(code)
+                    }
+                    +"}"
+                }
+            }
+            +"}" // Closing brace
+        }
 
-        is ASTNode.While -> {
+        is ExpressionNode.While -> {
+            -"while"
+            -" ("
+            print(node.condition)
+            -")"
+            +" {"
+            indent {
+                print(node.expressions)
+            }
+            +"}"
+        }
+        is ExpressionNode.WhilePhase3 -> {
             -"while"
             -" ("
             print(node.condition)
@@ -81,7 +107,7 @@ private fun Indenter.print(node: ASTNode) {
             +"}"
         }
 
-        is ASTNode.ValAssignment -> {
+        is ExpressionNode.ValAssignment -> {
             -"val ${node.variableSymbol.name}: ${node.variableSymbol.type} ="
             +""
             indent {
@@ -89,7 +115,7 @@ private fun Indenter.print(node: ASTNode) {
             }
         }
 
-        is ASTNode.VarAssignment -> {
+        is ExpressionNode.VarAssignment -> {
             -"var ${node.variableSymbol.name}: ${node.variableSymbol.type} ="
             +""
             indent {
@@ -97,11 +123,11 @@ private fun Indenter.print(node: ASTNode) {
             }
         }
 
-        is ASTNode.Variable -> {
+        is ExpressionNode.Variable -> {
             +"${node.variableSymbol.name}: ${node.variableSymbol.type}"
         }
 
-        is ASTNode.Function -> {
+        is ExpressionNode.Function -> {
             -"fun ${node.symbol.name}("
             -node.symbol.parameters.joinToString(", ") { "${it.name}: ${it.type}" }
             -")"
@@ -113,7 +139,7 @@ private fun Indenter.print(node: ASTNode) {
             +"}"
         }
 
-        // Handle non-Expression ASTNode types if necessary, using default toString
+        // Handle non-Expression GenericNode types if necessary, using default toString
         else -> +"${node::class.simpleName}(...)" // Generic fallback
     }
 }

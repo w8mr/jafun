@@ -15,7 +15,7 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
         type: TypeSymbol?,
         path: String,
     ): Boolean {
-        return identifierMap[type]?.containsKey(path) ?: false
+        return identifierMap[type]?.containsKey(path) == true
     }
 
     override fun add(

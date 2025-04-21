@@ -12,7 +12,7 @@ class SymbolMapManager {
             add(
                 null, // For main method
                 "arguments",
-                JFVariableSymbol("arguments", OperandType.Array(JFClass("java/lang/String")), this, false),
+                JFVariableSymbol("arguments", OperandType.Array(JFClass("java.lang.String")), this, false),
             )
         }
 
@@ -22,7 +22,7 @@ class SymbolMapManager {
                 add(
                     null, // For main method
                     "arguments",
-                    JFVariableSymbol("arguments", OperandType.Array(JFClass("java/lang/String")), this, false),
+                    JFVariableSymbol("arguments", OperandType.Array(JFClass("java.lang.String")), this, false),
                 )
             }
     }

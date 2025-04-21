@@ -176,8 +176,8 @@ object IdentifierCache : SymbolMap {
     override fun contains(
         type: TypeSymbol?,
         path: String,
-    ): kotlin.Boolean {
-        return identifierMap[type]?.containsKey(path) ?: false
+    ): Boolean {
+        return identifierMap[type]?.containsKey(path) == true
     }
 
     override fun add(
