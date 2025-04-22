@@ -7,17 +7,20 @@ version = "0.0.1"
 
 
 plugins {
-    kotlin("multiplatform") version "2.1.10"
-    id("com.vanniktech.maven.publish") version "0.31.0"
+    alias(libs.plugins.kotlinMultiplatform) apply false
+    alias(libs.plugins.publish)
 }
+
+val multiplatformId = libs.plugins.kotlinMultiplatform.get().pluginId
+val publishId = libs.plugins.publish.get().pluginId
 
 subprojects {
     repositories {
         mavenCentral()
     }
 
-    apply(plugin = "org.jetbrains.kotlin.multiplatform")
-    apply(plugin = "com.vanniktech.maven.publish")
+    apply(plugin = publishId)
+    apply(plugin = multiplatformId)
 
     mavenPublishing {
         configure(KotlinMultiplatform(

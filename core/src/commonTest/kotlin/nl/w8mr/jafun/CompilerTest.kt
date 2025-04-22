@@ -37,6 +37,74 @@ expect fun runAndAssertOutput(
 
 class CompilerTest {
     companion object {
+        class TestContext() {
+            var code: String? = null
+            var bytecode: ByteArray? = null
+            var mainParams: Array<String>? = null
+            var expectedOutput: String? = null
+        }
+
+        fun test(block: TestDSL.() -> Unit) {
+            val files = mutableMapOf<String, TestContext>()
+            val runner = TestDSLImpl(files)
+            block.invoke(runner)
+
+            val compiler = Compiler()
+
+            val phase2Plugin = registerPhase2Plugin(compiler)
+            val phase3Plugin = registerPhase3Plugin(compiler)
+
+
+            for ((path, file) in files) {
+                val className = "Script"
+                val methodName = "main"
+                val actualBytes = compiler.compile(file.code ?: error("No code set for $path"), className, methodName)
+
+                println("CAPTURED: ${listOf(phase2Plugin.phase2, phase3Plugin.phase3)}")
+
+                writeFile(className, actualBytes)
+                val result = runAndAssertOutput(actualBytes, className, methodName, file.mainParams, file.expectedOutput ?: TODO("Handle no expected case"))
+
+                val expectedBytes = file.bytecode
+                if (expectedBytes != null) {
+                    if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
+                        compareDecompiled(expectedBytes, null /* change to boolean */, result, result, actualBytes)
+                    } else {
+                        assertContentEquals(expectedBytes, actualBytes)
+                    }
+                }
+
+            }
+        }
+
+        interface TestDSL {
+            fun file(path: String = "Script", block: TestFileDSL.() -> Unit)
+        }
+
+        class TestDSLImpl(val files : MutableMap<String, TestContext>): TestDSL {
+            override fun file(path: String, block: TestFileDSL.() -> Unit) {
+                val context = TestContext()
+                val runner = TestFileDSLImpl(context)
+                block.invoke(runner)
+                files[path] = context
+            }
+
+        }
+        interface TestFileDSL {
+            var code : String?
+            var expectedOutput: String?
+            fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit)
+
+        }
+        class TestFileDSLImpl(val context: TestContext): TestFileDSL {
+            override var code by context::code
+            override var expectedOutput by context::expectedOutput
+            override fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
+                context.bytecode = classBuilder(block).write()
+            }
+        }
+
+
         fun test(
             code: String,
             expectedOutput: String,
@@ -335,47 +403,59 @@ class CompilerTest {
 
     @Test
     fun assignmentSimple() {
-        test(
-            """
-            val str1 = "Hello World"
-            println str1""",
-            "Hello World\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant("Hello World")
-                astore("str1")
-                aload("str1")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        test {
+            file {
+                code = """
+                    val str1 = "Hello World"
+                    println str1"""
+                expectedOutput = "Hello World\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant("Hello World")
+                        astore("str1")
+                        aload("str1")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
             }
         }
     }
 
     @Test
     fun assignmentTwoVariables() {
-        test(
-            """
-            val str2 = "World"
-            val str1 = "Hello"
-            println join(str1, str2)""",
-            "Hello World\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant("World")
-                astore("str2")
-                loadConstant("Hello")
-                astore("str1")
-                aload("str1")
-                aload("str2")
-                invokeStatic("jafun/test/TestKt", "join", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        test {
+            file {
+                code = """
+                val str2 = "World"
+                val str1 = "Hello"
+                println join(str1, str2)"""
+
+                expectedOutput = "Hello World\n"
+
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant("World")
+                        astore("str2")
+                        loadConstant("Hello")
+                        astore("str1")
+                        aload("str1")
+                        aload("str2")
+                        invokeStatic(
+                            "jafun/test/TestKt",
+                            "join",
+                            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+                        )
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
             }
         }
     }
