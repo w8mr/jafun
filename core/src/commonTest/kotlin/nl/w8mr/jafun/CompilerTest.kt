@@ -2,8 +2,8 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.IRBuilder
 import nl.w8mr.jafun.compiler.Compiler
-import nl.w8mr.jafun.compiler.Compiler.PluginType.AST
-import nl.w8mr.jafun.compiler.Compiler.PluginType.CST
+import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
+import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
@@ -45,14 +45,14 @@ class CompilerTest {
         ) {
             val compiler = Compiler()
 
-            val cstPlugin = registerCstPlugin(compiler)
-            val astPlugin = registerAstPlugin(compiler)
+            val phase2Plugin = registerPhase2Plugin(compiler)
+            val phase3Plugin = registerPhase3Plugin(compiler)
 
             val className = "Script"
             val methodName = "main"
             val actualBytes = compiler.compile(code, className, methodName)
 
-            println("CAPTURED: ${listOf(cstPlugin.cst, astPlugin.ast)}")
+            println("CAPTURED: ${listOf(phase2Plugin.phase2, phase3Plugin.phase3)}")
 
             writeFile(className, actualBytes)
             val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
@@ -66,23 +66,23 @@ class CompilerTest {
 
         }
 
-        data class CSTPlugin(var cst: List<ExpressionNode.Phase2Expression>? = null) : Compiler.CSTPlugin {
+        data class Phase2Plugin(var phase2: List<ExpressionNode.Phase2Expression>? = null) : Compiler.Phase2Plugin {
             override fun handle(input: List<ExpressionNode.Phase2Expression>): List<ExpressionNode.Phase2Expression> {
-                cst = input
+                phase2 = input
                 return input
             }
         }
-        private fun registerCstPlugin(compiler: Compiler) =
-            CSTPlugin(). apply { compiler.registerPlugin(CST, this) }
+        private fun registerPhase2Plugin(compiler: Compiler) =
+            Phase2Plugin(). apply { compiler.registerPlugin(Phase2, this) }
 
-        data class ASTPlugin(var ast: IRBuilder.ClassContext? = null) : Compiler.ASTPlugin {
+        data class Phase3Plugin(var phase3: IRBuilder.ClassContext? = null) : Compiler.Phase3Plugin {
             override fun handle(input: IRBuilder.ClassContext): IRBuilder.ClassContext {
-                ast = input
+                phase3 = input
                 return input
             }
         }
-        private fun registerAstPlugin(compiler: Compiler) =
-            ASTPlugin().apply { compiler.registerPlugin(AST, this) }
+        private fun registerPhase3Plugin(compiler: Compiler) =
+            Phase3Plugin().apply { compiler.registerPlugin(Phase3, this) }
     }
 
     @Test

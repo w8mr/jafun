@@ -6,8 +6,8 @@ import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.buildClass
 import nl.w8mr.jafun.compileMethod
-import nl.w8mr.jafun.compiler.Compiler.PluginType.AST
-import nl.w8mr.jafun.compiler.Compiler.PluginType.CST
+import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
+import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.jafun.debug.print
@@ -18,13 +18,13 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>
         fun handle(input: A): A
     }
 
-    interface CSTPlugin : Plugin<List<ExpressionNode.Phase2Expression>>
-    interface ASTPlugin : Plugin<IRBuilder.ClassContext>
+    interface Phase2Plugin : Plugin<List<ExpressionNode.Phase2Expression>>
+    interface Phase3Plugin : Plugin<IRBuilder.ClassContext>
     interface JVMPlugin : Plugin<ByteArray>
 
     sealed interface PluginType<T, Plugin> {
-        object CST : PluginType<List<ExpressionNode.Phase2Expression>, CSTPlugin>
-        object AST : PluginType<IRBuilder.ClassContext, ASTPlugin>
+        object Phase2 : PluginType<List<ExpressionNode.Phase2Expression>, Phase2Plugin>
+        object Phase3 : PluginType<IRBuilder.ClassContext, Phase3Plugin>
         object JVM : PluginType<ByteArray, JVMPlugin>
     }
 
@@ -47,10 +47,10 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>
                 val parsed = parseResult.first
                 println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
                 println()
-                val updatedParsed = CST.run(parsed)
+                val updatedParsed = Phase2.run(parsed)
 
                 val classContext = ast2ir(className, updatedParsed, methodName)
-                val updatedContext = AST.run(classContext)
+                val updatedContext = Phase3.run(classContext)
 
                 val actualBytes = ir2jvmByteCode(className, updatedContext)
                 val updatedBytes = JVM.run(actualBytes)
