@@ -33,7 +33,7 @@
 
 ## Testing
 - Create better dsl for testing separate outputs (ast, ir, bytecode, output (print), output function) &#x2611;
-- Merge AST tests
+- Merge AST tests &#x2611;
 - Create more AoC tests
 
 ## Symbol table
