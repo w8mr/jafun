@@ -10,8 +10,8 @@
 
 ## Parser
 - 2 phase: Structure / code
-- Merge lexer and parser  &#x2611;
-- String interpolation
+- Merge lexer and parser &#x2611;
+- String interpolation &#x2611
 - pattern matching
 - imports / exports
 
@@ -21,9 +21,11 @@
 ## Compiler Frontend
 - Extract AST 2 IR code away from ASTNodes  &#x2611;
 - Create separate package for AST2IR  &#x2611;
+- Move String Interpolation handling toward frontend
 
 ## Compiler backend
 - Create separate package for IR2Jvm
+
 
 ## Compiler
 - Move towards one node type (with interfaces for levels) &#x2611;
