@@ -11,50 +11,53 @@ class AocTests {
 
     @Test
     fun `AoC 2015 Day 1 Part 1`() {
-        test(
-            """
-            val input = first(arguments)
-            var i = 0
-            val l = length(input)
-            var floor = 0
-            while (i < l) {
-                val c = charAt(input, i)
-                floor = floor + when (c) {
-                    ')' -> -1
-                    '(' -> 1
-                    else -> 0
-                }
-                i = i + 1
+        test {
+            file {
+                code = """
+                    val input = first(arguments)
+                    var i = 0
+                    val l = length(input)
+                    var floor = 0
+                    while (i < l) {
+                        val c = charAt(input, i)
+                        floor = floor + when (c) {
+                            ')' -> -1
+                            '(' -> 1
+                            else -> 0
+                        }
+                        i = i + 1
+                    }
+                    println floor"""
+                expectedOutput = "74\n"
+                params(aoc2015day1,
+            )
             }
-            println floor
-        """,
-            "74\n",
-            arrayOf(aoc2015day1),
-        )
+        }
     }
 
     @Test
     fun `AoC 2015 Day 1 Part 2`() {
-        test(
-            """
-            val input = first(arguments)
-            var i = 0
-            val l = length(input)
-            var floor = 0
-            while (floor >= 0) {
-                val c = charAt(input, i)
-                floor = floor + when (c) {
-                    ')' -> -1
-                    '(' -> 1
-                    else -> 0
-                }
-                i = i + 1
+        test {
+            file {
+                code = """
+                    val input = first(arguments)
+                    var i = 0
+                    val l = length(input)
+                    var floor = 0
+                    while (floor >= 0) {
+                        val c = charAt(input, i)
+                        floor = floor + when (c) {
+                            ')' -> -1
+                            '(' -> 1
+                            else -> 0
+                        }
+                        i = i + 1
+                    }
+                    println i"""
+                expectedOutput = "1795\n"
+                params(aoc2015day1)
             }
-            println i
-        """,
-            "1795\n",
-            arrayOf(aoc2015day1),
-        )
+        }
     }
 }
 

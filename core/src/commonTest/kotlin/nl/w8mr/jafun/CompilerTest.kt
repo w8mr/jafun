@@ -302,38 +302,6 @@ class CompilerTest {
         }
 
 
-        fun test(
-            code: String,
-            expectedOutput: String,
-            params: Array<String>? = null,
-            bytecode: (ClassBuilder.ClassDSL.DSL.() -> Unit)? = null,
-        ) {
-            val compiler = Compiler()
-
-            val phase2Plugin = compiler.registerPlugin(Phase2, Phase2Plugin())
-            val phase3Plugin = compiler.registerPlugin(Phase3, Phase3Plugin())
-            val jvmirPlugin = compiler.registerPlugin(JVMIR, JVMIRPlugin())
-
-            val className = "Script"
-            val methodName = "main"
-            val actualBytes = compiler.compile(code, className, methodName)
-
-            println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
-            println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
-            println("IR:\n ${jvmirPlugin.jvmir?.print()}")
-
-            writeFile(className, actualBytes)
-            val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
-
-            val expectedBytes = bytecode?.let { classBuilder(bytecode).write() } ?: actualBytes
-            if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
-                compareDecompiled(expectedBytes, bytecode, result, result, actualBytes)
-            } else {
-                assertContentEquals(expectedBytes, actualBytes)
-            }
-
-        }
-
         data class Phase2Plugin(var phase2: List<ExpressionNode.Phase2Expression>? = null) : Compiler.Phase2Plugin {
             override fun handle(input: List<ExpressionNode.Phase2Expression>): List<ExpressionNode.Phase2Expression> {
                 phase2 = input
