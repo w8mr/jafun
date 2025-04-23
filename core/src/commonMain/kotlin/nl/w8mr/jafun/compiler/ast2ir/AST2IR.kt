@@ -1,6 +1,6 @@
 package nl.w8mr.jafun.compiler.ast2ir
 
-import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compileMethod

@@ -3,6 +3,10 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.Type.JFClass
+import nl.w8mr.jafun.Type.JFMethod
+import nl.w8mr.jafun.Type.JFPackage
+import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
@@ -223,6 +227,66 @@ class SimpleParserTest {
                 emptyList(),
             ),
             21,
+        )
+    }
+
+    @Test
+    fun `string interpolation text only`() {
+        testSingleParser(
+            ParserJafun.stringLiteral_term,
+            "\"abc\"",
+            ExpressionNode.StringLiteral("abc"),
+            5,
+        )
+    }
+
+    @Test
+    fun `string interpolation simple variable`() {
+        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
+        testSingleParser(
+            ParserJafun.stringLiteral_term,
+            "\"abc\$num\"",
+            ExpressionNode.StringTemplate(listOf(
+
+
+                ExpressionNode.StringLiteral("abc"),
+                ExpressionNode.Variable(numVar)
+            )),
+            9,
+        )
+    }
+
+    @Test
+    fun `string interpolation simple expression`() {
+        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
+        testSingleParser(
+            ParserJafun.stringLiteral_term,
+            "\"abc\${1}\"",
+            ExpressionNode.StringTemplate(listOf(
+                ExpressionNode.StringLiteral("abc"),
+                ExpressionNode.IntegerLiteral(1)
+            )),
+            9,
+        )
+    }
+
+    @Test
+    fun `string interpolation expression`() {
+        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
+        testSingleParser(
+            ParserJafun.stringLiteral_term,
+            "\"abc\${21 + 21}\"",
+            ExpressionNode.StringTemplate(listOf(
+                ExpressionNode.StringLiteral("abc"),
+                ExpressionNode.Invocation(
+                    JFMethod(listOf(
+                        JFVariableSymbol("param1", OperandType.SInt32, IdentifierCache),
+                        JFVariableSymbol("param2", OperandType.SInt32, IdentifierCache)),
+                        JFClass("IntKt", JFPackage("lang", JFPackage("jafun"))),
+                        "+",
+                        OperandType.SInt32, true, true, Associativity.INFIXL, 100), null, listOf(ExpressionNode.IntegerLiteral(21), ExpressionNode.IntegerLiteral(21)))
+            )),
+            15,
         )
     }
 

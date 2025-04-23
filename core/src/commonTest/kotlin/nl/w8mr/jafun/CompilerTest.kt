@@ -1,6 +1,6 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
-import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.MethodParent
@@ -617,6 +617,78 @@ class CompilerTest {
     }
 
     @Test
+    fun stringInterpolationSimple() {
+        test {
+            file {
+                code = "val num = 42\n" +
+                    "println(\"The answer to the ultimate question of Life, the Universe, and Everything is \$num.\")"
+                expectedOutput = "The answer to the ultimate question of Life, the Universe, and Everything is 42.\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(42)
+                        istore("num")
+                        `new`("java/lang/StringBuilder")
+                        dup()
+                        invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                        loadConstant("The answer to the ultimate question of Life, the Universe, and Everything is ")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        iload("num")
+                        invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        loadConstant(".")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun stringInterpolationExpression() {
+        test {
+            file {
+                code = "val num = 21\n" +
+                        "val num2 = 21\n" +
+                        "println(\"The answer to the ultimate question of Life, the Universe, and Everything is \${num + num2}.\")"
+                expectedOutput = "The answer to the ultimate question of Life, the Universe, and Everything is 42.\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(21)
+                        istore("num")
+                        loadConstant(21)
+                        istore("num2")
+                        `new`("java/lang/StringBuilder")
+                        dup()
+                        invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                        loadConstant("The answer to the ultimate question of Life, the Universe, and Everything is ")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        iload("num")
+                        iload("num2")
+                        invokeStatic("jafun/lang/IntKt" , "+", "(II)I")
+                        invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        loadConstant(".")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+
+    @Test
     fun simpleInfix() {
         test {
             file {
@@ -1124,7 +1196,7 @@ class CompilerTest {
         test {
             file {
                 code = """
-println 5 euro + 20 cent"""
+                    println 5 euro + 20 cent"""
                 expectedOutput = "520\n"
                 jvmIr {
                     name = "Script"
@@ -1160,7 +1232,7 @@ println 5 euro + 20 cent"""
         test {
             file {
                 code = """
-fun test() { }"""
+                    fun test() { }"""
                 phase2 {
                     +function(method("test", OperandType.Unit))
                 }
@@ -1188,7 +1260,7 @@ fun test() { }"""
         test {
             file {
                 code = """
-fun test() { println 2 }"""
+                    fun test() { println 2 }"""
                 phase2 {
                     +function(method("test", OperandType.Unit)) {
                         +invocation(println, i(2))
@@ -1220,9 +1292,9 @@ fun test() { println 2 }"""
         test {
             file {
                 code = """
-fun test() { println 2 }
-test
-test()"""
+                    fun test() { println 2 }
+                    test
+                    test()"""
                 expectedOutput = "2\n2\n"
                 jvmIr {
                     name = "Script"
@@ -1251,11 +1323,11 @@ test()"""
         test {
             file {
                 code = """
-fun test(a: Int) { 
-println 2 * a
-}
-test 2
-test(3)"""
+                    fun test(a: Int) { 
+                        println 2 * a
+                    }
+                    test 2
+                    test(3)"""
                 phase2 {
                     +function(method("test", OperandType.Unit, symbol("a", OperandType.SInt32))) {
                         +invocation(
@@ -1299,11 +1371,11 @@ test(3)"""
         test {
             file {
                 code = """
-fun test(prefix: String, a: Int) { 
-print prefix
-println a
-}
-test("test: ",5)"""
+                    fun test(prefix: String, a: Int) { 
+                        print prefix
+                        println a
+                    }
+                    test("test: ",5)"""
                 expectedOutput = "test: 5\n"
                 jvmIr {
                     name = "Script"
@@ -1336,15 +1408,15 @@ test("test: ",5)"""
         test {
             file {
                 code = """
-fun test(prefix: String, a: Int) { 
-print prefix
-println a
-}
-fun test2(prefix: String) {
-test(prefix, 10)
-}
-test("test: ", 5)
-test2 "test: """"
+                    fun test(prefix: String, a: Int) { 
+                        print prefix
+                        println a
+                    }
+                    fun test2(prefix: String) {
+                        test(prefix, 10)
+                    }
+                    test("test: ", 5)
+                    test2 "test: """"
                 expectedOutput = "test: 5\ntest: 10\n"
                 jvmIr {
                     name = "Script"
@@ -1387,18 +1459,18 @@ test2 "test: """"
         test {
             file {
                 code = """
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2"""
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2
+                    1+2"""
                 expectedOutput = ""
                 jvmIr {
                     name = "Script"
@@ -1424,20 +1496,19 @@ test2 "test: """"
         test {
             file {
                 code = """
-fun test() {
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-1+2
-}
-println test()
-"""
+                    fun test() {
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                        1+2
+                    }
+                    println test()"""
                 expectedOutput = "3\n"
                 jvmIr {
                     name = "Script"
@@ -1481,11 +1552,11 @@ println test()
         test {
             file {
                 code = """
-fun add2(a: Int) {
-a + 2
-}
-println add2 4
-println add2(6)"""
+                    fun add2(a: Int) {
+                        a + 2
+                    }
+                    println add2 4
+                    println add2(6)"""
                 phase2 {
                     +function(
                         method(
@@ -1555,7 +1626,7 @@ println add2(6)"""
         test {
             file {
                 code = """
-fun test() { fun inner() { println 1 + 2 } }"""
+                    fun test() { fun inner() { println 1 + 2 } }"""
                 phase2 {
                     +function(method("test", OperandType.Unit)) {
                         +function(method("inner", OperandType.Unit)) {
@@ -1599,11 +1670,11 @@ fun test() { fun inner() { println 1 + 2 } }"""
         test {
             file {
                 code = """
-fun prefixed(text: String) {
-join("PREFIXED:", text)
-}
-println prefixed "Test"
-println(prefixed("Test2"))"""
+                    fun prefixed(text: String) {
+                        join("PREFIXED:", text)
+                    }
+                    println prefixed "Test"
+                    println(prefixed("Test2"))"""
                 expectedOutput = "PREFIXED: Test\nPREFIXED: Test2\n"
                 jvmIr {
                     name = "Script"
@@ -1636,16 +1707,16 @@ println(prefixed("Test2"))"""
         test {
             file {
                 code = """
-val a = 2
-{
-val a = 4
-{
-val a = a
-println a
-}
-println a
-}
-println a"""
+                    val a = 2
+                    {
+                        val a = 4
+                        {
+                            val a = a
+                            println a
+                        }
+                        println a
+                    }
+                    println a"""
                 expectedOutput = "4\n4\n2\n"
                 jvmIr {
                     name = "Script"
@@ -1679,17 +1750,17 @@ println a"""
         test {
             file {
                 code = """
-println 0
-println 1
-println 2
-println 3
-println 4
-println 5
-println 6
-println 127
-println 128
-println 32767
-println 32768"""
+                    println 0
+                    println 1
+                    println 2
+                    println 3
+                    println 4
+                    println 5
+                    println 6
+                    println 127
+                    println 128
+                    println 32767
+                    println 32768"""
                 expectedOutput = "0\n1\n2\n3\n4\n5\n6\n127\n128\n32767\n32768\n"
                 jvmIr {
                     name = "Script"
@@ -1725,8 +1796,8 @@ println 32768"""
         test {
             file {
                 code = """
-val b = true
-println b"""
+                    val b = true
+                    println b"""
                 expectedOutput = "true\n"
                 jvmIr {
                     name = "Script"
@@ -1750,10 +1821,10 @@ println b"""
         test {
             file {
                 code = """
-when {
-1 == 1 -> "One"
-else -> "Else"
-}"""
+                    when {
+                        1 == 1 -> "One"
+                        else -> "Else"
+                    }"""
                 phase2 {
                     +`when`(
                         invocation(equals, i(1), i(1)) to s("One"),
@@ -1786,7 +1857,8 @@ else -> "Else"
     fun basicEquality() {
         test {
             file {
-                code = """1 == 1"""
+                code = """
+                    1 == 1""".trimIndent()
                 expectedOutput = ""
                 jvmIr {
                     name = "Script"
@@ -1808,7 +1880,8 @@ else -> "Else"
     fun basicEqualityChars() {
         test {
             file {
-                code = """'a' == 'a'"""
+                code = """
+                    'a' == 'a'""".trimIndent()
                 expectedOutput = ""
                 jvmIr {
                     name = "Script"
@@ -1831,13 +1904,13 @@ else -> "Else"
         test {
             file {
                 code = """
-val a = 2
-println when {
-a == 1 -> "One"
-a == 2 -> "Two"
-a == 3 -> "Three"
-else -> "More"
-}"""
+                    val a = 2
+                    println when {
+                        a == 1 -> "One"
+                        a == 2 -> "Two"
+                        a == 3 -> "Three"
+                        else -> "More"
+                    }"""
                 expectedOutput = "Two\n"
                 jvmIr {
                     name = "Script"
@@ -1878,13 +1951,13 @@ else -> "More"
         test {
             file {
                 code = """
-val a = 2
-println when (a) {
-1 -> "One"
-2 -> "Two"
-3 -> "Three"
-else -> "More"
-}"""
+                    val a = 2
+                    println when (a) {
+                        1 -> "One"
+                        2 -> "Two"
+                        3 -> "Three"
+                        else -> "More"
+                    }"""
                 expectedOutput = "Two\n"
                 jvmIr {
                     name = "Script"
@@ -1925,12 +1998,12 @@ else -> "More"
         test {
             file {
                 code = """
-println when (1+1) {
-1 -> "One"
-2 -> "Two"
-3 -> "Three"
-else -> "More"
-}"""
+                    println when (1+1) {
+                        1 -> "One"
+                        2 -> "Two"
+                        3 -> "Three"
+                        else -> "More"
+                    }"""
                 expectedOutput = "Two\n"
                 jvmIr {
                     name = "Script"
@@ -1973,12 +2046,12 @@ else -> "More"
         test {
             file {
                 code = """
-println when (val a = 1 + 1) {
-1 -> "One"
-2 -> "Two"
-3 -> "Three"
-else -> "More"
-}"""
+                    println when (val a = 1 + 1) {
+                        1 -> "One"
+                        2 -> "Two"
+                        3 -> "Three"
+                        else -> "More"
+                    }"""
                 phase2 {
                     +invocation(
                         println,
@@ -2036,13 +2109,13 @@ else -> "More"
         test {
             file {
                 code = """
-fun factorial(n: Int): Int {
-when (n) {
-0 -> 1
-else -> n * (factorial n - 1)
-}
-}
-println factorial 6"""
+                    fun factorial(n: Int): Int {
+                        when (n) {
+                            0 -> 1
+                            else -> n * (factorial n - 1)
+                        }
+                    }
+                    println factorial 6"""
                 expectedOutput = "720\n"
                 jvmIr {
                     name = "Script"
@@ -2082,14 +2155,14 @@ println factorial 6"""
         test {
             file {
                 code = """
-fun fibonacci(n: Int): Int {
-when (n) {
-0 -> 0
-1 -> 1
-else -> (fibonacci n - 1) + (fibonacci n - 2)
-}
-}
-println fibonacci 13"""
+                    fun fibonacci(n: Int): Int {
+                        when (n) {
+                            0 -> 0
+                            1 -> 1
+                            else -> (fibonacci n - 1) + (fibonacci n - 2)
+                        }
+                    }
+                    println fibonacci 13"""
                 expectedOutput = "233\n"
 
             }
@@ -2102,13 +2175,13 @@ println fibonacci 13"""
             file {
 
                 code = """
-fun fibonacci(n: Int): Int {
-when {
-n <= 1 -> n
-else -> fibonacci(n - 1) + fibonacci(n - 2)
-}
-}
-println fibonacci 13"""
+                    fun fibonacci(n: Int): Int {
+                        when {
+                            n <= 1 -> n
+                            else -> fibonacci(n - 1) + fibonacci(n - 2)
+                        }
+                    }
+                    println fibonacci 13"""
                 expectedOutput = "233\n"
 
             }
@@ -2120,11 +2193,11 @@ println fibonacci 13"""
         test {
             file {
                 code = """
-var i = 0
-while (i < 3) {
-println i
-i = i + 1
-}"""
+                    var i = 0
+                    while (i < 3) {
+                        println i
+                        i = i + 1
+                    }"""
 
                 expectedOutput = "0\n1\n2\n"
                 jvmIr {
@@ -2159,18 +2232,18 @@ i = i + 1
         test {
             file {
                 code = """
-var i = 1
-println "Start"
-while (i < 4) {
-var j = 1
-while (j < 4) {
-println i * j
-j = j + 1
-}
-i = i + 1
-}
-println "End"
-"""
+                    var i = 1
+                    println "Start"
+                    while (i < 4) {
+                        var j = 1
+                        while (j < 4) {
+                            println i * j
+                            j = j + 1
+                        }
+                        i = i + 1
+                    }
+                    println "End"
+                    """
                 expectedOutput = "Start\n1\n2\n3\n2\n4\n6\n3\n6\n9\nEnd\n"
                 jvmIr {
                     name = "Script"
@@ -2220,14 +2293,14 @@ println "End"
         test {
             file {
                 code = """
-val input = first(arguments)
-var i = 0
-val l = length(input)
-while (i < l) {
-val c = charAt(input, i)
-println c
-i = i + 1
-}"""
+                    val input = first(arguments)
+                    var i = 0
+                    val l = length(input)
+                    while (i < l) {
+                        val c = charAt(input, i)
+                        println c
+                        i = i + 1
+                    }"""
                 expectedOutput = "T\ne\ns\nt\n"
                 params("Test")
             }
@@ -2241,11 +2314,11 @@ i = i + 1
 
 
                 code = """
-val so = getSimpleObject5()
-println so
-val a = so.fetchA()
-println a
-"""
+                    val so = getSimpleObject5()
+                    println so
+                    val a = so.fetchA()
+                    println a
+                    """
                 expectedOutput = "SimpleObject(a=5)\n5\n"
             }
         }

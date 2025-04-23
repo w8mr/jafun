@@ -2,6 +2,8 @@ package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
+import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.compileJVM
 import nl.w8mr.jafun.debug.prettyPrint
 import nl.w8mr.parsek.Parser
 

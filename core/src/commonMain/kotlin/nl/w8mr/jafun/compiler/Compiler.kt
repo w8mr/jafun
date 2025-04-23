@@ -1,10 +1,10 @@
 package nl.w8mr.jafun.compiler
 
-import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.buildClass
+import nl.w8mr.jafun.compiler.ir2jvm.buildClass
 import nl.w8mr.jafun.compileMethod
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2

@@ -1,6 +1,6 @@
 package nl.w8mr.jafun.debug
 
-import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
@@ -191,6 +191,16 @@ private fun Indenter.print(element: Printable) {
             print(element.expression)
             -") as "
             +element.to
+        }
+        is ExpressionNode.StringTemplate -> {
+            +"StringTemplate("
+            element.expressions.forEachIndexed { index, expression ->
+                if (index > 0) {
+                    -"+ "
+                }
+                print(expression)
+            }
+            -")"
         }
         // Handle non-Expression GenericNode types if necessary, using default toString
         else -> TODO("Create printable implementation for ${element::class.simpleName}") // +"${element::class.simpleName}(...)" // Generic fallback

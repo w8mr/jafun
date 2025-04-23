@@ -1,5 +1,7 @@
-package nl.w8mr.jafun
+package nl.w8mr.jafun.compiler.ir2jvm
 
+import nl.w8mr.jafun.OperandType
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.replaceIllegalCharacters
 import nl.w8mr.kasmine.ClassBuilder
@@ -14,6 +16,23 @@ class JVMBackend {
                     is ExpressionNode.StringLiteral -> loadConstant(instruction.value)
                     is ExpressionNode.BooleanLiteral -> loadConstant(if (instruction.value) 1 else 0)
                     is ExpressionNode.CharLiteral -> loadConstant(instruction.value)
+                    is ExpressionNode.StringTemplate -> {
+                        when (instruction.expressions.size) {
+                            0 -> {}
+                            1 -> loadStringPart(instruction.expressions[0])
+                            else -> {
+                                new("java/lang/StringBuilder")
+                                dup()
+                                invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                                instruction.expressions.forEach {
+                                    loadStringPart(it)
+                                    invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                                }
+                                invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                            }
+                        }
+                    }
+
                     is ExpressionNode.Invocation -> {
                         when (instruction.field) {
                             is Type.JFField -> {
@@ -23,8 +42,10 @@ class JVMBackend {
                                     signature(instruction.field.type ?: error("Type is null")),
                                 )
                             }
+
                             is Type.JFVariableSymbol -> {
-                                val variableName = "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
+                                val variableName =
+                                    "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
                                 when (instruction.field.type) {
                                     is OperandType.SInt32 -> iload(variableName)
                                     is OperandType.StringType -> aload(variableName)
@@ -37,6 +58,7 @@ class JVMBackend {
                                 }
 
                             }
+
                             else -> {}
                         }
 
@@ -45,18 +67,29 @@ class JVMBackend {
                             val methodClassName = instruction.method.parentPath.replace('.', '/')
                             val methodSignature =
                                 "(${instruction.method.parameters.joinToString("") { signature(it.type) }})" +
-                                    signature(instruction.method.rtn)
+                                        signature(instruction.method.rtn)
                             when (instruction.field) {
-                                null -> invokeStatic(methodClassName, instruction.method.name.replaceIllegalCharacters(), methodSignature)
-                                else -> invokeVirtual(methodClassName, instruction.method.name.replaceIllegalCharacters(), methodSignature)
+                                null -> invokeStatic(
+                                    methodClassName,
+                                    instruction.method.name.replaceIllegalCharacters(),
+                                    methodSignature
+                                )
+
+                                else -> invokeVirtual(
+                                    methodClassName,
+                                    instruction.method.name.replaceIllegalCharacters(),
+                                    methodSignature
+                                )
                             }
                         }
-                        if ((asStatement) && (instruction.method.rtn!= OperandType.Unit)) pop()
+                        if ((asStatement) && (instruction.method.rtn != OperandType.Unit)) pop()
                     }
+
                     is ExpressionNode.ValAssignment -> {
                         compile(instruction.expression)
                         if (!asStatement) dup()
-                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                        val variableName =
+                            "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
                         when (instruction.expression.type()) {
                             is OperandType.SInt32 -> istore(variableName)
                             is OperandType.StringType -> astore(variableName)
@@ -68,10 +101,12 @@ class JVMBackend {
                             is Type.JFClass -> astore(variableName)
                         }
                     }
+
                     is ExpressionNode.VarAssignment -> {
                         compile(instruction.expression)
                         if (!asStatement) dup()
-                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                        val variableName =
+                            "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
                         when (instruction.expression.type()) {
                             is OperandType.SInt32 -> istore(variableName)
                             is OperandType.StringType -> astore(variableName)
@@ -83,19 +118,11 @@ class JVMBackend {
                             is Type.JFClass -> astore(variableName)
                         }
                     }
+
                     is ExpressionNode.Variable -> {
-                        val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-                        when (instruction.variableSymbol.type) {
-                            is OperandType.SInt32 -> iload(variableName)
-                            is OperandType.StringType -> aload(variableName)
-                            is OperandType.UInt1 -> iload(variableName)
-                            is OperandType.CharType -> iload(variableName)
-                            is OperandType.Array -> aload(variableName)
-                            is OperandType.Generic -> TODO()
-                            is OperandType.Unit -> TODO()
-                            is Type.JFClass -> aload(variableName)
-                        }
+                        loadVariable(instruction)
                     }
+
                     is ExpressionNode.WhenPhase3 -> {
                         val after = createTarget()
                         instruction.matches.forEach { match ->
@@ -103,6 +130,7 @@ class JVMBackend {
                                 ExpressionNode.BooleanLiteral(true) -> {
                                     compile(match.second, asStatement)
                                 }
+
                                 else -> {
                                     compile(match.first)
                                     val next = createTarget()
@@ -115,14 +143,16 @@ class JVMBackend {
                         }
                         insertInstructionBlock(after)
                     }
+
                     is ExpressionNode.ExpressionList -> {
-                        
+
                         val lastIndex = instruction.expressions.size - 1
                         instruction.expressions.forEachIndexed { index, it ->
                             compile(it, asStatement || (index != lastIndex))
                         }
 
                     }
+
                     is ExpressionNode.DoWhile -> {
                         val body = createTarget()
                         insertInstructionBlock(body)
@@ -141,64 +171,122 @@ class JVMBackend {
                         goto(body)
                         insertInstructionBlock(after)
                     }
+
                     is ExpressionNode.Convert -> {
                         compile(instruction.expression)
-                        when (instruction.from) {
-                            is OperandType.SInt32 -> {
-                                when (instruction.to) {
-                                    is Type.JFClass -> {
-                                        invokeStatic(
-                                            "java/lang/Integer",
-                                            "valueOf",
-                                            "(I)Ljava/lang/Integer;"
-                                        )
-                                    }
-                                    else -> TODO("Conversion not defined for SInt32 -> ${instruction.to}")
-                                }
-                            }
-                            is OperandType.UInt1 -> {
-                                when (instruction.to) {
-                                    is Type.JFClass -> {
-                                        invokeStatic(
-                                            "java/lang/Boolean",
-                                            "valueOf",
-                                            "(Z)Ljava/lang/Boolean;"
-                                        )
-                                    }
-                                    else -> TODO("Conversion not defined for UInt1 -> ${instruction.to}")
-                                }
-                            }
-                            is OperandType.CharType -> {
-                                when (instruction.to) {
-                                    is Type.JFClass -> {
-                                        invokeStatic(
-                                            "java/lang/Character",
-                                            "valueOf",
-                                            "(C)Ljava/lang/Character;"
-                                        )
-                                    }
-                                    else -> TODO("Conversion not defined for CharType -> ${instruction.to}")
-                                }
-                            }
-                            is Type.JFClass -> {
-                                when (instruction.to) {
-                                    is Type.JFClass -> {
-                                        when {
-                                            instruction.to.path == "java.lang.Object" -> {}
-                                            instruction.from.path == instruction.to.path -> {}
-                                            else -> TODO("Conversion not defined for ${instruction.from.path} -> ${instruction.to.path}")
-                                        }
-                                    }
-                                    else -> TODO("Conversion not defined for ${instruction.from.path} -> ${instruction.to}")
-                                }
-                            }
-                            else -> TODO("Conversion not defined for ${instruction.from} -> ${instruction.to}")
-
-                        }
+                        conversion(instruction.from, instruction.to)
                     }
+
                     else -> TODO()
                 }
             }
+
+        private fun ClassBuilder.MethodDSL.DSL.conversion(
+            from: OperandType<*>,
+            to: OperandType<*>
+        ) {
+            when (from) {
+                is OperandType.SInt32 -> {
+                    when (to) {
+                        is OperandType.StringType -> {
+                            invokeStatic(
+                                "java/lang/String",
+                                "valueOf",
+                                "(I)Ljava/lang/String;"
+                            )
+                        }
+
+                        is Type.JFClass -> {
+                            invokeStatic(
+                                "java/lang/Integer",
+                                "valueOf",
+                                "(I)Ljava/lang/Integer;"
+                            )
+                        }
+
+                        else -> TODO("Conversion not defined for SInt32 -> $to")
+                    }
+                }
+
+                is OperandType.UInt1 -> {
+                    when (to) {
+                        is Type.JFClass -> {
+                            invokeStatic(
+                                "java/lang/Boolean",
+                                "valueOf",
+                                "(Z)Ljava/lang/Boolean;"
+                            )
+                        }
+
+                        else -> TODO("Conversion not defined for UInt1 -> $to")
+                    }
+                }
+
+                is OperandType.CharType -> {
+                    when (to) {
+                        is Type.JFClass -> {
+                            invokeStatic(
+                                "java/lang/Character",
+                                "valueOf",
+                                "(C)Ljava/lang/Character;"
+                            )
+                        }
+
+                        else -> TODO("Conversion not defined for CharType -> ${to}")
+                    }
+                }
+
+                is Type.JFClass -> {
+                    when (to) {
+                        is Type.JFClass -> {
+                            when {
+                                to.path == "java.lang.Object" -> {}
+                                from.path == to.path -> {}
+                                else -> TODO("Conversion not defined for ${from.path} -> ${to.path}")
+                            }
+                        }
+
+                        else -> TODO("Conversion not defined for ${from.path} -> ${to}")
+                    }
+                }
+
+                else -> TODO("Conversion not defined for ${from} -> ${to}")
+
+            }
+        }
+
+        fun ClassBuilder.MethodDSL.DSL.loadVariable(instruction: ExpressionNode.Variable) {
+            val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+            when (instruction.variableSymbol.type) {
+                is OperandType.SInt32 -> iload(variableName)
+                is OperandType.StringType -> aload(variableName)
+                is OperandType.UInt1 -> iload(variableName)
+                is OperandType.CharType -> iload(variableName)
+                is OperandType.Array -> aload(variableName)
+                is OperandType.Generic -> TODO()
+                is OperandType.Unit -> TODO()
+                is Type.JFClass -> aload(variableName)
+            }
+        }
+
+        fun ClassBuilder.MethodDSL.DSL.loadStringPart(expression: ExpressionNode.Phase2Expression) {
+            when (expression) {
+                is ExpressionNode.StringLiteral -> loadConstant(expression.value)
+                is ExpressionNode.Variable -> {
+                    when (expression.variableSymbol.type) {
+                        is OperandType.StringType -> loadVariable(expression)
+                        else -> {
+                            loadVariable(expression)
+                            conversion(expression.variableSymbol.type, OperandType.StringType)
+                        }
+                    }
+                }
+                else -> {
+                    compile(expression)
+                    conversion(expression.type(), OperandType.StringType)
+                }
+            }
+        }
     }
 }
 

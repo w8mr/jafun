@@ -55,12 +55,6 @@ object ParserJafun {
     val lParenTerm = '(' and owsnl
     val rParenTerm = ')' and ows
 
-    // TODO: Escape characters
-    val lineStringContent =
-        zeroOrMore(char(" is not valid string Char") { it != '"' && it != '\\' })
-    val stringLiteral_term = ('"' and lineStringContent and '"').map(ExpressionNode::StringLiteral)
-    // TODO: Multiline string
-
     val charLiteral_term =
         ('\'' and char(" is not valid string Char") { it != '\'' && it != '\\' } and '\'').map { ExpressionNode.CharLiteral(it[0]) }
 
@@ -153,6 +147,17 @@ object ParserJafun {
     val expressionUntilArrow = prattParser(stopTerm = whenArrow)
     val expressionUntilRightParen = prattParser(stopTerm = rParenTerm)
     val expressionUntilComma = prattParser(stopTerm = literal(','))
+
+    val simpleStringExpression = "$" and normalIdentifier map { (symbolMap.findSingleOrNull(it.value) as? JFVariableSymbol)?.let { ExpressionNode.Variable(it) } ?: error("No variable found") }
+    val complexStringExpression = "\${" and expressionUntilRightParen and "}"
+    val stringLiteral = oneOrMore(char(" is not valid string Char") { it != '"' && it != '\\' && it != '$'}).map(ExpressionNode::StringLiteral)
+
+    // TODO: Escape characters
+//    val lineStringContent = stringLiteral or
+//            (zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression) map { ExpressionNode.StringTemplate(it) })
+    val stringLiteral_term = ('"' and ((stringLiteral and '"') or ((zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression) map { ExpressionNode.StringTemplate(it) }) and '"') ))
+    // TODO: Multiline string
+
 
     val betweenParentheses = lParenTerm and expressionUntilNewline and rParenTerm
 

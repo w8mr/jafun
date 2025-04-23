@@ -10,6 +10,10 @@ sealed interface ExpressionNode: Printable {
         override fun type() = OperandType.StringType
     }
 
+    data class StringTemplate(val expressions: List<Phase2Expression>) : Phase2Expression {
+        override fun type() = OperandType.StringType
+    }
+
     data class CharLiteral(val value: Char) : Phase2Expression {
         override fun type() = OperandType.CharType
     }

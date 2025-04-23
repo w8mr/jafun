@@ -1,5 +1,6 @@
-package nl.w8mr.jafun
+package nl.w8mr.jafun.compiler.ir2jvm
 
+import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.debug.Printable
 
