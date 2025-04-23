@@ -1,11 +1,23 @@
 package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.IRBuilder
+import nl.w8mr.jafun.OperandType
+import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.Type.MethodParent
+import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.Compiler
+import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.ExpressionNode.IntegerLiteral
+import nl.w8mr.jafun.compiler.ExpressionNode.StringLiteral
+import nl.w8mr.jafun.compiler.ExpressionNode.ValAssignment
+import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.debug.prettyPrint
+import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.ClassBuilder
+import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.kasmine.classBuilder
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -41,6 +53,7 @@ class CompilerTest {
             var code: String? = null
             var bytecode: ByteArray? = null
             var mainParams: Array<String>? = null
+            var phase2Expected: List<ExpressionNode.Phase2Expression>? = null
             var expectedOutput: String? = null
         }
 
@@ -51,19 +64,34 @@ class CompilerTest {
 
             val compiler = Compiler()
 
-            val phase2Plugin = registerPhase2Plugin(compiler)
-            val phase3Plugin = registerPhase3Plugin(compiler)
-
+            val phase2Plugin = compiler.registerPlugin(Phase2, Phase2Plugin())
+            val phase3Plugin = compiler.registerPlugin(Phase3, Phase3Plugin())
+            val jvmirPlugin = compiler.registerPlugin(JVMIR, JVMIRPlugin())
 
             for ((path, file) in files) {
                 val className = "Script"
                 val methodName = "main"
                 val actualBytes = compiler.compile(file.code ?: error("No code set for $path"), className, methodName)
 
-                println("CAPTURED: ${listOf(phase2Plugin.phase2, phase3Plugin.phase3)}")
+                if (file.phase2Expected != null) {
+                    if (file.phase2Expected != phase2Plugin.phase2) {
+                        assertEquals(file.phase2Expected?.map { it.prettyPrint() }, phase2Plugin.phase2?.map { it.prettyPrint() })
+                    } else {
+                        println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
+
+                    }
+                }
+                println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
+                println("IR:\n ${jvmirPlugin.jvmir?.print()}")
 
                 writeFile(className, actualBytes)
-                val result = runAndAssertOutput(actualBytes, className, methodName, file.mainParams, file.expectedOutput ?: TODO("Handle no expected case"))
+                val result = runAndAssertOutput(
+                    actualBytes,
+                    className,
+                    methodName,
+                    file.mainParams,
+                    file.expectedOutput ?: TODO("Handle no expected case")
+                )
 
                 val expectedBytes = file.bytecode
                 if (expectedBytes != null) {
@@ -81,7 +109,7 @@ class CompilerTest {
             fun file(path: String = "Script", block: TestFileDSL.() -> Unit)
         }
 
-        class TestDSLImpl(val files : MutableMap<String, TestContext>): TestDSL {
+        class TestDSLImpl(val files: MutableMap<String, TestContext>) : TestDSL {
             override fun file(path: String, block: TestFileDSL.() -> Unit) {
                 val context = TestContext()
                 val runner = TestFileDSLImpl(context)
@@ -90,18 +118,148 @@ class CompilerTest {
             }
 
         }
+
         interface TestFileDSL {
-            var code : String?
+            var code: String?
             var expectedOutput: String?
+            fun params(vararg params: String)
+
             fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit)
+            fun phase2(block: Phase2Builder.() -> Unit)
 
         }
-        class TestFileDSLImpl(val context: TestContext): TestFileDSL {
+
+        class TestFileDSLImpl(val context: TestContext) : TestFileDSL {
             override var code by context::code
             override var expectedOutput by context::expectedOutput
+            override fun params(vararg params: String) {
+                context.mainParams = params.toList().toTypedArray()
+            }
             override fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
                 context.bytecode = classBuilder(block).write()
             }
+
+            override fun phase2(block: Phase2Builder.() -> Unit) {
+                context.phase2Expected = Phase2Builder().apply(block).expressionsList
+            }
+        }
+
+        class Phase2Builder {
+            val expressionsList: MutableList<ExpressionNode.Phase2Expression> = mutableListOf()
+            val objectType = Type.JFClass("java.lang.Object")
+
+            val join =
+                method(
+                    "join",
+                    OperandType.StringType,
+                    OperandType.StringType,
+                    OperandType.StringType,
+                    parent = IdentifierCache.findClass("jafun.test.TestKt"),
+                    operator = false,
+                )
+
+            val println =
+                method(
+                    "println",
+                    OperandType.Unit,
+                    objectType,
+                    parent = IdentifierCache.findClass("jafun.io.ConsoleKt"),
+                    operator = false,
+                )
+
+            val plus =
+                method(
+                    "+",
+                    OperandType.SInt32,
+                    OperandType.SInt32,
+                    OperandType.SInt32,
+                    associativity = Associativity.INFIXL,
+                    precedence = 100,
+                    parent = IdentifierCache.findClass("jafun.lang.IntKt"),
+                    operator = true,
+                )
+
+            val equals =
+                method(
+                    "==",
+                    OperandType.UInt1,
+                    OperandType.SInt32,
+                    OperandType.SInt32,
+                    associativity = Associativity.INFIXL,
+                    precedence = 40,
+                    parent = IdentifierCache.findClass("jafun.lang.IntKt"),
+                    operator = true,
+                )
+
+            fun method(
+                name: String,
+                returnType: OperandType<*>,
+                vararg parameters: Type.JFVariableSymbol,
+                static: Boolean = true,
+                associativity: Associativity = Associativity.PREFIX,
+                precedence: Int = 10,
+                parent: MethodParent = Type.JFClass("Script"),
+            ) = Type.JFMethod(
+                parameters.toList(),
+                parent,
+                name,
+                returnType,
+                static,
+                associativity = associativity,
+                precedence = precedence,
+            )
+
+            fun method(
+                name: String,
+                returnType: OperandType<*>,
+                vararg parameters: OperandType<*>,
+                static: Boolean = true,
+                associativity: Associativity = Associativity.PREFIX,
+                precedence: Int = 10,
+                parent: MethodParent = Type.JFClass("Script"),
+                operator: Boolean = false,
+            ) = Type.JFMethod(
+                parameters.toList().mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
+                parent,
+                name,
+                returnType,
+                static,
+                operator,
+                associativity,
+                precedence,
+            )
+
+            fun i(integer: Int) = IntegerLiteral(integer)
+
+            fun s(string: String) = StringLiteral(string)
+
+            fun invocation(
+                method: Type.JFMethod,
+                field: Type.JFField?,
+                vararg parameters: ExpressionNode.Phase2_3Expression,
+            ) {
+                expressionsList.add(
+                    ExpressionNode.Invocation(method, field, parameters.toList(),)
+                )
+            }
+
+            fun function(
+                method: Type.JFMethod,
+                vararg expressions: ExpressionNode.Phase2_3Expression,
+            ) {
+                expressionsList.add(
+                    ExpressionNode.Function(method, expressions.toList())
+                )
+            }
+
+            fun valAssignment(
+                variable: Type.JFVariableSymbol,
+                expression: ExpressionNode.Phase2_3Expression,
+            ) {
+                expressionsList.add(ValAssignment(variable, expression))
+            }
+            fun symbol(name: String, type: OperandType<*>) = Type.JFVariableSymbol(name, type, IdentifierCache)
+            fun variable(symbol: Type.JFVariableSymbol) = ExpressionNode.Variable(symbol)
         }
 
 
@@ -113,14 +271,18 @@ class CompilerTest {
         ) {
             val compiler = Compiler()
 
-            val phase2Plugin = registerPhase2Plugin(compiler)
-            val phase3Plugin = registerPhase3Plugin(compiler)
+            var tmp: IRBuilder.ClassContext? = null
+            val phase2Plugin = compiler.registerPlugin(Phase2, Phase2Plugin())
+            val phase3Plugin = compiler.registerPlugin(Phase3, Phase3Plugin())
+            val jvmirPlugin = compiler.registerPlugin(JVMIR, JVMIRPlugin())
 
             val className = "Script"
             val methodName = "main"
             val actualBytes = compiler.compile(code, className, methodName)
 
-            println("CAPTURED: ${listOf(phase2Plugin.phase2, phase3Plugin.phase3)}")
+            println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
+            println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
+            println("IR:\n ${jvmirPlugin.jvmir?.print()}")
 
             writeFile(className, actualBytes)
             val result = runAndAssertOutput(actualBytes, className, methodName, params, expectedOutput)
@@ -140,8 +302,6 @@ class CompilerTest {
                 return input
             }
         }
-        private fun registerPhase2Plugin(compiler: Compiler) =
-            Phase2Plugin(). apply { compiler.registerPlugin(Phase2, this) }
 
         data class Phase3Plugin(var phase3: IRBuilder.ClassContext? = null) : Compiler.Phase3Plugin {
             override fun handle(input: IRBuilder.ClassContext): IRBuilder.ClassContext {
@@ -149,24 +309,61 @@ class CompilerTest {
                 return input
             }
         }
-        private fun registerPhase3Plugin(compiler: Compiler) =
-            Phase3Plugin().apply { compiler.registerPlugin(Phase3, this) }
+
+        data class JVMIRPlugin(var jvmir: ClassDef? = null) : Compiler.JVMIRPlugin {
+            override fun handle(input: ClassDef): ClassDef {
+                jvmir = input
+                return input
+            }
+        }
     }
 
     @Test
     fun helloWorldParens() {
-        test(
-            """
-                println("Hello World")""",
-            "Hello World\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant("Hello World")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        test{
+            file {
+
+                code = """
+                    println("Hello World")"""
+                phase2 {
+                    invocation(println, null, s("Hello World"))
+                }
+                expectedOutput = "Hello World\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant("Hello World")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun helloWorldNoParens() {
+        test{
+            file {
+
+                code = """
+                    println "Hello World""""
+                phase2 {
+                    invocation(println, null, s("Hello World"))
+                }
+                expectedOutput = "Hello World\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant("Hello World")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
             }
         }
     }
@@ -408,6 +605,10 @@ class CompilerTest {
                 code = """
                     val str1 = "Hello World"
                     println str1"""
+                phase2 {
+                    valAssignment(symbol("str1", OperandType.StringType), s("Hello World"))
+                    invocation(println, null, variable(symbol("str1", OperandType.StringType)))
+                }
                 expectedOutput = "Hello World\n"
                 jvmIr {
                     name = "Script"
@@ -462,22 +663,29 @@ class CompilerTest {
 
     @Test
     fun integer() {
-        test(
-            """
-            val i = 128
-            println i""",
-            "128\n",
-        ) {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                loadConstant(128)
-                istore("i")
-                iload("i")
-                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                `return`()
+        test {
+            file {
+                code = """
+                    val i = 128
+                    println i"""
+                phase2 {
+                    valAssignment(symbol("i", OperandType.SInt32), i(128))
+                    invocation(println, null, variable(symbol("i", OperandType.SInt32)))
+                }
+                expectedOutput = "128\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(128)
+                        istore("i")
+                        iload("i")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
             }
         }
     }
@@ -1644,21 +1852,21 @@ class CompilerTest {
 
     @Test
     fun whileWithInput() {
-        test(
-            """
-            val input = first(arguments)
-            var i = 0
-            val l = length(input)
-            while (i < l) {
-                val c = charAt(input, i)
-                println c
-                i = i + 1
+        test {
+            file {
+                code = """
+                    val input = first(arguments)
+                    var i = 0
+                    val l = length(input)
+                    while (i < l) {
+                        val c = charAt(input, i)
+                        println c
+                        i = i + 1
+                    }"""
+                expectedOutput = "T\ne\ns\nt\n"
+                params("Test")
             }
-            
-        """,
-            "T\ne\ns\nt\n",
-            arrayOf("Test"),
-        )
+        }
     }
 
     @Test

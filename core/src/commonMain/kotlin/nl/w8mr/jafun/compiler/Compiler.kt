@@ -9,11 +9,11 @@ import nl.w8mr.jafun.compileMethod
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
-import nl.w8mr.jafun.debug.prettyPrint
-import nl.w8mr.jafun.debug.print
+import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
+import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.parsek.Parser
 
-class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>> = mutableMapOf<PluginType<*,*>, List<Plugin<*>>>()) {
+class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plugin<*>>> = mutableMapOf<PluginType<*,*>, MutableList<Plugin<*>>>()) {
     interface Plugin<A> {
         fun handle(input: A): A
     }
@@ -21,14 +21,19 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>
     interface Phase2Plugin : Plugin<List<ExpressionNode.Phase2Expression>>
     interface Phase3Plugin : Plugin<IRBuilder.ClassContext>
     interface JVMPlugin : Plugin<ByteArray>
+    interface JVMIRPlugin : Plugin<ClassDef>
 
     sealed interface PluginType<T, Plugin> {
         object Phase2 : PluginType<List<ExpressionNode.Phase2Expression>, Phase2Plugin>
         object Phase3 : PluginType<IRBuilder.ClassContext, Phase3Plugin>
+        object JVMIR : PluginType<ClassDef, JVMIRPlugin>
         object JVM : PluginType<ByteArray, JVMPlugin>
     }
 
-    fun <T, P: Plugin<T>> registerPlugin(type: PluginType<T, P>, plugin: P) = plugins.getOrPut(type) { listOf(plugin) }
+    fun <T, P: Plugin<T>> registerPlugin(type: PluginType<T, in P>, plugin: P): P {
+        plugins.getOrPut(type) { mutableListOf() }.add(plugin)
+        return plugin
+    }
 
     private fun <T, P: Plugin<T>> getPlugins(type: PluginType<T, P>) : List<P>? = plugins.get(type) as List<P>?
 
@@ -45,26 +50,18 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>
 
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
-                println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
-                println()
-                val updatedParsed = Phase2.run(parsed)
+                val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
                 val classContext = ast2ir(className, updatedParsed, methodName)
                 val updatedContext = Phase3.run(classContext)
 
-                val actualBytes = ir2jvmByteCode(className, updatedContext)
-                val updatedBytes = JVM.run(actualBytes)
+                val clazz = buildClass(className, updatedContext)
+                clazz.classDef = JVMIR.run(clazz.classDef)
 
-                updatedBytes
+                val actualBytes = clazz.write()
+                JVM.run(actualBytes)
             }
         }
-    }
-
-    private fun ir2jvmByteCode(className: String, classContext: IRBuilder.ClassContext): ByteArray {
-        val clazz = buildClass(className, classContext)
-        println("Bytecode: \n${clazz.classDef.print()}")
-        val actualBytes = clazz.write()
-        return actualBytes
     }
 
     private fun ast2ir(
@@ -100,7 +97,6 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, List<Plugin<*>>
                 }
             }
 
-        println("IR: \n${builder.classes[className]?.prettyPrint()}")
         val classContext = builder.classes[className] ?: error("Class not found: $className")
         return classContext
     }

@@ -7,11 +7,12 @@
 - else &#x2611;
 - input values &#x2611;
 - method on input values &#x2611;
-- pattern matching
 
 ## Parser
 - 2 phase: Structure / code
 - Merge lexer and parser  &#x2611;
+- String interpolation
+- pattern matching
 - imports / exports
 
 ## Debug
@@ -31,7 +32,7 @@
 - Scope node (check if needed)
 
 ## Testing
-- Create better dsl for testing separate outputs (ast, ir, bytecode, output (print), output function)
+- Create better dsl for testing separate outputs (ast, ir, bytecode, output (print), output function) &#x2611;
 - Merge AST tests
 - Create more AoC tests
 
@@ -60,6 +61,8 @@
 ## Kasmine
 - Remove hardcoded path &#x2611;
 - Publish as library &#x2611;
+- StackMapTable
+- 
 
 ## Prelude
 

@@ -20,30 +20,6 @@ import kotlin.test.assertEquals
 
 class AstParserTest {
     @Test
-    fun helloWorldParser() {
-        test(
-            "println \"Hello World\"",
-            invocation(println, null, s("Hello World")),
-        )
-    }
-
-    @Test
-    fun integerParser() {
-        test(
-            "println 7",
-            invocation(println, null, i(7)),
-        )
-    }
-
-    @Test
-    fun helloWorldNormalParser() {
-        test(
-            "println(\"Hello World\")",
-            invocation(println, null, s("Hello World")),
-        )
-    }
-
-    @Test
     fun helloWorldTwoLevelParser() {
         test(
             """println(join("Hello","World"))""",
@@ -67,7 +43,7 @@ class AstParserTest {
                 method(
                     "println",
                     OperandType.Unit,
-                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    OperandType.StringType,
                     parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
@@ -85,7 +61,7 @@ class AstParserTest {
                 method(
                     "println",
                     OperandType.Unit,
-                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    OperandType.StringType,
                     parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
@@ -103,33 +79,13 @@ class AstParserTest {
                 method(
                     "println",
                     OperandType.Unit,
-                    Type.JFVariableSymbol("param1", OperandType.StringType, IdentifierCache),
+                    OperandType.StringType,
                     parent = IdentifierCache.findClass("java.io.PrintStream"),
                     static = false,
                 ),
                 Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
                 s("Hello World"),
             ),
-        )
-    }
-
-    @Test
-    fun `Assignment with plus`() {
-        test(
-            """
-            |val num=1""",
-            ValAssignment(Type.JFVariableSymbol("num", OperandType.SInt32, IdentifierCache), i(1)),
-        )
-    }
-
-    @Test
-    fun assignment() {
-        test(
-            """
-            |val str = "Hello World"
-            |println str""",
-            ValAssignment(Type.JFVariableSymbol("str", OperandType.StringType, IdentifierCache), s("Hello World")),
-            invocation(println, null, Variable(Type.JFVariableSymbol("str", OperandType.StringType, IdentifierCache))),
         )
     }
 
@@ -274,7 +230,7 @@ class AstParserTest {
                 println("PARSED: \n${parsed!!.joinToString("\n") { it.prettyPrint() }}")
                 assertEquals(
                     ExpressionNode.ExpressionList(expressions.toList()).prettyPrint(),
-                    parsed?.let { ExpressionNode.ExpressionList(it).prettyPrint() },
+                    parsed.let { ExpressionNode.ExpressionList(it).prettyPrint() },
                 )
                 assertContentEquals(
                     expressions.toList(),
@@ -355,28 +311,9 @@ class AstParserTest {
         associativity: Associativity = Associativity.PREFIX,
         precedence: Int = 10,
         parent: MethodParent = Type.JFClass("Script"),
-        operator: Boolean,
+        operator: Boolean = false,
     ) = Type.JFMethod(
         parameters.toList().mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
-        parent,
-        name,
-        returnType,
-        static,
-        operator,
-        associativity,
-        precedence,
-    )
-
-    private fun method(
-        name: String,
-        returnType: OperandType<*>,
-        static: Boolean = true,
-        associativity: Associativity = Associativity.PREFIX,
-        precedence: Int = 10,
-        parent: MethodParent = Type.JFClass("Script"),
-        operator: Boolean,
-    ) = Type.JFMethod(
-        emptyList(),
         parent,
         name,
         returnType,
