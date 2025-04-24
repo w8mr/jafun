@@ -227,3 +227,6 @@ expect fun IdentifierCache.findInClass(
     jClassName: String,
     name: String,
 ): Type.JFMethod?
+
+expect fun findClassInPackage(name: String, parent: Type.JFPackage): List<TypeSymbol>
+

@@ -2,6 +2,7 @@ package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.TypeSymbol
 
 actual fun IdentifierCache.findInClass(
     jClassName: String,
@@ -256,3 +257,10 @@ actual fun IdentifierCache.findInClass(
         }
         else -> null
     }
+
+actual fun findClassInPackage(
+    name: String,
+    parent: Type.JFPackage
+): List<TypeSymbol> {
+    return emptyList<TypeSymbol>()
+}

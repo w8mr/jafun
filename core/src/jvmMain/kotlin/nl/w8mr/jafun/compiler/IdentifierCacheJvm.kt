@@ -2,6 +2,7 @@ package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.TypeSymbol
 import java.lang.reflect.AccessFlag
 
 actual fun IdentifierCache.findInClass(
@@ -35,5 +36,16 @@ actual fun IdentifierCache.findInClass(
             )
         method
     }
+}
+
+actual fun findClassInPackage(name: String, parent: Type.JFPackage): List<TypeSymbol> {
+    try {
+        val clazz = Class.forName("${parent.path}.${name}")
+        return listOf(Type.JFClass(name, parent))
+    } catch (e: ClassNotFoundException) {
+
+    }
+    return emptyList()
+
 }
 

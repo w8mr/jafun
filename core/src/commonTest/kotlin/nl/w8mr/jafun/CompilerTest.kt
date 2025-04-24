@@ -2323,4 +2323,18 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun simpleConstructor() {
+        test {
+            file {
+                code = """
+                    val p = jafun.test.POJO()
+                    println p
+                """.trimMargin()
+                expectedOutput = "SimpleObject(a=5)                  q\n"
+            }
+        }
+    }
 }
+
