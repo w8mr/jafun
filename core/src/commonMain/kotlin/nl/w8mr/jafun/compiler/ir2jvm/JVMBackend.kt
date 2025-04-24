@@ -88,35 +88,13 @@ class JVMBackend {
                     is ExpressionNode.ValAssignment -> {
                         compile(instruction.expression)
                         if (!asStatement) dup()
-                        val variableName =
-                            "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-                        when (instruction.expression.type()) {
-                            is OperandType.SInt32 -> istore(variableName)
-                            is OperandType.StringType -> astore(variableName)
-                            is OperandType.UInt1 -> istore(variableName)
-                            is OperandType.CharType -> istore(variableName)
-                            is OperandType.Array -> astore(variableName)
-                            is OperandType.Generic -> TODO()
-                            is OperandType.Unit -> TODO()
-                            is Type.JFClass -> astore(variableName)
-                        }
+                        storeVariable(instruction)
                     }
 
                     is ExpressionNode.VarAssignment -> {
                         compile(instruction.expression)
                         if (!asStatement) dup()
-                        val variableName =
-                            "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-                        when (instruction.expression.type()) {
-                            is OperandType.SInt32 -> istore(variableName)
-                            is OperandType.StringType -> astore(variableName)
-                            is OperandType.UInt1 -> istore(variableName)
-                            is OperandType.CharType -> istore(variableName)
-                            is OperandType.Array -> astore(variableName)
-                            is OperandType.Generic -> TODO()
-                            is OperandType.Unit -> TODO()
-                            is Type.JFClass -> astore(variableName)
-                        }
+                        storeVariable(instruction)
                     }
 
                     is ExpressionNode.Variable -> {
@@ -181,77 +159,48 @@ class JVMBackend {
                 }
             }
 
+        private fun ClassBuilder.MethodDSL.DSL.storeVariable(instruction: ExpressionNode.Assignment) {
+            val variableName =
+                "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+            when (instruction.expression.type()) {
+                is OperandType.SInt32 -> istore(variableName)
+                is OperandType.StringType -> astore(variableName)
+                is OperandType.UInt1 -> istore(variableName)
+                is OperandType.CharType -> istore(variableName)
+                is OperandType.Array -> astore(variableName)
+                is OperandType.Generic -> TODO()
+                is OperandType.Unit -> TODO()
+                is Type.JFClass -> astore(variableName)
+            }
+        }
+
         private fun ClassBuilder.MethodDSL.DSL.conversion(
             from: OperandType<*>,
             to: OperandType<*>
         ) {
             when (from) {
-                is OperandType.SInt32 -> {
-                    when (to) {
-                        is OperandType.StringType -> {
-                            invokeStatic(
-                                "java/lang/String",
-                                "valueOf",
-                                "(I)Ljava/lang/String;"
-                            )
-                        }
-
-                        is Type.JFClass -> {
-                            invokeStatic(
-                                "java/lang/Integer",
-                                "valueOf",
-                                "(I)Ljava/lang/Integer;"
-                            )
-                        }
-
-                        else -> TODO("Conversion not defined for SInt32 -> $to")
-                    }
+                is OperandType.SInt32 -> when (to) {
+                    is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
+                    is Type.JFClass -> invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                    else -> TODO("Conversion not defined for SInt32 -> $to")
                 }
-
-                is OperandType.UInt1 -> {
-                    when (to) {
-                        is Type.JFClass -> {
-                            invokeStatic(
-                                "java/lang/Boolean",
-                                "valueOf",
-                                "(Z)Ljava/lang/Boolean;"
-                            )
-                        }
-
-                        else -> TODO("Conversion not defined for UInt1 -> $to")
-                    }
+                is OperandType.UInt1 -> when (to) {
+                    is Type.JFClass -> invokeStatic("java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;")
+                    else -> TODO("Conversion not defined for UInt1 -> $to")
                 }
-
-                is OperandType.CharType -> {
-                    when (to) {
-                        is Type.JFClass -> {
-                            invokeStatic(
-                                "java/lang/Character",
-                                "valueOf",
-                                "(C)Ljava/lang/Character;"
-                            )
-                        }
-
-                        else -> TODO("Conversion not defined for CharType -> ${to}")
-                    }
+                is OperandType.CharType -> when (to) {
+                    is Type.JFClass -> invokeStatic("java/lang/Character", "valueOf", "(C)Ljava/lang/Character;")
+                    else -> TODO("Conversion not defined for CharType -> ${to}")
                 }
-
-                is Type.JFClass -> {
-                    when (to) {
-                        is Type.JFClass -> {
-                            when {
-                                to.path == "java.lang.Object" -> {}
-                                from.path == to.path -> {}
-                                else -> TODO("Conversion not defined for ${from.path} -> ${to.path}")
-                            }
-                        }
-
-                        else -> TODO("Conversion not defined for ${from.path} -> ${to}")
+                is Type.JFClass -> when (to) {
+                    is Type.JFClass -> when {
+                        to.path == "java.lang.Object" -> {}
+                        from.path == to.path -> {}
+                        else -> TODO("Conversion not defined for ${from.path} -> ${to.path}")
                     }
+                    else -> TODO("Conversion not defined for ${from.path} -> ${to}")
                 }
-
                 else -> TODO("Conversion not defined for ${from} -> ${to}")
-
             }
         }
 
@@ -272,15 +221,6 @@ class JVMBackend {
         fun ClassBuilder.MethodDSL.DSL.loadStringPart(expression: ExpressionNode.Phase2Expression) {
             when (expression) {
                 is ExpressionNode.StringLiteral -> loadConstant(expression.value)
-                is ExpressionNode.Variable -> {
-                    when (expression.variableSymbol.type) {
-                        is OperandType.StringType -> loadVariable(expression)
-                        else -> {
-                            loadVariable(expression)
-                            conversion(expression.variableSymbol.type, OperandType.StringType)
-                        }
-                    }
-                }
                 else -> {
                     compile(expression)
                     conversion(expression.type(), OperandType.StringType)

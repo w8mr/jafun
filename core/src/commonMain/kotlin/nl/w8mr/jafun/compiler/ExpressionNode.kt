@@ -60,11 +60,16 @@ sealed interface ExpressionNode: Printable {
         override fun type() = OperandType.Unit
     }
 
-    data class ValAssignment(val variableSymbol: Type.JFVariableSymbol, val expression: Phase2_3Expression) : Phase2Expression {
+    interface Assignment : Phase2Expression  {
+        val variableSymbol: Type.JFVariableSymbol
+        val expression: Phase2_3Expression
+    }
+
+    data class ValAssignment(override val variableSymbol: Type.JFVariableSymbol, override val expression: Phase2_3Expression) : Assignment {
         override fun type() = expression.type()
     }
 
-    data class VarAssignment(val variableSymbol: Type.JFVariableSymbol, val expression: Phase2_3Expression) : Phase2Expression {
+    data class VarAssignment(override val variableSymbol: Type.JFVariableSymbol, override val expression: Phase2_3Expression) : Assignment {
         override fun type() = expression.type()
     }
 
