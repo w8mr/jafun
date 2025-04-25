@@ -48,6 +48,13 @@ interface Type : TypeSymbol {
         val precedence: Int = 10,
     ) : Type, HasParent<MethodParent>
 
+    data class JFConstructor(
+        val parameters: List<JFVariableSymbol>,
+        override val parent: MethodParent,
+        override val name: String = "<init>",
+    ) : Type, HasParent<MethodParent>
+
+
     data class JFFieldMethod(
         val field: JFField,
         val method: JFMethod,

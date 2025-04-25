@@ -48,7 +48,7 @@ private fun createWhenConditionExpression(
     condition: ExpressionNode.Phase2_3Expression,
 ): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
-        val symbol = IdentifierCache.findMethod(null, "==", listOf(subjVar.type, condition.type()))
+        val symbol = IdentifierCache.findMethod(subjVar.type, "==", listOf(subjVar.type, condition.type()))
         ExpressionNode.Invocation(symbol, null, listOf(ExpressionNode.Variable(subjVar), condition))
     } ?: condition // If no subject variable, the condition is used directly
 }

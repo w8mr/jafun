@@ -33,6 +33,12 @@ class JVMBackend {
                         }
                     }
 
+                    is ExpressionNode.Constructor -> {
+                        val consSignature = "(${instruction.arguments.joinToString("")})V"
+                        new(instruction.type().path.replace('.', '/'))
+                        dup()
+                        invokeSpecial(instruction.type().path.replace('.', '/'), "<init>", consSignature)
+                    }
                     is ExpressionNode.Invocation -> {
                         when (instruction.field) {
                             is Type.JFField -> {

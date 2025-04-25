@@ -8,11 +8,11 @@ import nl.w8mr.jafun.compiler.IdentifierCache.addPackage
 
 interface SymbolMap {
     fun findMethod(
-        jfClass: Type.JFClass?,
+        typeSymbol: TypeSymbol?,
         methodName: String,
         parameterTypes: List<OperandType<*>>,
     ): Type.JFMethod {
-        val symbols = IdentifierCache.find(jfClass, methodName)
+        val symbols = IdentifierCache.find(typeSymbol, methodName)
         val symbol =
             symbols.filterIsInstance<Type.JFMethod>().singleOrNull { methodSymbol ->
                 methodSymbol.parameters.map { it.type } == parameterTypes
@@ -22,9 +22,13 @@ interface SymbolMap {
     }
 
     fun find(
+        type: TypeSymbol?
+    ): Set<TypeSymbol>
+
+    fun find(
         type: TypeSymbol?,
         path: String,
-    ): List<TypeSymbol>
+    ): Set<TypeSymbol>
 
     fun findSingle(
         type: TypeSymbol?,
@@ -49,7 +53,7 @@ interface SymbolMap {
     fun findFromPath(
         path: String,
         parent: Type? = null,
-    ): List<TypeSymbol> =
+    ): Set<TypeSymbol> =
         if (path.contains('.')) {
             findFromPath(
                 path.substringAfter('.'),
@@ -93,6 +97,19 @@ interface SymbolMap {
     fun incSymbolMapCount(): Int
 
     val symbolMapId: Int
+
+    fun addClassToSymbolMap(parent: TypeSymbol?, className: String) {
+        IdentifierCache.findMethodsInClass(className).forEach {
+            when (it.associativity) {
+                Associativity.PREFIX -> add(parent, it.name, it)
+                else -> add(it.parameters[0].type, it.name, it)
+            }
+        }
+        IdentifierCache.findConstructorsInClass(className).forEach {
+            add(parent, it.name, it)
+        }
+    }
+
 }
 
 fun String.replaceIllegalCharacters() =

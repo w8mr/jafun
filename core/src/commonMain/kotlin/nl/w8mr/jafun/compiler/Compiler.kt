@@ -111,3 +111,6 @@ annotation class FunctionAssociativity(val associativity: Associativity)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionPrecedence(val precedence: Int)
 
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class FunctionName(val name: String)

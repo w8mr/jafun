@@ -2,6 +2,7 @@ package jafun.test
 
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.FunctionAssociativity
+import nl.w8mr.jafun.compiler.FunctionName
 import nl.w8mr.jafun.compiler.FunctionPrecedence
 
 fun join(
@@ -28,6 +29,7 @@ fun cent(n: Int) = n
 // fun test() = 5
 
 @Suppress("ktlint:standard:function-naming")
+@FunctionName("<=>")
 fun `﹤=﹥`(n: Int) = 1
 
 data class SimpleObject(val a: Int) {

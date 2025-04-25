@@ -33,6 +33,10 @@ class SymbolMapManager {
 
     fun find(
         type: TypeSymbol?,
+    ) = currentSymbolMap.find(type)
+
+    fun find(
+        type: TypeSymbol?,
         path: String,
     ) = currentSymbolMap.find(type, path)
 
@@ -50,6 +54,8 @@ class SymbolMapManager {
         path: String,
         typeSig: Type,
     ) = currentSymbolMap.add(null, path, typeSig)
+
+    fun addClassToSymbolMap(parent: TypeSymbol? ,className: String) = currentSymbolMap.addClassToSymbolMap(parent, className)
 
     fun newVariableSymbol(
         name: String,

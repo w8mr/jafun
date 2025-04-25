@@ -79,6 +79,19 @@ private fun Indenter.print(element: Printable) {
             element.expressions.forEach { print(it) }
         }
 
+        is ExpressionNode.Constructor -> {
+            +"constructor ${element.cons.parent.path}("
+            if (element.arguments.isNotEmpty()) {
+                indent {
+                    element.arguments.forEachIndexed { index, arg ->
+                        print(arg) // Print the current arg
+                    }
+                }
+            }
+            +")" // Closing parenthesis
+        }
+
+
         is ExpressionNode.Invocation -> {
             -((element.field as? Type.JFField)?.name ?: "") // TODO Variable
             -(element.method.name)

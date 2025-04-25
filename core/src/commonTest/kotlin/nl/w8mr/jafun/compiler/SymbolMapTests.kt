@@ -17,17 +17,22 @@ class SymbolMapTests {
         // Mock parent SymbolMap
         val parentSymbolMap =
             object : SymbolMap {
-                private val data = mutableMapOf<TypeSymbol?, Map<String, List<TypeSymbol>>>()
+                private val data = mutableMapOf<TypeSymbol?, Map<String, Set<TypeSymbol>>>()
 
                 init {
                     add(null, "parentPath", OperandType.StringType)
                 }
 
                 override fun find(
+                    type: TypeSymbol?
+                ): Set<TypeSymbol> =
+                    data.getOrPut(type) { mutableMapOf() }.values.flatten().toSet()
+
+                override fun find(
                     type: TypeSymbol?,
                     path: String,
-                ): List<TypeSymbol> {
-                    return data[type]?.get(path) ?: emptyList()
+                ): Set<TypeSymbol> {
+                    return data[type]?.get(path) ?: emptySet()
                 }
 
                 override fun findOrAddClass(className: String, packageName: String, simpleName: String): Type.JFClass {
@@ -50,7 +55,7 @@ class SymbolMapTests {
                     path: String,
                     typeSig: TypeSymbol,
                 ) {
-                    data[type] = mapOf(path to listOf(typeSig))
+                    data[type] = mapOf(path to setOf(typeSig))
                 }
             }
 
@@ -62,13 +67,13 @@ class SymbolMapTests {
         val typeString = OperandType.StringType
         localSymbolMap.add(null, "testPath", typeString)
         assertTrue(localSymbolMap.contains(null, "testPath"))
-        assertEquals(listOf(typeString), localSymbolMap.find(null, "testPath"))
+        assertEquals(setOf(typeString), localSymbolMap.find(null, "testPath"))
     }
 
     @Test
     fun testFindFromParent() {
         val type = OperandType.StringType
-        assertEquals(listOf(type), localSymbolMap.find(null, "parentPath"))
+        assertEquals(setOf(type), localSymbolMap.find(null, "parentPath"))
     }
 
     @Test

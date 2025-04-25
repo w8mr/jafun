@@ -2,6 +2,7 @@ package jafun.lang
 
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.FunctionAssociativity
+import nl.w8mr.jafun.compiler.FunctionName
 import nl.w8mr.jafun.compiler.FunctionPrecedence
 
 @Suppress("ktlint:standard:function-naming")
@@ -15,6 +16,7 @@ fun `==`(
 @Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
+@FunctionName("<=")
 fun `﹤=`(
     a: Int,
     b: Int,
@@ -23,6 +25,7 @@ fun `﹤=`(
 @Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
+@FunctionName("<")
 fun `﹤`(
     a: Int,
     b: Int,
@@ -31,6 +34,7 @@ fun `﹤`(
 @Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
+@FunctionName(">")
 fun `﹥`(
     a: Int,
     b: Int,
@@ -39,6 +43,7 @@ fun `﹥`(
 @Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(50)
 @FunctionAssociativity(Associativity.INFIXL)
+@FunctionName(">=")
 fun `﹥=`(
     a: Int,
     b: Int,
@@ -71,6 +76,7 @@ fun `*`(
 @Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(110)
 @FunctionAssociativity(Associativity.INFIXL)
+@FunctionName("/")
 fun `∕`(
     a: Int,
     b: Int,

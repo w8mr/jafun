@@ -2332,7 +2332,7 @@ class CompilerTest {
                     val p = jafun.test.POJO()
                     println p
                 """.trimMargin()
-                expectedOutput = "SimpleObject(a=5)                  q\n"
+                expectedOutput = "POJO(a=5)\n"
             }
         }
     }

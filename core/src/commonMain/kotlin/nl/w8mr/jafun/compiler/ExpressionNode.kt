@@ -38,6 +38,14 @@ sealed interface ExpressionNode: Printable {
         override fun type() = method.rtn
     }
 
+    data class Constructor(
+        val cons: Type.JFConstructor,
+        val arguments: List<Phase2_3Expression>
+    ) : Phase2Expression {
+        override fun type() = (cons.parent as? Type.JFClass) ?: error("Constructor ${cons.parent} is not an instance of Type.JFClass")
+    }
+
+
     data class When(val subject: Phase2_3Expression?, val matches: List<Pair<Phase2_3Expression, Phase2_3Expression>>) : Phase2Expression {
         override fun type() = matches.firstOrNull()?.second?.type() ?: OperandType.Unit
         // Type is based on first branch? Or common type? Original used last. Let's use first non-null or Unit.

@@ -4,12 +4,17 @@ import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
 
 data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = IdentifierCache.incSymbolMapCount()) : SymbolMap {
-    private val identifierMap = mutableMapOf<TypeSymbol?, MutableMap<String, List<TypeSymbol>>>()
+    private val identifierMap = mutableMapOf<TypeSymbol?, MutableMap<String, MutableSet<TypeSymbol>>>()
+
+    override fun find(
+        type: TypeSymbol?
+    ): Set<TypeSymbol> =
+        identifierMap.getOrPut(type) { mutableMapOf() }.values.flatten().toSet() + parent.find(type)
 
     override fun find(
         type: TypeSymbol?,
         path: String,
-    ): List<TypeSymbol> = identifierMap[type]?.get(path) ?: parent.find(type, path)
+    ): Set<TypeSymbol> = identifierMap[type]?.get(path) ?: parent.find(type, path)
 
     override fun contains(
         type: TypeSymbol?,
@@ -23,8 +28,11 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
         path: String,
         typeSig: TypeSymbol,
     ) {
-        val typeMap = identifierMap.getOrPut(type) { mutableMapOf() }
-        typeMap[path] = listOf(typeSig)
+        identifierMap.getOrPut(type) {
+            mutableMapOf()
+        }.getOrPut(path) {
+            mutableSetOf()
+        }.add(typeSig)
     }
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()

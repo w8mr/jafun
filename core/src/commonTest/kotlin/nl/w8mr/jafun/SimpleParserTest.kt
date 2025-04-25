@@ -18,37 +18,6 @@ import kotlin.test.fail
 
 class SimpleParserTest {
     @Test
-    fun `Equality`() {
-        testSingleParser(
-            ParserJafun.complexIdentifier,
-            "==4",
-            listOf(
-                Type.JFMethod(
-                    listOf(Type.JFVariableSymbol("param1", OperandType.SInt32), Type.JFVariableSymbol("param2", OperandType.SInt32)),
-                    IdentifierCache.findClass("jafun.lang.IntKt"),
-                    "==",
-                    OperandType.UInt1,
-                    true,
-                    true,
-                    Associativity.INFIXL,
-                    40,
-                ),
-                Type.JFMethod(
-                    listOf(Type.JFVariableSymbol("param1", OperandType.CharType), Type.JFVariableSymbol("param2", OperandType.CharType)),
-                    IdentifierCache.findClass("jafun.lang.CharKt"),
-                    "==",
-                    OperandType.UInt1,
-                    true,
-                    true,
-                    Associativity.INFIXL,
-                    40,
-                ),
-            ),
-            2,
-        )
-    }
-
-    @Test
     fun `Spaceship`() {
         // TODO: should be operator (not sure if it matters)
         testSingleParser(

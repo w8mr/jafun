@@ -13,6 +13,7 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -43,8 +44,6 @@ import nl.w8mr.parsek.zeroOrMore
 import kotlin.math.E
 
 object ParserJafun {
-    val symbolMap = SymbolMapManager()
-
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.asLiteral()
     val ows = zeroOrMore(whitespace)
 
@@ -117,7 +116,12 @@ object ParserJafun {
                                 }
                             }
                             is Failure ->
-                                listOf(current) // TODO: check if we need to handle invoke
+                                when (current) {
+                                    is JFClass ->
+                                        symbolMap.find(current).toList().filterIsInstance<Type.JFConstructor>()
+                                    //TODO: Check for invoke methods
+                                    else -> listOf(current)
+                                }
                         }
                     }
                     is JFMethod -> listOf(current)
@@ -288,6 +292,9 @@ object ParserJafun {
             ExpressionNode.Function(symbolWithReturnType, block.expressions)
         }
 
+    val symbolMap = SymbolMapManager()
+
+
     fun prattParser(
         stopTerm: Parser<Char, *> = newline or ';',
         minPrecedence: Int = 0,
@@ -337,36 +344,45 @@ object ParserJafun {
         // TODO: Cache parsers
         combi {
             val symbols = complexIdentifier.bind()
-            symbols.map { symbol ->
-                when (symbol) {
-                    is JFVariableSymbol ->
-                        ExpressionNode.Variable(symbol)
-                    is JFMethod -> {
-                        val arguments =
-                            when (symbol.associativity) {
-                                PREFIX -> methodArguments(symbol, minPrecedence)
-                                else -> fail("Method does not have the right associativity")
-                            }
-                        methodInvocation(symbol, arguments)
+            symbols.mapNotNull { symbol ->
+                (combi {
+                    when (symbol) {
+                        is JFVariableSymbol ->
+                            ExpressionNode.Variable(symbol)
+
+                        is Type.JFConstructor -> {
+                            val arguments = methodArguments(symbol)
+                            constructorInvocation(symbol, arguments)
+                        }
+                        is JFMethod -> {
+                            val arguments =
+                                when (symbol.associativity) {
+                                    PREFIX -> methodArguments(symbol, minPrecedence)
+                                    else -> fail("Method does not have the right associativity")
+                                }
+                            methodInvocation(symbol, arguments)
+                        }
+
+                        is JFFieldMethod -> {
+                            val arguments =
+                                when (symbol.method.associativity) {
+                                    PREFIX -> methodArguments(symbol.method, minPrecedence)
+                                    else -> fail("Method does not have the right associativity")
+                                }
+                            methodInvocation(symbol.method, symbol.field, arguments)
+                        }
+
+                        is JFVariableMethod -> {
+                            val arguments =
+                                when (symbol.method.associativity) {
+                                    PREFIX -> methodArguments(symbol.method, minPrecedence)
+                                    else -> fail("Method does not have the right associativity")
+                                }
+                            methodInvocation(symbol.method, symbol.variable, arguments)
+                        } // TODO: remove duplication
+                        else -> fail("Method or variable not found")
                     }
-                    is JFFieldMethod -> {
-                        val arguments =
-                            when (symbol.method.associativity) {
-                                PREFIX -> methodArguments(symbol.method, minPrecedence)
-                                else -> fail("Method does not have the right associativity")
-                            }
-                        methodInvocation(symbol.method, symbol.field, arguments)
-                    }
-                    is JFVariableMethod -> {
-                        val arguments =
-                            when (symbol.method.associativity) {
-                                PREFIX -> methodArguments(symbol.method, minPrecedence)
-                                else -> fail("Method does not have the right associativity")
-                            }
-                        methodInvocation(symbol.method, symbol.variable, arguments)
-                    } // TODO: remove duplication
-                    else -> fail("Method or variable not found")
-                }
+                }.bindAsResult() as? Success)?.value
             }.singleOrNull() ?: fail("No single method found")
         }
 
@@ -411,6 +427,13 @@ object ParserJafun {
         }
 
     private fun CombinatorDSL<Char, ExpressionNode.Phase2Expression>.methodArguments(
+        method: Type.JFConstructor,
+        lhsExpression: ExpressionNode.Phase2Expression? = null,
+    ): List<ExpressionNode.Phase2Expression> {
+        val count = method.parameters.size - (if (lhsExpression == null) 0 else 1)
+        return methodArguments(count, 10, lhsExpression)
+    }
+    private fun CombinatorDSL<Char, ExpressionNode.Phase2Expression>.methodArguments(
         method: JFMethod,
         minPrecedence: Int,
         lhsExpression: ExpressionNode.Phase2Expression? = null,
@@ -421,33 +444,52 @@ object ParserJafun {
                 method.precedence > minPrecedence -> method.precedence - if (method.associativity == INFIXR) 1 else 0
                 else -> 0
             }
+        return methodArguments(count, newPrecedence, lhsExpression)
+    }
+
+    private fun CombinatorDSL<Char, ExpressionNode.Phase2Expression>.methodArguments(
+        count: Int,
+        newPrecedence: Int,
+        lhsExpression: ExpressionNode.Phase2Expression?
+    ): List<ExpressionNode.Phase2Expression> {
         val rhsArguments =
             (
-                ows and
-                    oneOf(
-                        lParenTerm and
-                            combi {
-                                when (count) {
-                                    0 -> emptyList()
-                                    1 -> listOf(expressionUntilComma.bind())
-                                    else ->
-                                        listOf(
-                                            expressionUntilComma.bind(),
-                                        ) + (commaTerm and expressionUntilComma).times(count - 1).bind()
-                                }
-                            } and rParenTerm,
-                        prattParser(minPrecedence = newPrecedence).times(count),
-                    )
-            ).bind()
+                    ows and
+                            oneOf(
+                                lParenTerm and
+                                        combi {
+                                            when (count) {
+                                                0 -> emptyList()
+                                                1 -> listOf(expressionUntilComma.bind())
+                                                else ->
+                                                    listOf(
+                                                        expressionUntilComma.bind(),
+                                                    ) + (commaTerm and expressionUntilComma).times(count - 1).bind()
+                                            }
+                                        } and rParenTerm,
+                                prattParser(minPrecedence = newPrecedence).times(count),
+                            )
+                    ).bind()
         return lhsExpression.asList() + rhsArguments
     }
+
+    private fun constructorInvocation(
+        constructor: Type.JFConstructor,
+        arguments: List<ExpressionNode.Phase2Expression>,
+    ): ExpressionNode.Phase2Expression {
+            //(method.rtn as? JFClass)?.let { symbolMap.addClassToSymbolMap(it,it.path) }
+            return ExpressionNode.Constructor(constructor, arguments)
+        }
 
     private fun methodInvocation(
         method: JFMethod,
         arguments: List<ExpressionNode.Phase2Expression>,
     ): ExpressionNode.Phase2Expression =
         when {
-            method.static -> ExpressionNode.Invocation(method, null, arguments)
+            method.static -> {
+                (method.rtn as? JFClass)?.let { symbolMap.addClassToSymbolMap(it,it.path) }
+                ExpressionNode.Invocation(method, null, arguments)
+            }
             else -> error("Method is not static")
         }
 
