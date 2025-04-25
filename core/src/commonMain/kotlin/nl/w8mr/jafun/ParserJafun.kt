@@ -82,63 +82,51 @@ object ParserJafun {
 
     val complexIdentifier: Parser<Char, List<TypeSymbol>> =
         combi {
-            fun CombinatorDSL<Char, List<TypeSymbol>>.nextIdentifierPart(current: TypeSymbol): List<TypeSymbol> {
-                fun CombinatorDSL<Char, List<TypeSymbol>>.handleNexts(
-                    nextIdResult: Success<Identifier>,
-                    current: TypeSymbol,
-                ): List<TypeSymbol> {
-                    val nexts =
-                        symbolMap.find(current, nextIdResult.value.value)
-                    return nexts.flatMap { next ->
-                        when (next) {
-                            is JFField -> {
-                                nextIdentifierPart((next.type as JFClass))
-                                    .filterIsInstance<JFMethod>()
-                                    .filter { !it.static }
-                                    .map { JFFieldMethod(next, it) }
+            fun CombinatorDSL<Char, List<TypeSymbol>>.handleSubIndentifiers(current: TypeSymbol): List<TypeSymbol> =
+                when (current) {
+                    is JFClass, is JFVariableSymbol, is JFPackage, is JFField -> {
+                        val parentContext = when (current) {
+                            is JFVariableSymbol -> current.type
+                            is JFField -> current.type
+                            else -> current
+                        }
+                        when (val result = ('.' and identifier).bindAsResult()) {
+                            is Success -> when (val children = symbolMap.find(parentContext, result.value.value)) {
+                                else -> children.flatMap { child ->
+                                    when (current) {
+                                        is JFField -> when (child) {
+                                            is JFMethod -> listOf(JFFieldMethod(current, child))
+                                            else -> TODO("Should be method")
+                                        }
+                                        is JFPackage -> when (child) {
+                                            is JFClass -> handleSubIndentifiers(child)
+                                            is JFPackage -> handleSubIndentifiers(child)
+                                            else -> TODO("Shoudl be class or package")
+                                        }
+                                        is JFClass -> when (child) {
+                                            is JFField -> handleSubIndentifiers(child)
+                                            else -> TODO("Should be field")
+                                        }
+                                        is JFVariableSymbol -> when (child) {
+                                            is JFMethod -> listOf(JFVariableMethod(current, child))
+                                            else -> TODO("Should be method")
+                                        }
+                                        else -> TODO("Handle else")
+                                    }
+                                }
                             }
-
-                            is JFClass, is JFPackage -> nextIdentifierPart(next)
-                            is JFMethod -> listOf(next)
-                            else -> error("Should be field or method")
+                            is Failure ->
+                                listOf(current) // TODO: check if we need to handle invoke
                         }
                     }
+                    is JFMethod -> listOf(current)
+                    is OperandType<*> -> listOf(current)
+                    else -> TODO("handle else")
                 }
-
-                return when (
-                    val nextIdResult =
-                        combi {
-                            -char('.')
-                            (identifier and owsnl).bind()
-                        }.bindAsResult()
-                ) {
-                    is Success<Identifier> -> {
-                        when (current) {
-                            is JFClass, is JFPackage -> handleNexts(nextIdResult, current)
-                            is JFField -> handleNexts(nextIdResult, (current.type as JFClass))
-                            is JFVariableSymbol -> {
-                                handleNexts(nextIdResult, (current.type as JFClass))
-                                    .filterIsInstance<JFMethod>()
-                                    .filter { !it.static }
-                                    .map { JFVariableMethod(current, it) }
-                            }
-
-                            else -> error("Should be field or method")
-                        }
-                    }
-
-                    is Failure<*> -> listOf(current)
-                }
-            }
 
             val id = identifier.bind()
             val currents = symbolMap.find(null, id.value)
-            currents.flatMap { current ->
-                when (current) {
-                    is JFMethod -> listOf(current)
-                    else -> nextIdentifierPart(current)
-                }
-            }
+            currents.flatMap { handleSubIndentifiers(it) }
         }
 
     val whenArrow = identifier.filter { it.value == "->" }.asLiteral()
