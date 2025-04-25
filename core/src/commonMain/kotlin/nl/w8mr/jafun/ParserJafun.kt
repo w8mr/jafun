@@ -40,6 +40,7 @@ import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
+import kotlin.math.E
 
 object ParserJafun {
     val symbolMap = SymbolMapManager()
@@ -141,9 +142,14 @@ object ParserJafun {
     val stringLiteral = oneOrMore(char(" is not valid string Char") { it != '"' && it != '\\' && it != '$'}).map(ExpressionNode::StringLiteral)
 
     // TODO: Escape characters
-//    val lineStringContent = stringLiteral or
-//            (zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression) map { ExpressionNode.StringTemplate(it) })
-    val stringLiteral_term = ('"' and ((stringLiteral and '"') or ((zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression) map { ExpressionNode.StringTemplate(it) }) and '"') ))
+    val lineStringContent = zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression)
+    val stringLiteral_term = '"' and lineStringContent and '"' map {
+        when (it.size) {
+            0 -> ExpressionNode.StringLiteral("")
+            1 -> it[0] as? ExpressionNode.StringLiteral ?: ExpressionNode.StringTemplate(it)
+            else -> ExpressionNode.StringTemplate(it)
+        }
+    }
     // TODO: Multiline string
 
 
