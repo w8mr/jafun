@@ -18,6 +18,7 @@ class SymbolMapTests {
         val parentSymbolMap =
             object : SymbolMap {
                 private val data = mutableMapOf<TypeSymbol?, Map<String, Set<TypeSymbol>>>()
+                override val parent: SymbolMap? = null
 
                 init {
                     add(null, "parentPath", OperandType.StringType)
@@ -56,6 +57,10 @@ class SymbolMapTests {
                     typeSig: TypeSymbol,
                 ) {
                     data[type] = mapOf(path to setOf(typeSig))
+                }
+
+                override fun replaceType(type: TypeSymbol?, path: String, typeSig: Type) {
+                    TODO("Not yet implemented")
                 }
             }
 

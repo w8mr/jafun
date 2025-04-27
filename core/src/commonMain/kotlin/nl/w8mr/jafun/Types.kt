@@ -74,6 +74,7 @@ interface Type : TypeSymbol {
         val type: OperandType<*>,
         val symbolMap: SymbolMap = IdentifierCache,
         val mutable: Boolean = false,
+        val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
         override fun equals(other: Any?): Boolean =
             when (other) {
@@ -114,4 +115,9 @@ sealed interface OperandType<J> : TypeSymbol {
     object Unit : OperandType<jafun.Unit> {
         override fun toString() = "UnitType"
     }
+
+    object Unknown : OperandType<Any> {
+        override fun toString() = "UnknownType"
+    }
+
 }

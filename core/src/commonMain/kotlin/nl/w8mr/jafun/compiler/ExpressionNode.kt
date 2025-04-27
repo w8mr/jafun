@@ -112,11 +112,25 @@ sealed interface ExpressionNode: Printable {
 
     interface Phase1 : ExpressionNode // CST
 
+    // Phase1 node implementations
+    data class FunctionDeclaration(
+        val name: String,
+        val parameters: List<Pair<String, OperandType<*>>>,
+        val returnType: OperandType<*>,
+        val body: List<Phase1>,
+        val symbolMap: SymbolMap
+    ) : Phase1
+    data class ValDeclaration(val name: String, val expression: Phase1) : Phase1
+    data class VarDeclaration(val name: String, val expression: Phase1) : Phase1
+    data class VarAssignmentPhase1(val name: String, val expression: Phase1) : Phase1
+    data class Whitespace(val value: String) : Phase1
+    data class NewLine(val value: String) : Phase1
+    data class CurlyBlockExpression(val body: List<Phase1>, val symbolMap: SymbolMap) : Phase1 // For { }
+    data class RawExpression(val value: String) : Phase1 // For expressions that will be parsed in phase 2
+
     interface Phase2 : ExpressionNode // AST
 
     interface Phase3 : ExpressionNode // TreeIR
 
     interface Phase4 : ExpressionNode // StackIR
 }
-
-

@@ -32,6 +32,7 @@ private fun Indenter.print(element: Printable) {
             OperandType.UInt1 -> "Boolean"
             OperandType.CharType -> "Char"
             OperandType.Unit -> "Unit"
+            OperandType.Unknown -> "Unknown"
             is Type.JFClass -> operandType.path
         }
 

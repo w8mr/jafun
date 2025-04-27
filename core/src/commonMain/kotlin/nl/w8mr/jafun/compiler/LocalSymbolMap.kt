@@ -3,7 +3,7 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
 
-data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int = IdentifierCache.incSymbolMapCount()) : SymbolMap {
+data class LocalSymbolMap(override val parent: SymbolMap, override val symbolMapId: Int = IdentifierCache.incSymbolMapCount()) : SymbolMap {
     private val identifierMap = mutableMapOf<TypeSymbol?, MutableMap<String, MutableSet<TypeSymbol>>>()
 
     override fun find(
@@ -34,6 +34,18 @@ data class LocalSymbolMap(val parent: SymbolMap, override val symbolMapId: Int =
             mutableSetOf()
         }.add(typeSig)
     }
+
+    override fun replaceType(
+        type: TypeSymbol?,
+        path: String,
+        typeSig: Type,
+    ) {
+        val list = identifierMap.get(type)?.get(path) ?: mutableListOf()
+        val removed = list.filter { it !is Type || it.name != typeSig.name }.toMutableList()
+        removed.add(typeSig)
+        identifierMap.get(type)?.put(path, removed.toMutableSet())
+    }
+
 
     override fun incSymbolMapCount(): Int = parent.incSymbolMapCount()
 }

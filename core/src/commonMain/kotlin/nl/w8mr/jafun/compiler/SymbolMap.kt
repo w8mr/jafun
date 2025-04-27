@@ -7,6 +7,8 @@ import nl.w8mr.jafun.compiler.IdentifierCache.addClass
 import nl.w8mr.jafun.compiler.IdentifierCache.addPackage
 
 interface SymbolMap {
+    val parent: SymbolMap?
+
     fun findMethod(
         typeSymbol: TypeSymbol?,
         methodName: String,
@@ -92,6 +94,12 @@ interface SymbolMap {
         type: TypeSymbol?,
         path: String,
         typeSig: TypeSymbol,
+    )
+
+    fun replaceType(
+        type: TypeSymbol?,
+        path: String,
+        typeSig: Type,
     )
 
     fun incSymbolMapCount(): Int

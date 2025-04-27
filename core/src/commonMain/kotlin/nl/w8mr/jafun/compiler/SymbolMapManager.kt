@@ -2,7 +2,6 @@ package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.TypeSymbol
 
@@ -55,17 +54,24 @@ class SymbolMapManager {
         typeSig: Type,
     ) = currentSymbolMap.add(null, path, typeSig)
 
+
+    fun replaceType(
+        path: String,
+        type: Type,
+    ) = currentSymbolMap.replaceType(null, path, type)
+
     fun addClassToSymbolMap(parent: TypeSymbol? ,className: String) = currentSymbolMap.addClassToSymbolMap(parent, className)
 
     fun newVariableSymbol(
         name: String,
         type: OperandType<*>,
         mutable: Boolean,
+        initialized: Boolean = true
     ): JFVariableSymbol {
         if (currentSymbolMap.contains(null, name)) {
             throw IllegalStateException("Variable $name already defined")
         }
-        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable)
+        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized)
         currentSymbolMap.add(null, name, variableSymbol)
         return variableSymbol
     }

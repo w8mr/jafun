@@ -7,6 +7,7 @@ import nl.w8mr.jafun.TypeSymbol
 interface ClassInfo
 
     object IdentifierCache : SymbolMap {
+        override val parent: SymbolMap? = null
         private val identifierMap = mutableMapOf<TypeSymbol?, MutableMap<String, MutableSet<TypeSymbol>>>()
 
         private var symbolMapCounter: Int = 0
@@ -96,6 +97,17 @@ interface ClassInfo
             }.getOrPut(path) {
                 mutableSetOf()
             }.add(typeSig)
+        }
+
+        override fun replaceType(
+            type: TypeSymbol?,
+            path: String,
+            typeSig: Type,
+        ) {
+            val list = identifierMap.get(type)?.get(path) ?: mutableListOf()
+            val removed = list.filter { it !is Type.JFVariableSymbol || it.name != typeSig.name }.toMutableList()
+            removed.add(typeSig)
+            identifierMap.get(type)?.put(path, removed.toMutableSet())
         }
 
         override fun incSymbolMapCount(): Int {

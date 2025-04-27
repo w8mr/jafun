@@ -60,6 +60,7 @@ class JVMBackend {
                                     is OperandType.Array -> aload(variableName)
                                     is OperandType.Generic -> TODO()
                                     is OperandType.Unit -> TODO()
+                                    is OperandType.Unknown -> aload(variableName) // Default to aload for Unknown type
                                     is Type.JFClass -> aload(variableName)
                                 }
 
@@ -174,6 +175,7 @@ class JVMBackend {
                 is OperandType.UInt1 -> istore(variableName)
                 is OperandType.CharType -> istore(variableName)
                 is OperandType.Array -> astore(variableName)
+                is OperandType.Unknown -> astore(variableName) // Default to astore for Unknown type
                 is OperandType.Generic -> TODO()
                 is OperandType.Unit -> TODO()
                 is Type.JFClass -> astore(variableName)
@@ -218,6 +220,7 @@ class JVMBackend {
                 is OperandType.UInt1 -> iload(variableName)
                 is OperandType.CharType -> iload(variableName)
                 is OperandType.Array -> aload(variableName)
+                is OperandType.Unknown -> aload(variableName) // Default to aload for Unknown type
                 is OperandType.Generic -> TODO()
                 is OperandType.Unit -> TODO()
                 is Type.JFClass -> aload(variableName)
@@ -283,6 +286,7 @@ fun signature(type: OperandType<*>): String =
         is OperandType.StringType -> "Ljava/lang/String;"
         is OperandType.SInt32 -> "I"
         is OperandType.CharType -> "C"
+        is OperandType.Unknown -> "Ljava/lang/Object;" // Default to Object for Unknown type
         is OperandType.UInt1 -> "Z"
         is OperandType.Generic -> TODO()
         is Type.JFClass -> "L${type.path.replace('.', '/')};" // TODO: check if this needs to bee JFObject?

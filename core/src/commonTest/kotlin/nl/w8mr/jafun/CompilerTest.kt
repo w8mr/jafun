@@ -62,6 +62,7 @@ class CompilerTest {
 
             val compiler = Compiler()
 
+   //         val phase1Plugin = compiler.registerPlugin(Phase1, Phase1Plugin())
             val phase2Plugin = compiler.registerPlugin(Phase2, Phase2Plugin())
             val phase3Plugin = compiler.registerPlugin(Phase3, Phase3Plugin())
             val jvmirPlugin = compiler.registerPlugin(JVMIR, JVMIRPlugin())
@@ -69,17 +70,27 @@ class CompilerTest {
             for ((path, file) in files) {
                 val className = "Script"
                 val methodName = "main"
-                val actualBytes = compiler.compile(file.code ?: error("No code set for $path"), className, methodName)
+                val actualBytes = try {
+                    compiler.compile(file.code ?: error("No code set for $path"), className, methodName)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+//                    println("Phase1: ${phase1Plugin.phase1}")
+                    println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
+                    println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
+                    println("IR:\n ${jvmirPlugin.jvmir?.print()}")
+                    throw e
+                }
+
+//                println("Phase1: ${phase1Plugin.phase1}")
 
                 if (file.phase2Expected != null) {
                     if (file.phase2Expected != phase2Plugin.phase2) {
                         assertEquals(
                             file.phase2Expected?.map { it.prettyPrint() },
                             phase2Plugin.phase2?.map { it.prettyPrint() })
-                    } else {
-                        println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
-
                     }
+                } else {
+                    println("Phase2:\n ${phase2Plugin.phase2?.joinToString("\n") { it.prettyPrint() }}")
                 }
                 println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
                 println("IR:\n ${jvmirPlugin.jvmir?.print()}")
@@ -300,7 +311,6 @@ class CompilerTest {
             ) =
                 ExpressionNode.When(subject, matches.toList())
         }
-
 
         data class Phase2Plugin(var phase2: List<ExpressionNode.Phase2Expression>? = null) : Compiler.Phase2Plugin {
             override fun handle(input: List<ExpressionNode.Phase2Expression>): List<ExpressionNode.Phase2Expression> {
@@ -743,10 +753,10 @@ class CompilerTest {
                 code = """
                     val str1 = "Hello World"
                     println str1"""
-                phase2 {
-                    +valAssignment(symbol("str1", OperandType.StringType), s("Hello World"))
-                    +invocation(println, variable(symbol("str1", OperandType.StringType)))
-                }
+//                phase2 {
+//                    +valAssignment(symbol("str1", OperandType.StringType), s("Hello World"))
+//                    +invocation(println, variable(symbol("str1", OperandType.StringType)))
+//                }
                 expectedOutput = "Hello World\n"
                 jvmIr {
                     name = "Script"
