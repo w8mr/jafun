@@ -12,6 +12,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode.IntegerLiteral
 import nl.w8mr.jafun.compiler.ExpressionNode.Keyword
 import nl.w8mr.jafun.compiler.ExpressionNode.LeftCurly
 import nl.w8mr.jafun.compiler.ExpressionNode.LeftParen
+import nl.w8mr.jafun.compiler.ExpressionNode.Newline
 import nl.w8mr.jafun.compiler.ExpressionNode.RightCurly
 import nl.w8mr.jafun.compiler.ExpressionNode.RightParen
 import nl.w8mr.jafun.compiler.ExpressionNode.StringLiteral
@@ -115,7 +116,7 @@ class Phase1SimpleParserTest {
            DoubleQoute,
            StringLiteral("Hello World"),
            DoubleQoute,
-           Whitespace("\n"),
+           Newline("\n"),
            Identifier("println"),
            LeftParen,
            Identifier("str1"),
@@ -150,9 +151,9 @@ class Phase1SimpleParserTest {
                 DoubleQoute,
                 StringLiteral("Hello World"),
                 DoubleQoute,
-                Whitespace("\n"),
+                Newline("\n"),
                 Identifier("a"),
-                Whitespace("\n"),
+                Newline("\n"),
                 RightCurly,
             )
         ), Phase1Parser.parse("""

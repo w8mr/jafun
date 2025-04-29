@@ -217,7 +217,10 @@ private fun Indenter.print(element: Printable) {
             -")"
         }
         is ExpressionNode.Whitespace -> {
-            +"Whitespace(\"${element.value.replace("\n", "\\n")}\")"
+            +"Whitespace(\"${element.value}\")"
+        }
+        is ExpressionNode.Newline -> {
+            +"Newline(\"${element.value.replace("\n", "\\n").replace("\r", "\\r")}\")"
         }
         is ExpressionNode.Keyword -> {
             +"Keyword(\"${element.value}\")"

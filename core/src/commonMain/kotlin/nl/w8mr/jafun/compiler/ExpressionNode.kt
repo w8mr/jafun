@@ -22,6 +22,7 @@ sealed interface ExpressionNode: Printable {
     data class Identifier(val value: String, val operator: Boolean = false): Phase1Token
 
     data class Whitespace(val value: String): Phase1Token
+    data class Newline(val value: String): Phase1Token
     data class Keyword(val value: String): Phase1Token
 
     data class Phase1List(val tokens: List<Phase1Token>) : Phase1Token {
