@@ -2,6 +2,7 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
+import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.MethodParent
 import nl.w8mr.jafun.compiler.Associativity
@@ -68,10 +69,15 @@ class CompilerTest {
             val jvmirPlugin = compiler.registerPlugin(JVMIR, JVMIRPlugin())
 
             for ((path, file) in files) {
+                val code = file.code?.trimIndent() ?: error("No code set for $path")
+
+                val parsePhase1 = Phase1Parser.parse(code)
+                assertEquals(false, parsePhase1.first == null, "PHASE1 fail: ${parsePhase1.second}")
+
                 val className = "Script"
                 val methodName = "main"
                 val actualBytes = try {
-                    compiler.compile(file.code ?: error("No code set for $path"), className, methodName)
+                    compiler.compile(code, className, methodName)
                 } catch (e: Throwable) {
                     e.printStackTrace()
 //                    println("Phase1: ${phase1Plugin.phase1}")
@@ -81,7 +87,7 @@ class CompilerTest {
                     throw e
                 }
 
-//                println("Phase1: ${phase1Plugin.phase1}")
+                println("Phase1: ${parsePhase1.first?.joinToString("") { it.prettyPrint() } }}")
 
                 if (file.phase2Expected != null) {
                     if (file.phase2Expected != phase2Plugin.phase2) {
@@ -703,7 +709,7 @@ class CompilerTest {
         test {
             file {
                 code = """
-                    1 + 2""""
+                    1 + 2"""
                 expectedOutput = ""
                 jvmIr {
                     name = "Script"
@@ -726,7 +732,7 @@ class CompilerTest {
         test {
             file {
                 code = """
-                    1 + 2 * 3""""
+                    1 + 2 * 3"""
                 expectedOutput = ""
                 jvmIr {
                     name = "Script"

@@ -216,6 +216,43 @@ private fun Indenter.print(element: Printable) {
             }
             -")"
         }
+        is ExpressionNode.Whitespace -> {
+            +"Whitespace(\"${element.value.replace("\n", "\\n")}\")"
+        }
+        is ExpressionNode.Keyword -> {
+            +"Keyword(\"${element.value}\")"
+        }
+        is ExpressionNode.Identifier -> {
+            +"Identifier(\"${element.value}\", ${element.operator})"
+        }
+        is ExpressionNode.CurlyBlock -> {
+            +"{"
+            indent {
+                element.tokens.drop(1).dropLast(1).forEachIndexed { index, token ->
+                    print(token)
+                }
+            }
+            +"}"
+        }
+        is ExpressionNode.Phase1List -> {
+            element.tokens.forEachIndexed { index, token ->
+                print(token)
+            }
+        }
+
+
+        is ExpressionNode.Equals -> -"="
+        is ExpressionNode.Dot -> -"."
+        is ExpressionNode.Comma -> -","
+        is ExpressionNode.Colon -> -":"
+        is ExpressionNode.Dollar -> -"$"
+        is ExpressionNode.DoubleQoute -> -"\""
+        is ExpressionNode.SingleQoute -> -"'"
+        is ExpressionNode.LeftParen -> -"("
+        is ExpressionNode.RightParen -> -")"
+        is ExpressionNode.LeftCurly -> +"{"
+        is ExpressionNode.RightCurly -> +"}"
+
         // Handle non-Expression GenericNode types if necessary, using default toString
         else -> TODO("Create printable implementation for ${element::class.simpleName}") // +"${element::class.simpleName}(...)" // Generic fallback
     }

@@ -1,6 +1,5 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.Token.Identifier
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFFieldMethod
@@ -13,7 +12,7 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
-import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.Parser
@@ -41,7 +40,6 @@ import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.text.zeroOrMore
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
-import kotlin.math.E
 
 object ParserJafun {
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }.asLiteral()
@@ -149,7 +147,7 @@ object ParserJafun {
     val lineStringContent = zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression)
     val stringLiteral_term = '"' and lineStringContent and '"' map {
         when (it.size) {
-            0 -> ExpressionNode.StringLiteral("")
+            0 -> ExpressionNode.StringLiteral("") as ExpressionNode.Phase2Expression
             1 -> it[0] as? ExpressionNode.StringLiteral ?: ExpressionNode.StringTemplate(it)
             else -> ExpressionNode.StringTemplate(it)
         }
