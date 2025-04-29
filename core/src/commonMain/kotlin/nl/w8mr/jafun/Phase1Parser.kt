@@ -2,6 +2,7 @@ package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
+import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.and
 import nl.w8mr.parsek.asLiteral
@@ -27,7 +28,11 @@ import nl.w8mr.parsek.text.string
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.zeroOrMore
 
-object Phase1Parser {
+data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().apply { reset() }) {
+    companion object {
+        val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
+    }
+
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }
     val ws = oneOrMore(whitespace) map { ExpressionNode.Whitespace(it) }
 
@@ -65,14 +70,14 @@ object Phase1Parser {
     val booleanLiteral_term = trueLiteral or falseLiteral
 
     val betweenParentheses1 = seq(leftParen, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightParen) { l, b, r -> ExpressionNode.Phase1List(l,b,r) }
-    val betweenCurly1 = seq(leftCurly, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightCurly) { l, b, r -> ExpressionNode.CurlyBlock(listOf(l) + b.flatten() + listOf(r)) }
+    val betweenCurly1 = seq(leftCurly, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightCurly) { l, b, r ->
+        ExpressionNode.CurlyBlock(listOf(l) + b.flatten() + listOf(r)) }
 
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
     val normalIdentifier =
         (letter or char('_')) and
                 any(letter or char('_') or unicode_digit) map (::Identifier)
 
-    val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
     val operatorIdentifier = oneOrMore(char { it in operatorSymbols }).map { Identifier(it, true) }
 
     val identifier = normalIdentifier or operatorIdentifier

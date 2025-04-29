@@ -3,7 +3,6 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
-import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFFieldMethod
@@ -13,6 +12,7 @@ import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.ListSource
 import nl.w8mr.parsek.Parser
 import kotlin.test.Test
@@ -24,7 +24,7 @@ class SimpleParserTest {
     fun `Spaceship`() {
         // TODO: should be operator (not sure if it matters)
         testSingleParser(
-            ParserJafun.complexIdentifier,
+            ParserJafun().complexIdentifier,
             "<=>4",
             listOf(
                 JFMethod(
@@ -42,7 +42,7 @@ class SimpleParserTest {
     @Test
     fun `Simple Identifier`() {
         testSingleParser(
-            ParserJafun.complexIdentifier,
+            ParserJafun().complexIdentifier,
             "println()",
             listOf(
                 JFMethod(
@@ -60,7 +60,7 @@ class SimpleParserTest {
     @Test
     fun `Complex Identifier`() {
         testSingleParser(
-            ParserJafun.complexIdentifier,
+            ParserJafun().complexIdentifier,
             "java.lang.System.out.println()",
             listOf(
                 JFFieldMethod(
@@ -83,9 +83,10 @@ class SimpleParserTest {
 
     @Test
     fun `Simple Variable`() {
-        val varSymbol = ParserJafun.symbolMap.newVariableSymbol("abcd", OperandType.SInt32, true)
+        val symbolMap = SymbolMapManager().apply { reset() }
+        val varSymbol = symbolMap.newVariableSymbol("abcd", OperandType.SInt32, true)
         testSingleParser(
-            ParserJafun.methodLhs(0),
+            ParserJafun(symbolMap).methodLhs(0),
             "abcd+3",
             ExpressionNode.Variable(varSymbol),
             1,
@@ -94,9 +95,9 @@ class SimpleParserTest {
 
     @Test
     fun `Simple Variable not found`() {
-        ParserJafun.symbolMap.newVariableSymbol("abcd", OperandType.SInt32, true)
+        val symbolMap = SymbolMapManager().apply { reset() }
         testSingleParserFailed(
-            ParserJafun.methodLhs(0),
+            ParserJafun(symbolMap).methodLhs(0),
             "bcd+3",
             "Combinator failed, parser number 1 with error: No single method found",
             0,
@@ -106,7 +107,7 @@ class SimpleParserTest {
     @Test
     fun `Empty block compact`() {
         testSingleParser(
-            ParserJafun.curlyBlock,
+            ParserJafun().curlyBlock,
             "{}",
             ExpressionNode.ExpressionList(emptyList()),
             1,
@@ -116,7 +117,7 @@ class SimpleParserTest {
     @Test
     fun `Empty block whitespace`() {
         testSingleParser(
-            ParserJafun.curlyBlock,
+            ParserJafun().curlyBlock,
             """|{  
                |}
             """,
@@ -128,7 +129,7 @@ class SimpleParserTest {
     @Test
     fun `val assignment compact`() {
         testSingleParser(
-            ParserJafun.initValAssignment,
+            ParserJafun().initValAssignment,
             """|val abc=5""".trimMargin(),
             ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
             5,
@@ -138,7 +139,7 @@ class SimpleParserTest {
     @Test
     fun `val assignment whitespace`() {
         testSingleParser(
-            ParserJafun.initValAssignment,
+            ParserJafun().initValAssignment,
             """|val 
                |abc = 
                |5
@@ -151,7 +152,7 @@ class SimpleParserTest {
     @Test
     fun `var assignment whitespace`() {
         testSingleParser(
-            ParserJafun.initVarAssignment,
+            ParserJafun().initVarAssignment,
             """|var 
                |abc = 
                |5
@@ -163,9 +164,10 @@ class SimpleParserTest {
 
     @Test
     fun `var re-assignment whitespace`() {
-        ParserJafun.symbolMap.newVariableSymbol("abc", OperandType.SInt32, true)
+        val symbolMap = SymbolMapManager().apply { reset() }
+        symbolMap.newVariableSymbol("abc", OperandType.SInt32, true)
         testSingleParser(
-            ParserJafun.varAssignment,
+            ParserJafun(symbolMap).varAssignment,
             """|abc = 
                |5
             """.trimMargin(),
@@ -177,7 +179,7 @@ class SimpleParserTest {
     @Test
     fun `empty function compact`() {
         testSingleParser(
-            ParserJafun.function,
+            ParserJafun().function,
             """|fun test(){}""".trimMargin(),
             ExpressionNode.Function(
                 JFMethod(emptyList(), JFClass("Script"), "test", OperandType.Unit, true),
@@ -190,7 +192,7 @@ class SimpleParserTest {
     @Test
     fun `empty function whitespace`() {
         testSingleParser(
-            ParserJafun.function,
+            ParserJafun().function,
             """|fun 
                 |test 
                 |( 
@@ -209,7 +211,7 @@ class SimpleParserTest {
     @Test
     fun `string interpolation text only`() {
         testSingleParser(
-            ParserJafun.stringLiteral_term,
+            ParserJafun().stringLiteral_term,
             "\"abc\"",
             ExpressionNode.StringLiteral("abc"),
             3,
@@ -218,9 +220,10 @@ class SimpleParserTest {
 
     @Test
     fun `string interpolation simple variable`() {
-        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
+        val symbolMap = SymbolMapManager().apply { reset() }
+        val numVar = symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
         testSingleParser(
-            ParserJafun.stringLiteral_term,
+            ParserJafun(symbolMap).stringLiteral_term,
             "\"abc\$num\"",
             ExpressionNode.StringTemplate(listOf(
 
@@ -235,7 +238,7 @@ class SimpleParserTest {
     @Test
     fun `string interpolation simple expression`() {
         testSingleParser(
-            ParserJafun.stringLiteral_term,
+            ParserJafun().stringLiteral_term,
             "\"abc\${1}\"",
             ExpressionNode.StringTemplate(listOf(
                 ExpressionNode.StringLiteral("abc"),
@@ -248,7 +251,7 @@ class SimpleParserTest {
     @Test
     fun `string interpolation expression`() {
         testSingleParser(
-            ParserJafun.stringLiteral_term,
+            ParserJafun().stringLiteral_term,
             "\"abc\${21 + 21}\"",
             ExpressionNode.StringTemplate(listOf(
                 ExpressionNode.StringLiteral("abc"),
@@ -270,10 +273,10 @@ class SimpleParserTest {
         expected: R,
         afterIndex: Int = 1,
     ) {
-        val phase1 = Phase1Parser.parse(input.trimMargin()).first ?: fail("Phase1 not successful")
+        val symbolMap = SymbolMapManager().apply { reset() }
+        val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
         val source = ListSource(phase1)
         val parsed = parser.apply(source)
-        ParserJafun.symbolMap.reset()
         if (parsed is Parser.Failure) {
             println("Tree: \n${parser.parseTree(source).second}")
         }
@@ -291,11 +294,11 @@ class SimpleParserTest {
         expected: String,
         afterIndex: Int = 1,
     ) {
-        val phase1 = Phase1Parser.parse(input.trimMargin()).first ?: fail("Phase1 not successful")
+        val symbolMap = SymbolMapManager().apply { reset() }
+        val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
         val source = ListSource(phase1)
 
         val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
-        ParserJafun.symbolMap.reset()
         assertEquals(
             expected,
             failureMessage,

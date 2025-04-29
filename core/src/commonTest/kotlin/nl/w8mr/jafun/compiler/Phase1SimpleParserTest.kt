@@ -30,7 +30,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("=", true),
             Whitespace(" "),
-        ), Phase1Parser.valDeclaration.parse("val a = 1").flatten())
+        ), Phase1Parser().valDeclaration.parse("val a = 1").flatten())
     }
 
     @Test
@@ -45,7 +45,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("=", true),
             Whitespace(" "),
-        ), Phase1Parser.valDeclaration.parse("val a: Int = 1").flatten())
+        ), Phase1Parser().valDeclaration.parse("val a: Int = 1").flatten())
     }
 
     @Test
@@ -64,7 +64,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("=", true),
             Whitespace(" "),
-        ), Phase1Parser.valDeclaration.parse("val a: kotlin.collections.List = emptyList()").flatten())
+        ), Phase1Parser().valDeclaration.parse("val a: kotlin.collections.List = emptyList()").flatten())
     }
 
     @Test
@@ -73,7 +73,7 @@ class Phase1SimpleParserTest {
             DoubleQoute,
             StringLiteral("abc"),
             DoubleQoute,
-        ), Phase1Parser.stringLiteral_term.parse(""""abc"""").flatten())
+        ), Phase1Parser().stringLiteral_term.parse(""""abc"""").flatten())
     }
 
     @Test
@@ -83,7 +83,7 @@ class Phase1SimpleParserTest {
             Dollar,
             Identifier("abc"),
             DoubleQoute,
-        ), Phase1Parser.stringLiteral_term.parse(""""${'$'}abc"""").flatten())
+        ), Phase1Parser().stringLiteral_term.parse(""""${'$'}abc"""").flatten())
     }
 
     @Test
@@ -99,7 +99,7 @@ class Phase1SimpleParserTest {
                 RightCurly,
             ),
             DoubleQoute,
-        ), Phase1Parser.stringLiteral_term.parse(""""${'$'}{a+1}"""").flatten())
+        ), Phase1Parser().stringLiteral_term.parse(""""${'$'}{a+1}"""").flatten())
     }
 
 
@@ -120,7 +120,7 @@ class Phase1SimpleParserTest {
            LeftParen,
            Identifier("str1"),
            RightParen,
-       ), Phase1Parser.parse("""
+       ), Phase1Parser().parse("""
            |val str1 = "Hello World"
            |println(str1)
        """.trimMargin()).first)
@@ -155,7 +155,7 @@ class Phase1SimpleParserTest {
                 Newline("\n"),
                 RightCurly,
             )
-        ), Phase1Parser.parse("""
+        ), Phase1Parser().parse("""
            |fun test ( a: Int) :Int{println "Hello World"
            |a
            |}""".trimMargin()).first)

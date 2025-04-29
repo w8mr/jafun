@@ -4,7 +4,6 @@ import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
-import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ir2jvm.buildClass
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
@@ -42,8 +41,10 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         getPlugins(this)?.fold(input) { context, plugin -> plugin.handle(context) } ?: input
 
     fun compile(code: String, className: String, methodName: String): ByteArray {
-        val phase1 = Phase1Parser.parse(code).first ?: error("Phase 1 parsing failed")
-        val parseResult = ParserJafun.parse(phase1)
+        val symbolMap = SymbolMapManager()
+        symbolMap.reset()
+        val phase1 = Phase1Parser(symbolMap).parse(code).first ?: error("Phase 1 parsing failed")
+        val parseResult = ParserJafun(symbolMap).parse(phase1)
         return when (parseResult.second) {
             is Parser.Failure<*> -> {
                 println(parseResult.second)
@@ -71,24 +72,24 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         parsed: List<ExpressionNode.Phase2Expression>,
         methodName: String
     ): IRBuilder.ClassContext {
-        ParserJafun.symbolMap.currentSymbolMap =
-            LocalSymbolMap(IdentifierCache.reset()).apply {
-                add(
-                    null,
-                    "arguments",
-                    Type.JFVariableSymbol(
-                        "param1",
-                        OperandType.Array(
-                            Type.JFClass(
-                                "String",
-                                Type.JFPackage("lang", Type.JFPackage("java"))
-                            )
-                        ),
-                        this,
-                        false,
-                    ),
-                )
-            } // TODO: look into this.
+//        ParserJafun.symbolMap.currentSymbolMap =
+//            LocalSymbolMap(IdentifierCache.reset()).apply {
+//                add(
+//                    null,
+//                    "arguments",
+//                    Type.JFVariableSymbol(
+//                        "param1",
+//                        OperandType.Array(
+//                            Type.JFClass(
+//                                "String",
+//                                Type.JFPackage("lang", Type.JFPackage("java"))
+//                            )
+//                        ),
+//                        this,
+//                        false,
+//                    ),
+//                )
+//            } // TODO: look into this.
         val returnType: OperandType<*> = OperandType.Unit
         val parameterTypes: List<OperandType<*>> =
             listOf(OperandType.Array(OperandType.StringType))

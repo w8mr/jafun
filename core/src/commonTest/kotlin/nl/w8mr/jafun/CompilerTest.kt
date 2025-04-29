@@ -2,7 +2,6 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
-import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.MethodParent
 import nl.w8mr.jafun.compiler.Associativity
@@ -71,8 +70,8 @@ class CompilerTest {
             for ((path, file) in files) {
                 val code = file.code?.trimIndent() ?: error("No code set for $path")
 
-                val parsePhase1 = Phase1Parser.parse(code)
-                assertEquals(false, parsePhase1.first == null, "PHASE1 fail: ${parsePhase1.second}")
+//                val parsePhase1 = Phase1Parser(.parse(code)
+//                assertEquals(false, parsePhase1.first == null, "PHASE1 fail: ${parsePhase1.second}")
 
                 val className = "Script"
                 val methodName = "main"
@@ -87,7 +86,7 @@ class CompilerTest {
                     throw e
                 }
 
-                println("Phase1: ${parsePhase1.first?.joinToString("") { it.prettyPrint() } }}")
+         //       println("Phase1: ${parsePhase1.first?.joinToString("") { it.prettyPrint() } }}")
 
                 if (file.phase2Expected != null) {
                     if (file.phase2Expected != phase2Plugin.phase2) {

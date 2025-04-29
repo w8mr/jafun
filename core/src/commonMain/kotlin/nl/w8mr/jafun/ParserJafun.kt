@@ -33,7 +33,7 @@ import nl.w8mr.parsek.seq
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 
-object ParserJafun {
+data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().apply { reset() }) {
     inline fun <reified R: Any> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
@@ -268,9 +268,6 @@ object ParserJafun {
             ExpressionNode.Function(symbolWithReturnType, block.expressions)
         }
 
-    val symbolMap = SymbolMapManager()
-
-
     fun prattParser(
         stopTerm: Parser<ExpressionNode.Phase1Token, *> = newline or semiColon,
         minPrecedence: Int = 0,
@@ -480,7 +477,6 @@ object ParserJafun {
         }
 
     fun parse(input: List<ExpressionNode.Phase1Token>): Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>> {
-        symbolMap.reset()
         val source = ListSource(input)
         return expressions.parseTree(source)
     }
