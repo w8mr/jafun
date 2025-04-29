@@ -1,6 +1,5 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.ParserJafun.symbolMap
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
 import nl.w8mr.parsek.Parser
@@ -8,6 +7,7 @@ import nl.w8mr.parsek.and
 import nl.w8mr.parsek.asLiteral
 import nl.w8mr.parsek.combi
 import nl.w8mr.parsek.eof
+import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.oneOf
 import nl.w8mr.parsek.oneOrMore
@@ -25,24 +25,21 @@ import nl.w8mr.parsek.text.oneOrMore
 import nl.w8mr.parsek.text.repeat
 import nl.w8mr.parsek.text.string
 import nl.w8mr.parsek.text.value
-import nl.w8mr.parsek.text.zeroOrMore
 import nl.w8mr.parsek.zeroOrMore
 
 object Phase1Parser {
     val whitespace = char(" is not whitespace") { it == '\u0020' || it == '\u0009' || it == '\u000c' }
     val ws = oneOrMore(whitespace) map { ExpressionNode.Whitespace(it) }
-    val ows = zeroOrMore(whitespace) map { ExpressionNode.Whitespace(it) }
 
     private val newline = char('\n') or string("\r\n")
     val nl = oneOrMore(newline) map { ExpressionNode.Newline(it) }
-    val onl = zeroOrMore(newline) map { ExpressionNode.Newline(it) }
 
     val owsnl = zeroOrMore(ws or nl) map { ExpressionNode.Phase1List(it) }
     val wsnl = oneOrMore(ws or nl) map { ExpressionNode.Phase1List(it) }
 
     val dot = char('.').map { ExpressionNode.Dot }
     val colon = char(':').map { ExpressionNode.Colon }
-    val equals = char('=').map { ExpressionNode.Equals }
+    val semiColon = char(':').map { ExpressionNode.SemiColon }
     val dollar = char('$').map { ExpressionNode.Dollar }
     val doubleQoute = char('"').map { ExpressionNode.DoubleQoute }
     val singleQoute = char('\'').map { ExpressionNode.SingleQoute }
@@ -83,6 +80,7 @@ object Phase1Parser {
     val complexIdentifierPhase1 = (((identifier and owsnl) map { ExpressionNode.Phase1List(it.first, it.second) }) and zeroOrMore(seq(
         dot, owsnl, identifier, owsnl) { dot, ws1, identifier, ws2 -> ExpressionNode.Phase1List(dot, ws1, identifier, ws2)} ) map { ExpressionNode.Phase1List(listOf(it.first) + it.second) })
 
+    val equals = operatorIdentifier.filter { it.value == "=" }
 
     val simpleStringExpression = seq(dollar, normalIdentifier) map { d, i -> ExpressionNode.Phase1List(d, i) }
     val complexStringExpression = seq(dollar, betweenCurly1) map { d, e -> ExpressionNode.Phase1List(d, e) }
@@ -125,15 +123,16 @@ object Phase1Parser {
         val name = identifier.bind()
         val whitespace2 = owsnl.bind()
         val lp = leftParen.bind()
-        val parameters = ((seq(owsnl, identifier, owsnl, colon, owsnl, complexIdentifierPhase1, owsnl ) map ExpressionNode::Phase1List ) sepByAllowEmpty comma map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(
+        val whitespace3 = owsnl.bind()
+        val parameters = ((seq(identifier, owsnl, colon, owsnl, complexIdentifierPhase1, owsnl ) map ExpressionNode::Phase1List ) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(
             ExpressionNode.Comma) }.dropLast(1)) }).bind()
         val rp = rightParen.bind()
         val optionalType = (optional(
             seq(owsnl, colon, owsnl, complexIdentifierPhase1, owsnl) map ExpressionNode::Phase1List
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
-        val whitespace3 = owsnl.bind()
+        val whitespace4 = owsnl.bind()
         val body = betweenCurly1.bind()
-        ExpressionNode.Phase1List(`fun`, whitespace1, name, whitespace2, lp, parameters, rp, optionalType, whitespace3, body)
+        ExpressionNode.Phase1List(`fun`, whitespace1, name, whitespace2, lp, whitespace3, parameters, rp, optionalType, whitespace4, body)
     }
 
     val phase1Tokens: Parser<Char, List<ExpressionNode.Phase1Token>> = zeroOrMore(oneOf(
@@ -144,18 +143,19 @@ object Phase1Parser {
         valDeclaration,
         varDeclaration,
         funDeclaration,
+        equals,
+        comma,
+        dot,
+        semiColon,
         identifier,
         betweenParentheses1,
         betweenCurly1,
-        comma,
-        dot,
         wsnl,
     )).map { ExpressionNode.Phase1List(it).flatten() }
 
     val phase1 = phase1Tokens and eof<Char>().asLiteral()
 
     fun parse(input: String): Pair<List<ExpressionNode.Phase1Token>?, Parser.Result<List<ExpressionNode.Phase1Token>>> {
-        symbolMap.reset()
         val source = CharSequenceSource(input)
         return phase1.parseTree(source)
     }

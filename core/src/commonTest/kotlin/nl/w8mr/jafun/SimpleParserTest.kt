@@ -2,16 +2,19 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.JFClass
+import nl.w8mr.jafun.Type.JFField
+import nl.w8mr.jafun.Type.JFFieldMethod
 import nl.w8mr.jafun.Type.JFMethod
 import nl.w8mr.jafun.Type.JFPackage
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.parsek.ListSource
 import nl.w8mr.parsek.Parser
-import nl.w8mr.parsek.text.CharSequenceSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -24,15 +27,15 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "<=>4",
             listOf(
-                Type.JFMethod(
-                    listOf(Type.JFVariableSymbol("param1", OperandType.SInt32)),
+                JFMethod(
+                    listOf(JFVariableSymbol("param1", OperandType.SInt32)),
                     IdentifierCache.findClass("jafun.test.TestKt"),
                     "<=>",
                     OperandType.SInt32,
                     true,
                 ),
             ),
-            3,
+            1,
         )
     }
 
@@ -42,15 +45,15 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "println()",
             listOf(
-                Type.JFMethod(
-                    listOf(Type.JFVariableSymbol("param1", Type.JFClass("java.lang.Object"))),
+                JFMethod(
+                    listOf(JFVariableSymbol("param1", JFClass("java.lang.Object"))),
                     IdentifierCache.findClass("jafun.io.ConsoleKt"),
                     "println",
                     OperandType.Unit,
                     true,
                 ),
             ),
-            7,
+            1,
         )
     }
 
@@ -60,17 +63,21 @@ class SimpleParserTest {
             ParserJafun.complexIdentifier,
             "java.lang.System.out.println()",
             listOf(
-                Type.JFFieldMethod(
-                    Type.JFField("out", IdentifierCache.findClass("java.lang.System"), IdentifierCache.findClass("java.io.PrintStream")),
-                    Type.JFMethod(
-                        listOf(Type.JFVariableSymbol("param1", OperandType.StringType)),
+                JFFieldMethod(
+                    JFField(
+                        "out",
+                        IdentifierCache.findClass("java.lang.System"),
+                        IdentifierCache.findClass("java.io.PrintStream")
+                    ),
+                    JFMethod(
+                        listOf(JFVariableSymbol("param1", OperandType.StringType)),
                         IdentifierCache.findClass("java.io.PrintStream"),
                         "println",
                         OperandType.Unit,
                     ),
                 ),
             ),
-            28,
+            9,
         )
     }
 
@@ -81,7 +88,7 @@ class SimpleParserTest {
             ParserJafun.methodLhs(0),
             "abcd+3",
             ExpressionNode.Variable(varSymbol),
-            4,
+            1,
         )
     }
 
@@ -99,22 +106,22 @@ class SimpleParserTest {
     @Test
     fun `Empty block compact`() {
         testSingleParser(
-            ParserJafun.curlBlock,
+            ParserJafun.curlyBlock,
             "{}",
             ExpressionNode.ExpressionList(emptyList()),
-            2,
+            1,
         )
     }
 
     @Test
     fun `Empty block whitespace`() {
         testSingleParser(
-            ParserJafun.curlBlock,
+            ParserJafun.curlyBlock,
             """|{  
                |}
             """,
             ExpressionNode.ExpressionList(emptyList()),
-            5,
+            1,
         )
     }
 
@@ -123,8 +130,8 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun.initValAssignment,
             """|val abc=5""".trimMargin(),
-            ExpressionNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
-            9,
+            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
+            5,
         )
     }
 
@@ -136,8 +143,8 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.ValAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
-            13,
+            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
+            9,
         )
     }
 
@@ -149,8 +156,8 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
-            13,
+            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
+            9,
         )
     }
 
@@ -162,8 +169,8 @@ class SimpleParserTest {
             """|abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.VarAssignment(Type.JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
-            8,
+            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
+            6,
         )
     }
 
@@ -173,10 +180,10 @@ class SimpleParserTest {
             ParserJafun.function,
             """|fun test(){}""".trimMargin(),
             ExpressionNode.Function(
-                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
+                JFMethod(emptyList(), JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),
-            12,
+            6,
         )
     }
 
@@ -192,10 +199,10 @@ class SimpleParserTest {
                 |}
             """.trimMargin(),
             ExpressionNode.Function(
-                Type.JFMethod(emptyList(), Type.JFClass("Script"), "test", OperandType.Unit, true),
+                JFMethod(emptyList(), JFClass("Script"), "test", OperandType.Unit, true),
                 emptyList(),
             ),
-            21,
+            13,
         )
     }
 
@@ -205,7 +212,7 @@ class SimpleParserTest {
             ParserJafun.stringLiteral_term,
             "\"abc\"",
             ExpressionNode.StringLiteral("abc"),
-            5,
+            3,
         )
     }
 
@@ -221,13 +228,12 @@ class SimpleParserTest {
                 ExpressionNode.StringLiteral("abc"),
                 ExpressionNode.Variable(numVar)
             )),
-            9,
+            5,
         )
     }
 
     @Test
     fun `string interpolation simple expression`() {
-        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
         testSingleParser(
             ParserJafun.stringLiteral_term,
             "\"abc\${1}\"",
@@ -235,13 +241,12 @@ class SimpleParserTest {
                 ExpressionNode.StringLiteral("abc"),
                 ExpressionNode.IntegerLiteral(1)
             )),
-            9,
+            5,
         )
     }
 
     @Test
     fun `string interpolation expression`() {
-        val numVar = ParserJafun.symbolMap.newVariableSymbol("num", OperandType.SInt32, false)
         testSingleParser(
             ParserJafun.stringLiteral_term,
             "\"abc\${21 + 21}\"",
@@ -255,18 +260,18 @@ class SimpleParserTest {
                         "+",
                         OperandType.SInt32, true, true, Associativity.INFIXL, 100), null, listOf(ExpressionNode.IntegerLiteral(21), ExpressionNode.IntegerLiteral(21)))
             )),
-            15,
+            5,
         )
     }
 
     private fun <R> testSingleParser(
-        parser: Parser<Char, R>,
+        parser: Parser<ExpressionNode.Phase1Token, R>,
         input: String,
         expected: R,
         afterIndex: Int = 1,
     ) {
-        // val lexed = lexer.parse(input).filter { it !is Token.WS }
-        val source = CharSequenceSource(input.trimMargin())
+        val phase1 = Phase1Parser.parse(input.trimMargin()).first ?: fail("Phase1 not successful")
+        val source = ListSource(phase1)
         val parsed = parser.apply(source)
         ParserJafun.symbolMap.reset()
         if (parsed is Parser.Failure) {
@@ -277,17 +282,17 @@ class SimpleParserTest {
             expected,
             success,
         )
-        assertEquals(source.index, afterIndex)
+        assertEquals(afterIndex, source.index)
     }
 
     private fun <R> testSingleParserFailed(
-        parser: Parser<Char, R>,
+        parser: Parser<ExpressionNode.Phase1Token, R>,
         input: String,
         expected: String,
         afterIndex: Int = 1,
     ) {
-        // val lexed = lexer.parse(input).filter { it !is Token.WS }
-        val source = CharSequenceSource(input)
+        val phase1 = Phase1Parser.parse(input.trimMargin()).first ?: fail("Phase1 not successful")
+        val source = ListSource(phase1)
 
         val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
         ParserJafun.symbolMap.reset()

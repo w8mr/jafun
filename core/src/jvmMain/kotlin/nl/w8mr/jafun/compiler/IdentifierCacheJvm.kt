@@ -1,7 +1,6 @@
 package nl.w8mr.jafun.compiler
 
-import nl.w8mr.jafun.OperandType
-import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
 import java.lang.reflect.AccessFlag
@@ -32,7 +31,7 @@ actual fun IdentifierCache.findMethodsInClass(
                 functionName,
                 rtn,
                 AccessFlag.STATIC in jMethod.accessFlags(),
-                jMethod.name.all(ParserJafun.operatorSymbols::contains),
+                jMethod.name.all(Phase1Parser.operatorSymbols::contains),
                 associativity,
                 precedence,
             )

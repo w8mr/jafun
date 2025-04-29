@@ -244,10 +244,10 @@ private fun Indenter.print(element: Printable) {
         }
 
 
-        is ExpressionNode.Equals -> -"="
         is ExpressionNode.Dot -> -"."
         is ExpressionNode.Comma -> -","
         is ExpressionNode.Colon -> -":"
+        is ExpressionNode.SemiColon -> -";"
         is ExpressionNode.Dollar -> -"$"
         is ExpressionNode.DoubleQoute -> -"\""
         is ExpressionNode.SingleQoute -> -"'"

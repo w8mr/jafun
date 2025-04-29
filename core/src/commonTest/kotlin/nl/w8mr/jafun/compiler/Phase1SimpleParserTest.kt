@@ -6,7 +6,6 @@ import nl.w8mr.jafun.compiler.ExpressionNode.CurlyBlock
 import nl.w8mr.jafun.compiler.ExpressionNode.Dollar
 import nl.w8mr.jafun.compiler.ExpressionNode.Dot
 import nl.w8mr.jafun.compiler.ExpressionNode.DoubleQoute
-import nl.w8mr.jafun.compiler.ExpressionNode.Equals
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
 import nl.w8mr.jafun.compiler.ExpressionNode.IntegerLiteral
 import nl.w8mr.jafun.compiler.ExpressionNode.Keyword
@@ -29,7 +28,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("a"),
             Whitespace(" "),
-            Equals,
+            Identifier("=", true),
             Whitespace(" "),
         ), Phase1Parser.valDeclaration.parse("val a = 1").flatten())
     }
@@ -44,7 +43,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("Int"),
             Whitespace(" "),
-            Equals,
+            Identifier("=", true),
             Whitespace(" "),
         ), Phase1Parser.valDeclaration.parse("val a: Int = 1").flatten())
     }
@@ -63,7 +62,7 @@ class Phase1SimpleParserTest {
             Dot,
             Identifier("List"),
             Whitespace(" "),
-            Equals,
+            Identifier("=", true),
             Whitespace(" "),
         ), Phase1Parser.valDeclaration.parse("val a: kotlin.collections.List = emptyList()").flatten())
     }
@@ -111,7 +110,7 @@ class Phase1SimpleParserTest {
            Whitespace(" "),
            Identifier("str1"),
            Whitespace(" "),
-           Equals,
+           Identifier("=", true),
            Whitespace(" "),
            DoubleQoute,
            StringLiteral("Hello World"),

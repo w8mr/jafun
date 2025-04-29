@@ -3,13 +3,14 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
+import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ir2jvm.buildClass
-import nl.w8mr.jafun.compileMethod
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
+import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
 import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.parsek.Parser
 
@@ -41,7 +42,8 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         getPlugins(this)?.fold(input) { context, plugin -> plugin.handle(context) } ?: input
 
     fun compile(code: String, className: String, methodName: String): ByteArray {
-        val parseResult = ParserJafun.parse(code)
+        val phase1 = Phase1Parser.parse(code).first ?: error("Phase 1 parsing failed")
+        val parseResult = ParserJafun.parse(phase1)
         return when (parseResult.second) {
             is Parser.Failure<*> -> {
                 println(parseResult.second)
@@ -114,3 +116,22 @@ annotation class FunctionPrecedence(val precedence: Int)
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionName(val name: String)
+
+fun compileMethod(
+    builder: IRBuilder.ClassDSL,
+    expression: List<ExpressionNode.Phase2_3Expression>,
+    methodName: String,
+    returnType: OperandType<*>,
+    parameterTypes: List<OperandType<*>>,
+) {
+    with(builder) {
+        method(methodName, returnType, parameterTypes) {
+            codeBlock {
+                expression.size - 1
+                expression.forEachIndexed { index, statement ->
+                    compileExpressionNode(statement, this)
+                }
+            }
+        }
+    }
+}

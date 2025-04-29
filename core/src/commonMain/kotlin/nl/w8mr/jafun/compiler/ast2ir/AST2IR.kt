@@ -3,7 +3,7 @@ package nl.w8mr.jafun.compiler.ast2ir
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.compileMethod
+import nl.w8mr.jafun.compiler.compileMethod
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap

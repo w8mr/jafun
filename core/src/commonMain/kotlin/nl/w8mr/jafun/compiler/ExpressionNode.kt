@@ -9,7 +9,7 @@ sealed interface ExpressionNode: Printable {
     // Phase1 node implementations
     object Dot: Phase1Token
     object Colon: Phase1Token
-    object Equals: Phase1Token
+    object SemiColon: Phase1Token
     object Dollar: Phase1Token
     object DoubleQoute: Phase1Token
     object SingleQoute: Phase1Token
@@ -19,7 +19,9 @@ sealed interface ExpressionNode: Printable {
     object RightCurly: Phase1Token
     object Comma: Phase1Token
 
-    data class Identifier(val value: String, val operator: Boolean = false): Phase1Token
+    data class Identifier(val value: String, val operator: Boolean = false): Phase1Token, Phase2Expression {
+        override fun type(): OperandType<*> = OperandType.Unknown
+    }
 
     data class Whitespace(val value: String): Phase1Token
     data class Newline(val value: String): Phase1Token
@@ -62,6 +64,7 @@ sealed interface ExpressionNode: Printable {
 
     data class ExpressionList(val expressions: List<Phase2_3Expression>) : Phase2Expression {
         override fun type() = expressions.lastOrNull()?.type() ?: OperandType.Unit
+        fun simplify(): Phase2_3Expression = if (expressions.size == 1) expressions[0] else this
     }
 
     data class Invocation(
