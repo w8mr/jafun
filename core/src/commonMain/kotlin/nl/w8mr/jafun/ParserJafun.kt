@@ -356,7 +356,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                                     PREFIX -> methodArguments(symbol, minPrecedence)
                                     else -> fail("Method does not have the right associativity")
                                 }
-                            methodInvocation(symbol, arguments)
+                            methodInvocation(symbol, arguments) ?: fail("Method not found")
                         }
 
                         is JFFieldMethod -> {
@@ -369,12 +369,29 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         }
 
                         is JFVariableMethod -> {
-                            val arguments =
-                                when (symbol.method.associativity) {
-                                    PREFIX -> methodArguments(symbol.method, minPrecedence)
-                                    else -> fail("Method does not have the right associativity")
-                                }
-                            methodInvocation(symbol.method, symbol.variable, arguments)
+                            oneOf(combi {
+                                val arguments =
+                                    when (symbol.method.associativity) {
+                                        PREFIX -> methodArguments(symbol.method, minPrecedence)
+                                        else -> fail("Method does not have the right associativity")
+                                    }
+                                methodInvocation(symbol.method, symbol.variable, arguments)
+                            },
+                            combi {
+                                // Extention function
+                                val arguments =
+                                    when (symbol.method.associativity) {
+                                        PREFIX -> methodArguments(
+                                            symbol.method,
+                                            minPrecedence,
+                                            ExpressionNode.Variable(symbol.variable)
+                                        )
+
+                                        else -> fail("Method does not have the right associativity")
+                                    }
+                                methodInvocation(symbol.method, arguments) ?: fail("Method not found")
+                            }
+                            ).bind()
                         } // TODO: remove duplication
                         else -> fail("Method or variable not found")
                     }
@@ -480,13 +497,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     private fun methodInvocation(
         method: JFMethod,
         arguments: List<ExpressionNode.Phase2Expression>,
-    ): ExpressionNode.Phase2Expression =
+    ): ExpressionNode.Phase2Expression? =
         when {
             method.static -> {
                 (method.rtn as? JFClass)?.let { symbolMapManager.addClassToSymbolMap(it,it.path) }
                 ExpressionNode.Invocation(method, null, arguments)
             }
-            else -> error("Method is not static")
+            else -> null
         }
 
     private fun methodInvocation(

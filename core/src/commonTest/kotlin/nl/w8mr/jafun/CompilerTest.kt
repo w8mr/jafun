@@ -2384,9 +2384,9 @@ class CompilerTest {
                 code = """
                     val input = first(arguments)
                     var i = 0
-                    val l = length(input)
+                    val l = input.length
                     while (i < l) {
-                        val c = charAt(input, i)
+                        val c = input.charAt(i)
                         println c
                         i = i + 1
                     }"""

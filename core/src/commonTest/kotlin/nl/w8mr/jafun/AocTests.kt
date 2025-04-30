@@ -16,11 +16,10 @@ class AocTests {
                 code = """
                     val input = first(arguments)
                     var i = 0
-                    val l = length(input)
+                    val l = input.length
                     var floor = 0
                     while (i < l) {
-                        val c = charAt(input, i)
-                        floor = floor + when (c) {
+                        floor = floor + when (input.charAt(i)) {
                             ')' -> -1
                             '(' -> 1
                             else -> 0
@@ -42,11 +41,10 @@ class AocTests {
                 code = """
                     val input = first(arguments)
                     var i = 0
-                    val l = length(input)
+                    val l = input.length
                     var floor = 0
                     while (floor >= 0) {
-                        val c = charAt(input, i)
-                        floor = floor + when (c) {
+                        floor = floor + when (input.charAt(i)) {
                             ')' -> -1
                             '(' -> 1
                             else -> 0

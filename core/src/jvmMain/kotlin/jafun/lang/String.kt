@@ -10,3 +10,9 @@ fun charAt(
     str: String,
     index: Int,
 ): Char = str[index]
+
+@FunctionPrecedence(40)
+@FunctionAssociativity(Associativity.PREFIX)
+fun length(
+    str: String,
+): Int = str.length

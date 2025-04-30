@@ -220,9 +220,11 @@ interface ClassInfo
                 "out",
                 Type.JFField("out", findClass("java.lang.System"), findClass("java.io.PrintStream")),
             )
-            listOf("jafun.lang.IntKt", "jafun.lang.CharKt", "jafun.lang.StringKt", "jafun.io.ConsoleKt", "jafun.test.TestKt", ).forEach { className ->
+            listOf("jafun.lang.IntKt", "jafun.lang.CharKt"/*, "jafun.lang.StringKt"*/, "jafun.io.ConsoleKt", "jafun.test.TestKt").forEach { className ->
                 addClassToSymbolMap(null, className) //import into direct scope
             }
+    //        addClassToSymbolMap(OperandType.StringType, "java.lang.String")
+            addClassToSymbolMap(OperandType.StringType, "jafun.lang.StringKt")
 
             return this
         }
