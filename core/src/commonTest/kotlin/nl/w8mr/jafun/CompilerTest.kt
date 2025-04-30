@@ -56,6 +56,8 @@ class CompilerTest {
         }
 
         fun test(block: TestDSL.() -> Unit) {
+            IdentifierCache.reset()
+
             val files = mutableMapOf<String, TestContext>()
             val runner = TestDSLImpl(files)
             block.invoke(runner)
@@ -2103,6 +2105,78 @@ class CompilerTest {
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                         ifequal(9)
                         loadConstant("Two")
+                        goto(21)
+                        iload("a")
+                        loadConstant(3)
+                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        ifequal(9)
+                        loadConstant("Three")
+                        goto(6)
+                        loadConstant("More")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun basicWhenWithSubjectValExpressionWithStringInterpolation() {
+        test {
+            file {
+                code = """
+                    println when (val a = 1 + 1) {
+                        1 -> "One"
+                        2 -> "Two ${'$'}a"
+                        3 -> "Three"
+                        else -> "More"
+                    }"""
+                phase2 {
+                    +invocation(
+                        println,
+                        `when`(
+                            valAssignment(
+                                symbol("a", OperandType.SInt32),
+                                invocation(plus, i(1), i(1))
+                            ),
+                            i(1) to s("One"),
+                            i(2) to ExpressionNode.StringTemplate(listOf(s("Two "), ExpressionNode.ExpressionList(listOf(variable(symbol("a",
+                                OperandType.SInt32)))))),
+                            i(3) to s("Three"),
+                            b(true) to s("More")
+                        )
+                    )
+                }
+                expectedOutput = "Two 2\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(1)
+                        loadConstant(1)
+                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        istore("a")
+                        iload("a")
+                        loadConstant(1)
+                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        ifequal(9)
+                        loadConstant("One")
+                        goto(57)
+                        iload("a")
+                        loadConstant(2)
+                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        ifequal(30)
+                        `new`("java/lang/StringBuilder")
+                        dup()
+                        invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                        loadConstant("Two ")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        iload("a")
+                        invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
                         goto(21)
                         iload("a")
                         loadConstant(3)

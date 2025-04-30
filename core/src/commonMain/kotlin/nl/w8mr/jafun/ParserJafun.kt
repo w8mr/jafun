@@ -12,6 +12,7 @@ import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.ListSource
@@ -159,7 +160,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             -owsnl
             val expression = expressionUntilNewline.bind()
             val uninitialisedSymbol =  symbolMapManager.find(null, identifier.value).singleOrNull() as? JFVariableSymbol ?: error("Variable not found")
-            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true).apply { symbolMapManager.replaceType(identifier.value, this) }
+            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true).apply { this.symbolMap.replaceType(null, identifier.value, this) }
             ExpressionNode.ValAssignment(updatedSymbol, expression)
         }
 
@@ -202,14 +203,17 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     val whenExpression =
         combi {
             -whenTerm
-            val (subject, matches) =
-                symbolMapManager.local {
-                    val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
-                    val block = token<ExpressionNode.CurlyBlock>().bind()
-                    val matches = matches.parse(block.tokens.drop(1).dropLast(1))
+            val (subject, subjectSymbolMap) = symbolMapManager.local {
+                optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind() to symbolMapManager.currentSymbolMap
+            }
+            val block = token<ExpressionNode.CurlyBlock>().bind()
+            val symbolMap = block.symbolMap as? LocalSymbolMap ?: error("Invalid symbol map")
+            val newSymbolMap = symbolMap.copy(parent = subjectSymbolMap)
+            val matches = symbolMapManager.override(newSymbolMap) {
+                matches.parse(block.tokens.drop(1).dropLast(1))
 
-                    subject to matches
-                }
+            }
+
             ExpressionNode.When(subject, matches)
         }
 
