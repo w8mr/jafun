@@ -109,6 +109,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val optionalType = (optional(
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
+        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, false, false)
         ExpressionNode.Phase1List(`val`, whitespace1, identifier, whitespace2, optionalType/*, equals, whitespace3*/)
     }
 
@@ -120,6 +121,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val optionalType = (optional(
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
+        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, true, false)
         ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType)
     }
 

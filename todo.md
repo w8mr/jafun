@@ -9,7 +9,7 @@
 - method on input values &#x2611;
 
 ## Parser
-- 2 phase: Structure / code
+- 2 phase: Structure / code &#x2611
 - Merge lexer and parser &#x2611;
 - String interpolation &#x2611
 - pattern matching
@@ -29,7 +29,7 @@
 - Extract AST 2 IR code away from ASTNodes  &#x2611;
 - Create separate package for AST2IR  &#x2611;
 - Move String Interpolation handling toward frontend
-- Get the right scope for LocalSymbolMap - Fix scope handling in AST2IR conversion
+- Get the right scope for LocalSymbolMap - Fix scope handling in AST2IR conversion for when subject variable
 
 ## Compiler backend
 - Create separate package for IR2Jvm

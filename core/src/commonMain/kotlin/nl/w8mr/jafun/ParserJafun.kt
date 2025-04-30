@@ -158,7 +158,9 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             -equals
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ExpressionNode.ValAssignment(symbolMapManager.newVariableSymbol(identifier.value, expression.type(), false), expression)
+            val uninitialisedSymbol =  symbolMapManager.find(null, identifier.value).singleOrNull() as? JFVariableSymbol ?: error("Variable not found")
+            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true).apply { symbolMapManager.replaceType(identifier.value, this) }
+            ExpressionNode.ValAssignment(updatedSymbol, expression)
         }
 
     val varTerm = token<ExpressionNode.Keyword>().filter { it.value == "var" }.asLiteral() and wsnl
@@ -170,7 +172,9 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             -equals
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ExpressionNode.VarAssignment(symbolMapManager.newVariableSymbol(identifier.value, expression.type(), true), expression)
+            val uninitialisedSymbol =  symbolMapManager.find(null, identifier.value).singleOrNull() as? JFVariableSymbol ?: error("Variable not found")
+            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true).apply { symbolMapManager.replaceType(identifier.value, this) }
+            ExpressionNode.VarAssignment(updatedSymbol, expression)
         }
 
     val varAssignment =
@@ -325,7 +329,18 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 (combi {
                     when (symbol) {
                         is JFVariableSymbol ->
-                            ExpressionNode.Variable(symbol)
+                            if (symbol.initialized )
+                                ExpressionNode.Variable(symbol)
+                            else {
+                                ExpressionNode.Variable(
+                                    symbolMapManager.currentSymbolMap.parent
+                                        ?.find(null, symbol.path)
+                                        ?.firstOrNull() as? JFVariableSymbol
+                                        ?: error("Variable not found")
+                                )
+                            }
+
+
 
                         is Type.JFConstructor -> {
                             val arguments = methodArguments(symbol)

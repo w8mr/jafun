@@ -128,8 +128,10 @@ class SimpleParserTest {
 
     @Test
     fun `val assignment compact`() {
+        val symbolMap = SymbolMapManager().apply { reset() }
+        symbolMap.newVariableSymbol("abc", OperandType.SInt32, false, false)
         testSingleParser(
-            ParserJafun().initValAssignment,
+            ParserJafun(symbolMap).initValAssignment,
             """|val abc=5""".trimMargin(),
             ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
             5,
@@ -138,8 +140,10 @@ class SimpleParserTest {
 
     @Test
     fun `val assignment whitespace`() {
+        val symbolMap = SymbolMapManager().apply { reset() }
+        symbolMap.newVariableSymbol("abc", OperandType.SInt32, false, false)
         testSingleParser(
-            ParserJafun().initValAssignment,
+            ParserJafun(symbolMap).initValAssignment,
             """|val 
                |abc = 
                |5
@@ -151,8 +155,10 @@ class SimpleParserTest {
 
     @Test
     fun `var assignment whitespace`() {
+        val symbolMap = SymbolMapManager().apply { reset() }
+        symbolMap.newVariableSymbol("abc", OperandType.SInt32, false, false)
         testSingleParser(
-            ParserJafun().initVarAssignment,
+            ParserJafun(symbolMap).initVarAssignment,
             """|var 
                |abc = 
                |5
