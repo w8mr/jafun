@@ -3,7 +3,6 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.compiler.ExpressionNode.Colon
 import nl.w8mr.jafun.compiler.ExpressionNode.CurlyBlock
-import nl.w8mr.jafun.compiler.ExpressionNode.Dollar
 import nl.w8mr.jafun.compiler.ExpressionNode.Dot
 import nl.w8mr.jafun.compiler.ExpressionNode.DoubleQoute
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
@@ -28,8 +27,8 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
             Identifier("a"),
             Whitespace(" "),
-            Identifier("=", true),
-            Whitespace(" "),
+//            Identifier("=", true),
+//            Whitespace(" "),
         ), Phase1Parser().valDeclaration.parse("val a = 1").flatten())
     }
 
@@ -42,9 +41,9 @@ class Phase1SimpleParserTest {
             Colon,
             Whitespace(" "),
             Identifier("Int"),
-            Whitespace(" "),
-            Identifier("=", true),
-            Whitespace(" "),
+//            Whitespace(" "),
+//            Identifier("=", true),
+//            Whitespace(" "),
         ), Phase1Parser().valDeclaration.parse("val a: Int = 1").flatten())
     }
 
@@ -61,9 +60,9 @@ class Phase1SimpleParserTest {
             Identifier("collections"),
             Dot,
             Identifier("List"),
-            Whitespace(" "),
-            Identifier("=", true),
-            Whitespace(" "),
+//            Whitespace(" "),
+//            Identifier("=", true),
+//            Whitespace(" "),
         ), Phase1Parser().valDeclaration.parse("val a: kotlin.collections.List = emptyList()").flatten())
     }
 
@@ -80,7 +79,7 @@ class Phase1SimpleParserTest {
     fun stringSimpleDollar() {
         assertEquals(listOf(
             DoubleQoute,
-            Dollar,
+            Identifier("$", true),
             Identifier("abc"),
             DoubleQoute,
         ), Phase1Parser().stringLiteral_term.parse(""""${'$'}abc"""").flatten())
@@ -90,7 +89,7 @@ class Phase1SimpleParserTest {
     fun stringComplexDollar() {
         assertEquals(listOf(
             DoubleQoute,
-            Dollar,
+            Identifier("$", true),
             CurlyBlock(IdentifierCache,
                 LeftCurly,
                 Identifier("a"),

@@ -28,7 +28,7 @@ import nl.w8mr.parsek.text.string
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.zeroOrMore
 
-data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().apply { reset() }) {
+data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
     companion object {
         val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
     }
@@ -44,8 +44,7 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
 
     val dot = char('.').map { ExpressionNode.Dot }
     val colon = char(':').map { ExpressionNode.Colon }
-    val semiColon = char(':').map { ExpressionNode.SemiColon }
-    val dollar = char('$').map { ExpressionNode.Dollar }
+    val semiColon = char(';').map { ExpressionNode.SemiColon }
     val doubleQoute = char('"').map { ExpressionNode.DoubleQoute }
     val singleQoute = char('\'').map { ExpressionNode.SingleQoute }
     val leftParen = char('(').map { ExpressionNode.LeftParen }
@@ -70,11 +69,13 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
     val booleanLiteral_term = trueLiteral or falseLiteral
 
     val betweenParentheses1 = seq(leftParen, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightParen) { l, b, r -> ExpressionNode.Phase1List(l,b,r) }
-    val betweenCurly1 = seq(leftCurly.map { symbolMap.push(); it }, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightCurly) { l, b, r ->
-        val current = symbolMap.pop()
+    val betweenCurly1 = seq(
+        leftCurly.map { symbolMapManager.push(); it }, // push new symbolMap before parsing block
+        ref(::phase1Tokens) map ExpressionNode::Phase1List,
+        rightCurly) { l, b, r ->
+        val current = symbolMapManager.pop() // pop symbolmap and add it to CurlyBlock
         ExpressionNode.CurlyBlock(current, listOf(l) + b.flatten() + listOf(r))
     }
-
 
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
     val normalIdentifier =
@@ -85,10 +86,11 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
 
     val identifier = normalIdentifier or operatorIdentifier
 
-    val complexIdentifierPhase1 = (((identifier and owsnl) map { ExpressionNode.Phase1List(it.first, it.second) }) and zeroOrMore(seq(
-        dot, owsnl, identifier, owsnl) { dot, ws1, identifier, ws2 -> ExpressionNode.Phase1List(dot, ws1, identifier, ws2)} ) map { ExpressionNode.Phase1List(listOf(it.first) + it.second) })
+    val complexIdentifierPhase1 = ((identifier) and zeroOrMore(seq(
+        dot, owsnl, identifier) { dot, ws1, identifier -> ExpressionNode.Phase1List(dot, ws1, identifier)} ) map { ExpressionNode.Phase1List(listOf(it.first) + it.second) })
 
     val equals = operatorIdentifier.filter { it.value == "=" }
+    val dollar = operatorIdentifier.filter { it.value == "$" }
 
     val simpleStringExpression = seq(dollar, normalIdentifier) map { d, i -> ExpressionNode.Phase1List(d, i) }
     val complexStringExpression = seq(dollar, betweenCurly1) map { d, e -> ExpressionNode.Phase1List(d, e) }
@@ -105,11 +107,9 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
         val identifier = identifier.bind()
         val whitespace2 = owsnl.bind()
         val optionalType = (optional(
-            seq(colon, owsnl, complexIdentifierPhase1, owsnl) { colon, ws1, identifier, ws2 -> ExpressionNode.Phase1List(colon, ws1, identifier, ws2) }
+            seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
-        val equals = equals.bind()
-        val whitespace3 = owsnl.bind()
-        ExpressionNode.Phase1List(`val`, whitespace1, identifier, whitespace2, optionalType, equals, whitespace3)
+        ExpressionNode.Phase1List(`val`, whitespace1, identifier, whitespace2, optionalType/*, equals, whitespace3*/)
     }
 
     val varDeclaration = combi {
@@ -118,11 +118,9 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
         val identifier = identifier.bind()
         val whitespace2 = owsnl.bind()
         val optionalType = (optional(
-            seq(colon, owsnl, complexIdentifierPhase1, owsnl) { colon, ws1, identifier, ws2 -> ExpressionNode.Phase1List(colon, ws1, identifier, ws2) }
+            seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
-        val equals = equals.bind()
-        val whitespace3 = owsnl.bind()
-        ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType, equals, whitespace3)
+        ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType)
     }
 
     val funDeclaration = combi {

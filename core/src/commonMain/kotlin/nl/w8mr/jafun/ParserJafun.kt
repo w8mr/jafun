@@ -33,7 +33,7 @@ import nl.w8mr.parsek.seq
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 
-data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().apply { reset() }) {
+data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
     inline fun <reified R: Any> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
@@ -71,7 +71,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
                             else -> current
                         }
                         when (val result = (dot and identifier).bindAsResult()) {
-                            is Success -> when (val children = symbolMap.find(parentContext, result.value.value)) {
+                            is Success -> when (val children = symbolMapManager.find(parentContext, result.value.value)) {
                                 else -> children.flatMap { child ->
                                     when (current) {
                                         is JFField -> when (child) {
@@ -98,7 +98,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
                             is Failure ->
                                 when (current) {
                                     is JFClass ->
-                                        symbolMap.find(current).toList().filterIsInstance<Type.JFConstructor>()
+                                        symbolMapManager.find(current).toList().filterIsInstance<Type.JFConstructor>()
                                     //TODO: Check for invoke methods
                                     else -> listOf(current)
                                 }
@@ -110,7 +110,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
                 }
 
             val id = identifier.bind()
-            val currents = symbolMap.find(null, id.value)
+            val currents = symbolMapManager.find(null, id.value)
             currents.flatMap { handleSubIndentifiers(it) }
         }
 
@@ -122,8 +122,9 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
     val expressionUntilComma = prattParser(stopTerm = commaTerm)
 
     val stringLiteral = token<ExpressionNode.StringLiteral>()
-    val simpleStringExpression = seq(token<ExpressionNode.Dollar>(), token<ExpressionNode.Identifier>()) { d, i ->  expressions.parse(listOf(i)).firstOrNull() as? ExpressionNode.Variable ?: error("Variable not found") }
-    val complexStringExpression = seq(token<ExpressionNode.Dollar>(), token<ExpressionNode.CurlyBlock>()) { d, e -> ExpressionNode.ExpressionList( expressions.parse(e.tokens.drop(1).dropLast(1))).simplify() as ExpressionNode.Phase2Expression}
+    val dollar = token<ExpressionNode.Identifier>().filter { it.value == "\$" }
+    val simpleStringExpression = seq(dollar, token<ExpressionNode.Identifier>()) { d, i ->  expressions.parse(listOf(i)).firstOrNull() as? ExpressionNode.Variable ?: error("Variable not found") }
+    val complexStringExpression = seq(dollar, token<ExpressionNode.CurlyBlock>()) { d, e -> ExpressionNode.ExpressionList( expressions.parse(e.tokens.drop(1).dropLast(1))).simplify() as ExpressionNode.Phase2Expression}
 
     // TODO: Escape characters
     val lineStringContent = zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression)
@@ -143,7 +144,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
         zeroOrMore(owsnl and expressionUntilNewline)
 
     val curlyBlock = token<ExpressionNode.CurlyBlock>().map {
-        symbolMap.override(it.symbolMap) {
+        symbolMapManager.override(it.symbolMap) {
             ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
         }
     }
@@ -157,7 +158,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             -equals
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ExpressionNode.ValAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), false), expression)
+            ExpressionNode.ValAssignment(symbolMapManager.newVariableSymbol(identifier.value, expression.type(), false), expression)
         }
 
     val varTerm = token<ExpressionNode.Keyword>().filter { it.value == "var" }.asLiteral() and wsnl
@@ -169,7 +170,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             -equals
             -owsnl
             val expression = expressionUntilNewline.bind()
-            ExpressionNode.VarAssignment(symbolMap.newVariableSymbol(identifier.value, expression.type(), true), expression)
+            ExpressionNode.VarAssignment(symbolMapManager.newVariableSymbol(identifier.value, expression.type(), true), expression)
         }
 
     val varAssignment =
@@ -181,7 +182,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             val expression = expressionUntilNewline.bind()
 
             val variableSymbol =
-                symbolMap.findSingle(identifier.value) as? JFVariableSymbol
+                symbolMapManager.findSingle(identifier.value) as? JFVariableSymbol
                     ?: throw IllegalStateException("Variable ${identifier.value} not defined")
             if (!variableSymbol.mutable) {
                 throw IllegalStateException("Variable ${identifier.value} is not mutable")
@@ -198,7 +199,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
         combi {
             -whenTerm
             val (subject, matches) =
-                symbolMap.local {
+                symbolMapManager.local {
                     val subject = optional(lParenTerm and expressionUntilRightParen and rParenTerm).bind()
                     val block = token<ExpressionNode.CurlyBlock>().bind()
                     val matches = matches.parse(block.tokens.drop(1).dropLast(1))
@@ -213,7 +214,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
         combi {
             -whileTerm
             val (condition, expressions) =
-                symbolMap.local {
+                symbolMapManager.local {
                     -lParenTerm
                     val condition = expressionUntilRightParen.bind()
                     -rParenTerm
@@ -238,9 +239,9 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             -owsnl
 
             val (symbol, block) = token<ExpressionNode.CurlyBlock>().map {
-                symbolMap.override(it.symbolMap) {
+                symbolMapManager.override(it.symbolMap) {
                     val arguments = parameters.map { (identifier, type) ->
-                        symbolMap.newVariableSymbol(
+                        symbolMapManager.newVariableSymbol(
                             identifier.value,
                             type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
                             false,
@@ -251,12 +252,12 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
                             arguments,
                             JFClass("Script"),
                             name.value,
-                            returnType?.value?.let { symbolMap.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unit,
+                            returnType?.value?.let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unit,
                             static = true,
                             operator = name.operator,
                             associativity = PREFIX,
                         )
-                    symbolMap.add(name.value, symbol)
+                    symbolMapManager.add(name.value, symbol)
 
 
                     val block = ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
@@ -266,7 +267,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             }.bind()
 
             val symbolWithReturnType = symbol.copy(rtn = block.expressions .lastOrNull()?.type() ?: OperandType.Unit)
-            symbolMap.add(name.value, symbolWithReturnType)
+            symbolMapManager.add(name.value, symbolWithReturnType)
 
             ExpressionNode.Function(symbolWithReturnType, block.expressions)
         }
@@ -369,7 +370,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
         // TODO: Cache parsers
         combi {
             val identifier = (identifier and owsnl).bind()
-            val symbols = symbolMap.find(lhsExpression.type(), identifier.value)
+            val symbols = symbolMapManager.find(lhsExpression.type(), identifier.value)
             var okMark = mark()
             val result =
                 symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
@@ -463,7 +464,7 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
     ): ExpressionNode.Phase2Expression =
         when {
             method.static -> {
-                (method.rtn as? JFClass)?.let { symbolMap.addClassToSymbolMap(it,it.path) }
+                (method.rtn as? JFClass)?.let { symbolMapManager.addClassToSymbolMap(it,it.path) }
                 ExpressionNode.Invocation(method, null, arguments)
             }
             else -> error("Method is not static")

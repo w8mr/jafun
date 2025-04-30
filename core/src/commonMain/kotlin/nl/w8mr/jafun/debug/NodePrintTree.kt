@@ -248,7 +248,6 @@ private fun Indenter.print(element: Printable) {
         is ExpressionNode.Comma -> -","
         is ExpressionNode.Colon -> -":"
         is ExpressionNode.SemiColon -> -";"
-        is ExpressionNode.Dollar -> -"$"
         is ExpressionNode.DoubleQoute -> -"\""
         is ExpressionNode.SingleQoute -> -"'"
         is ExpressionNode.LeftParen -> -"("

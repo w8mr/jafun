@@ -10,7 +10,6 @@ sealed interface ExpressionNode: Printable {
     object Dot: Phase1Token
     object Colon: Phase1Token
     object SemiColon: Phase1Token
-    object Dollar: Phase1Token
     object DoubleQoute: Phase1Token
     object SingleQoute: Phase1Token
     object LeftParen: Phase1Token
