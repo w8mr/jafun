@@ -70,8 +70,11 @@ data class Phase1Parser(val symbolMap: SymbolMapManager = SymbolMapManager().app
     val booleanLiteral_term = trueLiteral or falseLiteral
 
     val betweenParentheses1 = seq(leftParen, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightParen) { l, b, r -> ExpressionNode.Phase1List(l,b,r) }
-    val betweenCurly1 = seq(leftCurly, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightCurly) { l, b, r ->
-        ExpressionNode.CurlyBlock(listOf(l) + b.flatten() + listOf(r)) }
+    val betweenCurly1 = seq(leftCurly.map { symbolMap.push(); it }, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightCurly) { l, b, r ->
+        val current = symbolMap.pop()
+        ExpressionNode.CurlyBlock(current, listOf(l) + b.flatten() + listOf(r))
+    }
+
 
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
     val normalIdentifier =

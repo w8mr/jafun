@@ -91,7 +91,7 @@ class Phase1SimpleParserTest {
         assertEquals(listOf(
             DoubleQoute,
             Dollar,
-            CurlyBlock(
+            CurlyBlock(IdentifierCache,
                 LeftCurly,
                 Identifier("a"),
                 Identifier("+", true),
@@ -144,6 +144,7 @@ class Phase1SimpleParserTest {
             Colon,
             Identifier("Int"),
             CurlyBlock(
+                IdentifierCache,
                 LeftCurly,
                 Identifier("println"),
                 Whitespace(" "),

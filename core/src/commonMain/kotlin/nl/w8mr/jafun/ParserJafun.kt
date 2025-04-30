@@ -143,7 +143,9 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
         zeroOrMore(owsnl and expressionUntilNewline)
 
     val curlyBlock = token<ExpressionNode.CurlyBlock>().map {
-        ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
+        symbolMap.override(it.symbolMap) {
+            ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
+        }
     }
 
     val valTerm = token<ExpressionNode.Keyword>().filter { it.value == "val" }.asLiteral() and wsnl
@@ -228,27 +230,25 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
             -funTerm
             val name = identifier.bind()
             -owsnl
-            val (symbol, block) =
-                symbolMap.local {
-                    -lParenTerm
-                    -owsnl
-                    val parameters =
-                        (
-                            identifier and owsnl and colon and owsnl and complexIdentifier map { identifier, type ->
-                                symbolMap.newVariableSymbol(
-                                    identifier.value,
-                                    type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
-                                    false,
-                                )
-                            } sepByAllowEmpty commaTerm
-                        ).bind()
-                    -rParenTerm
-                    val returnType = optional(colon and owsnl and identifier).bind()
-                    -owsnl
+            -lParenTerm
+            -owsnl
+            val parameters = (identifier and owsnl and colon and owsnl and complexIdentifier sepByAllowEmpty commaTerm).bind()
+            -rParenTerm
+            val returnType = optional(colon and owsnl and identifier).bind()
+            -owsnl
 
+            val (symbol, block) = token<ExpressionNode.CurlyBlock>().map {
+                symbolMap.override(it.symbolMap) {
+                    val arguments = parameters.map { (identifier, type) ->
+                        symbolMap.newVariableSymbol(
+                            identifier.value,
+                            type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
+                            false,
+                            )
+                    }
                     val symbol =
                         JFMethod(
-                            parameters,
+                            arguments,
                             JFClass("Script"),
                             name.value,
                             returnType?.value?.let { symbolMap.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unit,
@@ -258,11 +258,14 @@ data class ParserJafun(val symbolMap: SymbolMapManager = SymbolMapManager().appl
                         )
                     symbolMap.add(name.value, symbol)
 
-                    val block = curlyBlock.bind()
+
+                    val block = ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
+
                     symbol to block
                 }
+            }.bind()
 
-            val symbolWithReturnType = symbol.copy(rtn = block.expressions.lastOrNull()?.type() ?: OperandType.Unit)
+            val symbolWithReturnType = symbol.copy(rtn = block.expressions .lastOrNull()?.type() ?: OperandType.Unit)
             symbolMap.add(name.value, symbolWithReturnType)
 
             ExpressionNode.Function(symbolWithReturnType, block.expressions)

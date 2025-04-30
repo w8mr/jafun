@@ -38,8 +38,16 @@ sealed interface ExpressionNode: Printable {
         }
     }
 
-    data class CurlyBlock(val tokens: List<Phase1Token>) : Phase1Token {
-        constructor(vararg tokens: Phase1Token) : this(tokens.toList())
+    data class CurlyBlock(val symbolMap: SymbolMap, val tokens: List<Phase1Token>) : Phase1Token {
+        constructor(symbolMap: SymbolMap, vararg tokens: Phase1Token) : this(symbolMap, tokens.toList())
+
+        /**
+         * override equals to ignore symbolMap
+         */
+        override fun equals(other: Any?): Boolean =
+            (other as? CurlyBlock)?.tokens == tokens
+
+        override fun hashCode(): Int = tokens.hashCode()
     }
 
     data class StringLiteral(val value: String) : Phase1Token, Phase2Expression {

@@ -76,11 +76,12 @@ class SymbolMapManager {
         return variableSymbol
     }
 
-    private fun push() {
+    fun push(): SymbolMap {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
+        return currentSymbolMap
     }
 
-    private fun pop() {
+    fun pop(): SymbolMap {
         val oldSymbolMap = currentSymbolMap
         currentSymbolMap =
             if (oldSymbolMap is LocalSymbolMap) {
@@ -88,6 +89,7 @@ class SymbolMapManager {
             } else {
                 throw IllegalStateException("already at top of symbol map stack")
             }
+        return oldSymbolMap
     }
 
     fun <T> local(block: () -> T): T {
@@ -100,4 +102,17 @@ class SymbolMapManager {
             pop()
         }
     }
+
+    fun <T> override(symbolMap: SymbolMap, block: () -> T): T {
+        val old = currentSymbolMap
+        currentSymbolMap = symbolMap
+        return try {
+            block()
+        } catch (t: Throwable) {
+            throw t
+        } finally {
+            currentSymbolMap = old
+        }
+    }
+
 }
