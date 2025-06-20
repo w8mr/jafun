@@ -261,7 +261,7 @@ class SimpleParserTest {
             "\"abc\${21 + 21}\"",
             ExpressionNode.StringTemplate(listOf(
                 ExpressionNode.StringLiteral("abc"),
-                ExpressionNode.Invocation(
+                ExpressionNode.MethodInvocation(
                     JFMethod(listOf(
                         JFVariableSymbol("param1", OperandType.SInt32, IdentifierCache),
                         JFVariableSymbol("param2", OperandType.SInt32, IdentifierCache)),

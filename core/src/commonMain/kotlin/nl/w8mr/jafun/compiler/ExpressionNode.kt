@@ -74,18 +74,22 @@ sealed interface ExpressionNode: Printable {
         fun simplify(): Phase2_3Expression = if (expressions.size == 1) expressions[0] else this
     }
 
-    data class Invocation(
+    interface Invocation : Phase2Expression {
+        val arguments: List<Phase2_3Expression>
+    }
+
+    data class MethodInvocation(
         val method: Type.JFMethod,
         val field: Type.InvocationTarget?,
-        val arguments: List<Phase2_3Expression>
-    ) : Phase2Expression {
+        override val arguments: List<Phase2_3Expression>
+    ) : Invocation {
         override fun type() = method.rtn
     }
 
-    data class Constructor(
+    data class ConstructorInvocation(
         val cons: Type.JFConstructor,
-        val arguments: List<Phase2_3Expression>
-    ) : Phase2Expression {
+        override val arguments: List<Phase2_3Expression>
+    ) : Invocation {
         override fun type() = (cons.parent as? Type.JFClass) ?: error("Constructor ${cons.parent} is not an instance of Type.JFClass")
     }
 

@@ -30,6 +30,8 @@
 - Create separate package for AST2IR  &#x2611;
 - Move String Interpolation handling toward frontend
 - Get the right scope for LocalSymbolMap - Fix scope handling in AST2IR conversion for when subject variable
+- Change to Phase2_3Expression to Phase2or3Expression and Phase2and3Expression
+- When unreachale handling
 
 ## Compiler backend
 - Create separate package for IR2Jvm

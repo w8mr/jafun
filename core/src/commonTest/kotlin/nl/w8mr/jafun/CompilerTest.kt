@@ -19,6 +19,7 @@ import nl.w8mr.jafun.debug.print
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.kasmine.classBuilder
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -287,14 +288,14 @@ class CompilerTest {
             fun invocation(
                 method: Type.JFMethod,
                 vararg parameters: ExpressionNode.Phase2_3Expression,
-            ) = ExpressionNode.Invocation(method, null, parameters.toList())
+            ) = ExpressionNode.MethodInvocation(method, null, parameters.toList())
 
 
             fun invocation(
                 method: Type.JFMethod,
                 field: Type.JFField,
                 vararg parameters: ExpressionNode.Phase2_3Expression,
-            ) = ExpressionNode.Invocation(method, field, parameters.toList())
+            ) = ExpressionNode.MethodInvocation(method, field, parameters.toList())
 
             fun function(
                 method: Type.JFMethod,
@@ -760,10 +761,10 @@ class CompilerTest {
                 code = """
                     val str1 = "Hello World"
                     println str1"""
-//                phase2 {
-//                    +valAssignment(symbol("str1", OperandType.StringType), s("Hello World"))
-//                    +invocation(println, variable(symbol("str1", OperandType.StringType)))
-//                }
+                phase2 {
+                    +valAssignment(symbol("str1", OperandType.StringType), s("Hello World"))
+                    +invocation(println, variable(symbol("str1", OperandType.StringType)))
+                }
                 expectedOutput = "Hello World\n"
                 jvmIr {
                     name = "Script"
@@ -1470,6 +1471,58 @@ class CompilerTest {
         }
     }
 
+    @Test
+    @Ignore
+    fun funForwardsFunctionCallFromFunction() {
+        test {
+            file {
+                code = """
+                    fun test(prefix: String) { 
+                        test2(prefix, 10)
+                    }
+                    fun test2(prefix: String, a: Int) {
+                        print prefix
+                        println a
+                    }
+                    test "test: "
+                    test2("test: ", 5)"""
+                expectedOutput = "test: 5\ntest: 10\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant("test: ")
+                        loadConstant(5)
+                        invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
+                        loadConstant("test: ")
+                        invokeStatic("Script", "test2", "(Ljava/lang/String;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "test"
+                        signature = "(Ljava/lang/String;I)V"
+                        aload("prefix")
+                        invokeStatic("jafun/io/ConsoleKt", "print", "(Ljava/lang/Object;)V")
+                        iload("a")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "test2"
+                        signature = "(Ljava/lang/String;)V"
+                        aload("prefix")
+                        loadConstant(10)
+                        invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+
 
     @Test
     fun stackNeutralTest() {
@@ -1728,13 +1781,13 @@ class CompilerTest {
                     {
                         val a = 4
                         {
-                            val a = a
+                            val a = a + 2
                             println a
                         }
                         println a
                     }
                     println a"""
-                expectedOutput = "4\n4\n2\n"
+                expectedOutput = "6\n4\n2\n"
                 jvmIr {
                     name = "Script"
                     method {
@@ -1745,6 +1798,8 @@ class CompilerTest {
                         loadConstant(4)
                         istore("1.a")
                         iload("1.a")
+                        loadConstant(2)
+                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
                         istore("2.a")
                         iload("2.a")
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -1804,6 +1859,7 @@ class CompilerTest {
                         `return`()
                     }
                 }
+                //TODO evaluate actual jvm bytecode
             }
         }
     }
@@ -2425,5 +2481,19 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun constructorWithArguments() {
+        test {
+            file {
+                code = """
+                    val p = jafun.test.POJO(4)
+                    println p 
+                """.trimMargin()
+                expectedOutput = "POJO(a=4)\n"
+            }
+        }
+    }
+
 }
 

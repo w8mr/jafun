@@ -396,7 +396,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         else -> fail("Method or variable not found")
                     }
                 }.bindAsResult() as? Success)?.value
-            }.singleOrNull() ?: fail("No single method found")
+            }.groupBy { (it as? ExpressionNode.Invocation)?.arguments?.size ?: 0 }.maxByOrNull { it.key }?.value?.singleOrNull() ?: fail("No single method found")
         }
 
     fun methodRhs(
@@ -473,11 +473,12 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                                         combi {
                                             when (count) {
                                                 0 -> emptyList()
-                                                1 -> listOf(expressionUntilComma.bind())
+                                                1 -> listOf(expressionUntilRightParen.bind())
                                                 else ->
-                                                    listOf(
-                                                        expressionUntilComma.bind(),
-                                                    ) + (commaTerm and expressionUntilComma).times(count - 1).bind()
+                                                    listOf(expressionUntilComma.bind()) + 
+                                                            (commaTerm and expressionUntilComma).times((count - 2).coerceAtLeast(0)).bind() +
+                                                            listOf((commaTerm and expressionUntilRightParen).bind())
+                                                
                                             }
                                         } and rParenTerm,
                                 prattParser(minPrecedence = newPrecedence).times(count),
@@ -489,19 +490,19 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     private fun constructorInvocation(
         constructor: Type.JFConstructor,
         arguments: List<ExpressionNode.Phase2Expression>,
-    ): ExpressionNode.Phase2Expression {
+    ): ExpressionNode.ConstructorInvocation {
             //(method.rtn as? JFClass)?.let { symbolMap.addClassToSymbolMap(it,it.path) }
-            return ExpressionNode.Constructor(constructor, arguments)
+            return ExpressionNode.ConstructorInvocation(constructor, arguments)
         }
 
     private fun methodInvocation(
         method: JFMethod,
         arguments: List<ExpressionNode.Phase2Expression>,
-    ): ExpressionNode.Phase2Expression? =
+    ): ExpressionNode.MethodInvocation? =
         when {
             method.static -> {
                 (method.rtn as? JFClass)?.let { symbolMapManager.addClassToSymbolMap(it,it.path) }
-                ExpressionNode.Invocation(method, null, arguments)
+                ExpressionNode.MethodInvocation(method, null, arguments)
             }
             else -> null
         }
@@ -512,7 +513,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         arguments: List<ExpressionNode.Phase2Expression>,
     ): ExpressionNode.Phase2Expression =
         when {
-            !method.static -> ExpressionNode.Invocation(method, field, arguments)
+            !method.static -> ExpressionNode.MethodInvocation(method, field, arguments)
             else -> error("Method is static")
         }
 

@@ -45,8 +45,8 @@ actual fun IdentifierCache.findConstructorsInClass(
 ): List<Type.JFConstructor> {
     val jClass = Class.forName(jClassName)
     val jConstructors = jClass.constructors.toList()
-    val constructors = jConstructors.map { jConstructors ->
-        val params = jConstructors.parameters.map { jvmType(it.type.name) }
+    val constructors = jConstructors.map { jConstructor ->
+        val params = jConstructor.parameters.map { jvmType(it.type.name) }
         val jfClass = findOrAddClass(jClass.name, jClass.packageName, jClass.simpleName)
 
         val constructor =

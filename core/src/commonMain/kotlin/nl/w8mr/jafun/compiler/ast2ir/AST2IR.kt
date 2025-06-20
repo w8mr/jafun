@@ -49,7 +49,7 @@ private fun createWhenConditionExpression(
 ): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
         val symbol = IdentifierCache.findMethod(subjVar.type, "==", listOf(subjVar.type, condition.type()))
-        ExpressionNode.Invocation(symbol, null, listOf(ExpressionNode.Variable(subjVar), condition))
+        ExpressionNode.MethodInvocation(symbol, null, listOf(ExpressionNode.Variable(subjVar), condition))
     } ?: condition // If no subject variable, the condition is used directly
 }
 
@@ -58,9 +58,13 @@ fun compileExpressionNode(
     builder: IRBuilder.CodeBlockDSL,
 ) {
     when (node) {
-        is ExpressionNode.Invocation -> {
+        is ExpressionNode.MethodInvocation -> {
             val arguments = loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))
-            builder.add(ExpressionNode.Invocation(node.method, node.field, arguments))
+            builder.add(ExpressionNode.MethodInvocation(node.method, node.field, arguments))
+        }
+        is ExpressionNode.ConstructorInvocation -> {
+            val arguments = loadArguments(builder, node.arguments, node.cons.parameters.map(Type.JFVariableSymbol::type))
+            builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
         }
         is ExpressionNode.When -> {
             val subjectVariable =
@@ -92,7 +96,7 @@ fun compileExpressionNode(
                 }
 
             val lastIndex = node.matches.size - 1
-            var unreachable = false
+            var unreachable = false //TODO: Add handling
 
             val conditionAndBodyPairs = node.matches.mapIndexed { index, (condition, expression) ->
                 when(condition) {
