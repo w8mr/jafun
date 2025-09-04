@@ -15,7 +15,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
-import nl.w8mr.parsek.ListSource
+import nl.w8mr.parsek.ListContext
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.Parser.Failure
 import nl.w8mr.parsek.Parser.Success
@@ -31,11 +31,12 @@ import nl.w8mr.parsek.or
 import nl.w8mr.parsek.parse
 import nl.w8mr.parsek.sepByAllowEmpty
 import nl.w8mr.parsek.seq
+import nl.w8mr.parsek.text.anyChar
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 
 data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
-    inline fun <reified R: Any> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
+    inline fun <reified R: ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
     val ows = zeroOrMore(whitespace).asLiteral()
@@ -63,7 +64,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
     val complexIdentifier: Parser<ExpressionNode.Phase1Token, List<TypeSymbol>> =
         combi {
-            fun CombinatorDSL<ExpressionNode.Phase1Token, List<TypeSymbol>>.handleSubIndentifiers(current: TypeSymbol): List<TypeSymbol> =
+            fun CombinatorDSL<ExpressionNode.Phase1Token>.handleSubIndentifiers(current: TypeSymbol): List<TypeSymbol> =
                 when (current) {
                     is JFClass, is JFVariableSymbol, is JFPackage, is JFField -> {
                         val parentContext = when (current) {
@@ -249,7 +250,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val (symbol, block) = token<ExpressionNode.CurlyBlock>().map {
                 symbolMapManager.override(it.symbolMap) {
                     val arguments = parameters.map { (identifier, type) ->
-                        symbolMapManager.newVariableSymbol(
+                        symbolMapManager.replaceVariableSymbol(
                             identifier.value,
                             type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
                             false,
@@ -265,8 +266,9 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             operator = name.operator,
                             associativity = PREFIX,
                         )
-                    symbolMapManager.add(name.value, symbol)
+                    symbolMapManager.replaceType(name.value, symbol)
 
+                    queue.add(Phase1Method(name.value, it.tokens.drop(1).dropLast(1)))
 
                     val block = ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
 
@@ -275,7 +277,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             }.bind()
 
             val symbolWithReturnType = symbol.copy(rtn = block.expressions .lastOrNull()?.type() ?: OperandType.Unit)
-            symbolMapManager.add(name.value, symbolWithReturnType)
+            symbolMapManager.replaceType(name.value, symbolWithReturnType)
 
             ExpressionNode.Function(symbolWithReturnType, block.expressions)
         }
@@ -306,14 +308,16 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 ).bindAsResult()
 
             while (current is Success) {
-                val mark = mark()
-                when (stopTerm.bindAsResult()) {
-                    is Success -> {
-                        reset(mark)
-                        break
+                val stop = ((combi {
+                    when (stopTerm.bindAsResult()) {
+                        is Success -> fail("stop term found")
+                        is Failure -> fail("stop term not found")
                     }
-                    is Failure -> {
-                        reset(mark)
+                }).bindAsResult() as? Failure)?.error == "stop term found"
+
+                when (stop) {
+                    true -> break
+                    false -> {
                         current =
                             when (val rhs = (owsnl and methodRhs(current.value, minPrecedence) and ows).bindAsResult()) {
                                 is Failure -> break
@@ -327,13 +331,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
     fun methodLhs(minPrecedence: Int): Parser<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression> =
         // TODO: Cache parsers
-        combi {
+        combi  {
             val symbols = complexIdentifier.bind()
             symbols.mapNotNull { symbol ->
-                (combi {
+                val combi: Parser<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression> = combi {
                     when (symbol) {
                         is JFVariableSymbol ->
-                            if (symbol.initialized )
+                            if (symbol.initialized)
                                 ExpressionNode.Variable(symbol)
                             else {
                                 ExpressionNode.Variable(
@@ -345,11 +349,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             }
 
 
-
                         is Type.JFConstructor -> {
                             val arguments = methodArguments(symbol)
                             constructorInvocation(symbol, arguments)
                         }
+
                         is JFMethod -> {
                             val arguments =
                                 when (symbol.associativity) {
@@ -369,33 +373,35 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         }
 
                         is JFVariableMethod -> {
-                            oneOf(combi {
-                                val arguments =
-                                    when (symbol.method.associativity) {
-                                        PREFIX -> methodArguments(symbol.method, minPrecedence)
-                                        else -> fail("Method does not have the right associativity")
-                                    }
-                                methodInvocation(symbol.method, symbol.variable, arguments)
-                            },
-                            combi {
-                                // Extention function
-                                val arguments =
-                                    when (symbol.method.associativity) {
-                                        PREFIX -> methodArguments(
-                                            symbol.method,
-                                            minPrecedence,
-                                            ExpressionNode.Variable(symbol.variable)
-                                        )
+                            oneOf(
+                                combi<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression> {
+                                    val arguments =
+                                        when (symbol.method.associativity) {
+                                            PREFIX -> methodArguments(symbol.method, minPrecedence)
+                                            else -> fail("Method does not have the right associativity")
+                                        }
+                                    methodInvocation(symbol.method, symbol.variable, arguments)
+                                },
+                                combi {
+                                    // Extention function
+                                    val arguments =
+                                        when (symbol.method.associativity) {
+                                            PREFIX -> methodArguments(
+                                                symbol.method,
+                                                minPrecedence,
+                                                ExpressionNode.Variable(symbol.variable)
+                                            )
 
-                                        else -> fail("Method does not have the right associativity")
-                                    }
-                                methodInvocation(symbol.method, arguments) ?: fail("Method not found")
-                            }
+                                            else -> fail("Method does not have the right associativity")
+                                        }
+                                    methodInvocation(symbol.method, arguments) ?: fail("Method not found")
+                                }
                             ).bind()
                         } // TODO: remove duplication
                         else -> fail("Method or variable not found")
                     }
-                }.bindAsResult() as? Success)?.value
+                }
+                (combi.bindAsResult<ExpressionNode.Phase2Expression>() as? Success)?.value
             }.groupBy { (it as? ExpressionNode.Invocation)?.arguments?.size ?: 0 }.maxByOrNull { it.key }?.value?.singleOrNull() ?: fail("No single method found")
         }
 
@@ -407,29 +413,26 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         combi {
             val identifier = (identifier and owsnl).bind()
             val symbols = symbolMapManager.find(lhsExpression.type(), identifier.value)
-            var okMark = mark()
             val result =
                 symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
-                    val mark = mark()
-                    val arguments =
-                        when (symbol.associativity) {
-                            POSTFIX -> lhsExpression.asList()
-                            INFIXL, INFIXR -> {
-                                if (symbol.precedence <= minPrecedence) fail("Lower precedence")
-                                methodArguments(symbol, minPrecedence, lhsExpression)
+                    (combi<ExpressionNode.Phase1Token, ExpressionNode.MethodInvocation?> {
+                        val arguments =
+                            when (symbol.associativity) {
+                                POSTFIX -> lhsExpression.asList()
+                                INFIXL, INFIXR -> {
+                                    if (symbol.precedence <= minPrecedence) fail("Lower precedence")
+                                    methodArguments(symbol, minPrecedence, lhsExpression)
+                                }
+
+                                else -> fail("Method (${identifier.value}) does not have the right associativity")
                             }
-                            else -> fail("Method (${identifier.value }) does not have the right associativity")
+                        if (arguments.map { it.type() } == symbol.parameters.map { it.type }) {
+                            methodInvocation(symbol, arguments)
+                        } else {
+                            fail("no method match")
                         }
-                    if (arguments.map { it.type() } == symbol.parameters.map { it.type }) {
-                        okMark = mark()
-                        reset(mark)
-                        methodInvocation(symbol, arguments)
-                    } else {
-                        reset(mark)
-                        null
-                    }
+                    }.bindAsResult() as? Success)?.value
                 }.singleOrNull() ?: fail("No single method ($identifier) not found")
-            reset(okMark)
             result
         }
 
@@ -439,14 +442,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             else -> listOf(this)
         }
 
-    private fun CombinatorDSL<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression>.methodArguments(
+    private fun CombinatorDSL<ExpressionNode.Phase1Token>.methodArguments(
         method: Type.JFConstructor,
         lhsExpression: ExpressionNode.Phase2Expression? = null,
     ): List<ExpressionNode.Phase2Expression> {
         val count = method.parameters.size - (if (lhsExpression == null) 0 else 1)
         return methodArguments(count, 10, lhsExpression)
     }
-    private fun CombinatorDSL<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression>.methodArguments(
+    private fun CombinatorDSL<ExpressionNode.Phase1Token>.methodArguments(
         method: JFMethod,
         minPrecedence: Int,
         lhsExpression: ExpressionNode.Phase2Expression? = null,
@@ -460,7 +463,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         return methodArguments(count, newPrecedence, lhsExpression)
     }
 
-    private fun CombinatorDSL<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression>.methodArguments(
+    private fun CombinatorDSL<ExpressionNode.Phase1Token>.methodArguments(
         count: Int,
         newPrecedence: Int,
         lhsExpression: ExpressionNode.Phase2Expression?
@@ -517,8 +520,19 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             else -> error("Method is static")
         }
 
+    data class Phase1Method(val methodName: String, val body: List<ExpressionNode.Phase1Token>)
+    data class Phase2Method(val methodName: String, val body: Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>>)
+
+    val queue = ArrayDeque<Phase1Method>()
+    val result = mutableMapOf<String, Phase2Method>()
+
     fun parse(input: List<ExpressionNode.Phase1Token>): Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>> {
-        val source = ListSource(input)
-        return expressions.parseTree(source)
+        queue.add(Phase1Method("main", input))
+        while (queue.isNotEmpty()) {
+            val method = queue.removeFirst()
+            val source = ListContext(method.body)
+            result[method.methodName] = Phase2Method(method.methodName, expressions.parseTree(source))
+        }
+        return result["main"]?.body ?: error("No main method")
     }
 }

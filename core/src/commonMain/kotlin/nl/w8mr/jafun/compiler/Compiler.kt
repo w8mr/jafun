@@ -46,7 +46,7 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         val phase1 = Phase1Parser(symbolMap).parse(code).first ?: error("Phase 1 parsing failed")
         val parseResult = ParserJafun(symbolMap).parse(phase1)
         return when (parseResult.second) {
-            is Parser.Failure<*> -> {
+            is Parser.Failure -> {
                 println(parseResult.second)
                 error("Parser failed")
             }

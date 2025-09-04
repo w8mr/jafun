@@ -76,6 +76,18 @@ class SymbolMapManager {
         return variableSymbol
     }
 
+    fun replaceVariableSymbol(
+        name: String,
+        type: OperandType<*>,
+        mutable: Boolean,
+        initialized: Boolean = true
+    ): JFVariableSymbol {
+        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized)
+        currentSymbolMap.replaceType(null, name, variableSymbol)
+        return variableSymbol
+    }
+
+
     fun push(): SymbolMap {
         currentSymbolMap = LocalSymbolMap(currentSymbolMap)
         return currentSymbolMap

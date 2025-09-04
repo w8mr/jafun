@@ -41,9 +41,13 @@ data class LocalSymbolMap(override val parent: SymbolMap, override val symbolMap
         typeSig: Type,
     ) {
         val list = identifierMap.get(type)?.get(path) ?: mutableListOf()
-        val removed = list.filter { it !is Type || it.name != typeSig.name }.toMutableList()
-        removed.add(typeSig)
-        identifierMap.get(type)?.put(path, removed.toMutableSet())
+        if (list.isEmpty()) {
+            parent?.replaceType(type, path, typeSig)
+        } else {
+            val removed = list.filter { it !is Type || it.name != typeSig.name }.toMutableList()
+            removed.add(typeSig)
+            identifierMap.get(type)?.put(path, removed.toMutableSet())
+        }
     }
 
 

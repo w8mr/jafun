@@ -1,5 +1,8 @@
 package nl.w8mr.jafun
 
+import nl.w8mr.jafun.Type.JFClass
+import nl.w8mr.jafun.Type.JFMethod
+import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
 import nl.w8mr.jafun.compiler.SymbolMapManager
@@ -7,7 +10,6 @@ import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.and
 import nl.w8mr.parsek.asLiteral
 import nl.w8mr.parsek.combi
-import nl.w8mr.parsek.eof
 import nl.w8mr.parsek.filter
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.oneOf
@@ -17,7 +19,9 @@ import nl.w8mr.parsek.or
 import nl.w8mr.parsek.ref
 import nl.w8mr.parsek.sepByAllowEmpty
 import nl.w8mr.parsek.seq
-import nl.w8mr.parsek.text.CharSequenceSource
+import nl.w8mr.parsek.simple
+import nl.w8mr.parsek.simpleLiteral
+import nl.w8mr.parsek.text.CharSequenceContext
 import nl.w8mr.parsek.text.and
 import nl.w8mr.parsek.text.any
 import nl.w8mr.parsek.text.char
@@ -130,9 +134,18 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val whitespace1 = owsnl.bind()
         val name = identifier.bind()
         val whitespace2 = owsnl.bind()
+        symbolMapManager.push()
         val lp = leftParen.bind()
         val whitespace3 = owsnl.bind()
-        val parameters = ((seq(identifier, owsnl, colon, owsnl, complexIdentifierPhase1, owsnl ) map ExpressionNode::Phase1List ) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(
+        val arguments = mutableListOf<Type.JFVariableSymbol>()
+        val parameters = ((seq(identifier, owsnl, colon, owsnl, complexIdentifierPhase1, owsnl ) map { it ->
+            val identifier = it.getOrNull(0) as? ExpressionNode.Identifier ?: error("Identifier not found")
+            val type = ((it.getOrNull(4) as? ExpressionNode.Phase1List ?: error("Type not found"))
+                .tokens.singleOrNull() as? Identifier ?: error("Type not simple") ).value
+                .let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown
+            arguments += symbolMapManager.newVariableSymbol(identifier.value, type, false)
+            it
+        } map ExpressionNode::Phase1List ) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(
             ExpressionNode.Comma) }.dropLast(1)) }).bind()
         val rp = rightParen.bind()
         val optionalType = (optional(
@@ -140,6 +153,18 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
         val whitespace4 = owsnl.bind()
         val body = betweenCurly1.bind()
+        val symbol =
+            JFMethod(
+                arguments,
+                JFClass("Script"),
+                name.value,
+                (optionalType.tokens.firstOrNull() as? Identifier)?.value?.let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown,
+                static = true,
+                operator = name.operator,
+                associativity = PREFIX,
+            )
+        symbolMapManager.pop()
+        symbolMapManager.add(name.value, symbol)
         ExpressionNode.Phase1List(`fun`, whitespace1, name, whitespace2, lp, whitespace3, parameters, rp, optionalType, whitespace4, body)
     }
 
@@ -161,10 +186,10 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         wsnl,
     )).map { ExpressionNode.Phase1List(it).flatten() }
 
-    val phase1 = phase1Tokens and eof<Char>().asLiteral()
+    val phase1 = phase1Tokens and simpleLiteral { if (hasToken()) fail("not eof") }
 
     fun parse(input: String): Pair<List<ExpressionNode.Phase1Token>?, Parser.Result<List<ExpressionNode.Phase1Token>>> {
-        val source = CharSequenceSource(input)
+        val source = CharSequenceContext(input)
         return phase1.parseTree(source)
     }
 

@@ -1486,35 +1486,35 @@ class CompilerTest {
                     }
                     test "test: "
                     test2("test: ", 5)"""
-                expectedOutput = "test: 5\ntest: 10\n"
+                expectedOutput = "test: 10\ntest: 5\n"
                 jvmIr {
                     name = "Script"
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant("test: ")
-                        loadConstant(5)
-                        invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
+                        invokeStatic("Script", "test", "(Ljava/lang/String;)V")
                         loadConstant("test: ")
-                        invokeStatic("Script", "test2", "(Ljava/lang/String;)V")
+                        loadConstant(5)
+                        invokeStatic("Script", "test2", "(Ljava/lang/String;I)V")
                         `return`()
                     }
                     method {
                         name = "test"
+                        signature = "(Ljava/lang/String;)V"
+                        aload("prefix")
+                        loadConstant(10)
+                        invokeStatic("Script", "test2", "(Ljava/lang/String;I)V")
+                        `return`()
+                    }
+                    method {
+                        name = "test2"
                         signature = "(Ljava/lang/String;I)V"
                         aload("prefix")
                         invokeStatic("jafun/io/ConsoleKt", "print", "(Ljava/lang/Object;)V")
                         iload("a")
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
-                    }
-                    method {
-                        name = "test2"
-                        signature = "(Ljava/lang/String;)V"
-                        aload("prefix")
-                        loadConstant(10)
-                        invokeStatic("Script", "test", "(Ljava/lang/String;I)V")
                         `return`()
                     }
                 }

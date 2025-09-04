@@ -13,7 +13,7 @@ import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMapManager
-import nl.w8mr.parsek.ListSource
+import nl.w8mr.parsek.ListContext
 import nl.w8mr.parsek.Parser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -281,17 +281,17 @@ class SimpleParserTest {
     ) {
         val symbolMap = SymbolMapManager().apply { reset() }
         val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
-        val source = ListSource(phase1)
-        val parsed = parser.apply(source)
+        val source = ListContext(phase1)
+        val (parsed, afterContext) = parser.apply(source)
         if (parsed is Parser.Failure) {
             println("Tree: \n${parser.parseTree(source).second}")
         }
-        val success = (parsed as? Parser.Success ?: fail("Parse not successful ${(parsed as Parser.Failure).message}")).value
+        val success = (parsed as? Parser.Success<*> ?: fail("Parse not successful ${(parsed as Parser.Failure).error}")).value
         assertEquals(
             expected,
             success,
         )
-        assertEquals(afterIndex, source.index)
+        assertEquals(afterIndex, (afterContext as? ListContext)?.idx)
     }
 
     private fun <R> testSingleParserFailed(
@@ -302,13 +302,14 @@ class SimpleParserTest {
     ) {
         val symbolMap = SymbolMapManager().apply { reset() }
         val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
-        val source = ListSource(phase1)
+        val source = ListContext(phase1)
 
-        val failureMessage = (parser.apply(source) as? Parser.Failure ?: fail("Parse not failed")).message
+        val (result, newContext) = parser.apply(source)
+        val failureMessage = (result as? Parser.Failure ?: fail("Parse not failed")).error.toString()
         assertEquals(
             expected,
             failureMessage,
         )
-        assertEquals(source.index, afterIndex)
+        assertEquals(afterIndex, (newContext as? ListContext)?.idx)
     }
 }
