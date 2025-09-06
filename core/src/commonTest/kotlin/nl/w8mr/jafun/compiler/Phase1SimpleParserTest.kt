@@ -15,6 +15,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode.RightCurly
 import nl.w8mr.jafun.compiler.ExpressionNode.RightParen
 import nl.w8mr.jafun.compiler.ExpressionNode.StringLiteral
 import nl.w8mr.jafun.compiler.ExpressionNode.Whitespace
+import nl.w8mr.parsek.text.invoke
 import nl.w8mr.parsek.text.parse
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +30,7 @@ class Phase1SimpleParserTest {
             Whitespace(" "),
 //            Identifier("=", true),
 //            Whitespace(" "),
-        ), Phase1Parser().valDeclaration.parse("val a = 1").flatten())
+        ), Phase1Parser().valDeclaration("val a = 1").flatten())
     }
 
     @Test
@@ -44,7 +45,7 @@ class Phase1SimpleParserTest {
 //            Whitespace(" "),
 //            Identifier("=", true),
 //            Whitespace(" "),
-        ), Phase1Parser().valDeclaration.parse("val a: Int = 1").flatten())
+        ), Phase1Parser().valDeclaration("val a: Int = 1").flatten())
     }
 
     @Test
@@ -63,7 +64,7 @@ class Phase1SimpleParserTest {
 //            Whitespace(" "),
 //            Identifier("=", true),
 //            Whitespace(" "),
-        ), Phase1Parser().valDeclaration.parse("val a: kotlin.collections.List = emptyList()").flatten())
+        ), Phase1Parser().valDeclaration("val a: kotlin.collections.List = emptyList()").flatten())
     }
 
     @Test
@@ -72,7 +73,7 @@ class Phase1SimpleParserTest {
             DoubleQoute,
             StringLiteral("abc"),
             DoubleQoute,
-        ), Phase1Parser().stringLiteral_term.parse(""""abc"""").flatten())
+        ), Phase1Parser().stringLiteral_term(""""abc"""").flatten())
     }
 
     @Test
@@ -82,7 +83,7 @@ class Phase1SimpleParserTest {
             Identifier("$", true),
             Identifier("abc"),
             DoubleQoute,
-        ), Phase1Parser().stringLiteral_term.parse(""""${'$'}abc"""").flatten())
+        ), Phase1Parser().stringLiteral_term(""""${'$'}abc"""").flatten())
     }
 
     @Test
@@ -98,7 +99,7 @@ class Phase1SimpleParserTest {
                 RightCurly,
             ),
             DoubleQoute,
-        ), Phase1Parser().stringLiteral_term.parse(""""${'$'}{a+1}"""").flatten())
+        ), Phase1Parser().stringLiteral_term(""""${'$'}{a+1}"""").flatten())
     }
 
 

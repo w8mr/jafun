@@ -15,6 +15,7 @@ import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.ListContext
 import nl.w8mr.parsek.Parser
+import nl.w8mr.parsek.parse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -284,7 +285,7 @@ class SimpleParserTest {
         val source = ListContext(phase1)
         val (parsed, afterContext) = parser.apply(source)
         if (parsed is Parser.Failure) {
-            println("Tree: \n${parser.parseTree(source).second}")
+            println("Tree: \n${parser.parse(source)}")
         }
         val success = (parsed as? Parser.Success<*> ?: fail("Parse not successful ${(parsed as Parser.Failure).error}")).value
         assertEquals(

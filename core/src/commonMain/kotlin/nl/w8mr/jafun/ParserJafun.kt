@@ -34,6 +34,7 @@ import nl.w8mr.parsek.seq
 import nl.w8mr.parsek.text.anyChar
 import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
+import nl.w8mr.parsek.invoke
 
 data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
     inline fun <reified R: ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
@@ -125,8 +126,8 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
     val stringLiteral = token<ExpressionNode.StringLiteral>()
     val dollar = token<ExpressionNode.Identifier>().filter { it.value == "\$" }
-    val simpleStringExpression = seq(dollar, token<ExpressionNode.Identifier>()) { d, i ->  expressions.parse(listOf(i)).firstOrNull() as? ExpressionNode.Variable ?: error("Variable not found") }
-    val complexStringExpression = seq(dollar, token<ExpressionNode.CurlyBlock>()) { d, e -> ExpressionNode.ExpressionList( expressions.parse(e.tokens.drop(1).dropLast(1))).simplify() as ExpressionNode.Phase2Expression}
+    val simpleStringExpression = seq(dollar, token<ExpressionNode.Identifier>()) { d, i ->  expressions(listOf(i)).firstOrNull() as? ExpressionNode.Variable ?: error("Variable not found") }
+    val complexStringExpression = seq(dollar, token<ExpressionNode.CurlyBlock>()) { d, e -> ExpressionNode.ExpressionList( expressions(e.tokens.drop(1).dropLast(1))).simplify() as ExpressionNode.Phase2Expression}
 
     // TODO: Escape characters
     val lineStringContent = zeroOrMore(stringLiteral or simpleStringExpression or complexStringExpression)
@@ -147,7 +148,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
     val curlyBlock = token<ExpressionNode.CurlyBlock>().map {
         symbolMapManager.override(it.symbolMap) {
-            ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
+            ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
         }
     }
 
@@ -211,7 +212,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val symbolMap = block.symbolMap as? LocalSymbolMap ?: error("Invalid symbol map")
             val newSymbolMap = symbolMap.copy(parent = subjectSymbolMap)
             val matches = symbolMapManager.override(newSymbolMap) {
-                matches.parse(block.tokens.drop(1).dropLast(1))
+                matches(block.tokens.drop(1).dropLast(1))
 
             }
 
@@ -270,7 +271,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
                     queue.add(Phase1Method(name.value, it.tokens.drop(1).dropLast(1)))
 
-                    val block = ExpressionNode.ExpressionList(expressions.parse(it.tokens.drop(1).dropLast(1)) )
+                    val block = ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
 
                     symbol to block
                 }
@@ -531,7 +532,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         while (queue.isNotEmpty()) {
             val method = queue.removeFirst()
             val source = ListContext(method.body)
-            result[method.methodName] = Phase2Method(method.methodName, expressions.parseTree(source))
+            result[method.methodName] = Phase2Method(method.methodName, expressions.parse(source))
         }
         return result["main"]?.body ?: error("No main method")
     }

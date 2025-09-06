@@ -11,11 +11,13 @@ import nl.w8mr.parsek.and
 import nl.w8mr.parsek.asLiteral
 import nl.w8mr.parsek.combi
 import nl.w8mr.parsek.filter
+import nl.w8mr.parsek.invoke
 import nl.w8mr.parsek.map
 import nl.w8mr.parsek.oneOf
 import nl.w8mr.parsek.oneOrMore
 import nl.w8mr.parsek.optional
 import nl.w8mr.parsek.or
+import nl.w8mr.parsek.parse
 import nl.w8mr.parsek.ref
 import nl.w8mr.parsek.sepByAllowEmpty
 import nl.w8mr.parsek.seq
@@ -190,7 +192,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
 
     fun parse(input: String): Pair<List<ExpressionNode.Phase1Token>?, Parser.Result<List<ExpressionNode.Phase1Token>>> {
         val source = CharSequenceContext(input)
-        return phase1.parseTree(source)
+        return phase1.parse(source)
     }
 
 }
