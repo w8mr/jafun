@@ -536,6 +536,8 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val source = ListContext(method.body)
             result[method.methodName] = Phase2Method(method.methodName, expressions.parse(source))
         }
+
+        parseBodies(functions, emptyList())
         return result["main"]?.body ?: error("No main method")
     }
 
@@ -649,5 +651,52 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             }
         }
         return OperandType.Unknown
+    }
+
+    private data class PendingFunction(
+        val descriptor: FunDescriptor,
+        var parsedBody: List<ExpressionNode.Phase2Expression>? = null,
+    )
+
+    private fun parseBodies(
+        functions: List<FunDescriptor>,
+        mainResult: List<ExpressionNode.Phase2Expression>,
+    ): List<ExpressionNode.Phase2Expression> {
+        if (functions.isEmpty()) return mainResult
+        val pending = functions.map { PendingFunction(it) }
+        val rtnCache = functions.associate { it.name to it.returnType }.toMutableMap()
+
+        var changed = true
+        while (changed) {
+            changed = false
+            for (fn in pending.filter { it.parsedBody == null }) {
+                try {
+                    val (body, _) = symbolMapManager.override(fn.descriptor.symbolMap) {
+                        expressions.parse(ListContext(fn.descriptor.bodyTokens))
+                    }
+                    if (body == null) continue
+                    val inferredType = body.lastOrNull()?.type() ?: OperandType.Unit
+                    val currentType = rtnCache[fn.descriptor.name] ?: OperandType.Unknown
+                    if (inferredType != currentType) {
+                        rtnCache[fn.descriptor.name] = inferredType
+                        changed = true
+                        val currentSymbol = symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                        if (currentSymbol != null) {
+                            symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+                        }
+                    }
+                    fn.parsedBody = body
+                } catch (_: Exception) { }
+            }
+            if (!changed && pending.any { it.parsedBody == null }) {
+                error("Unresolvable functions: ${pending.filter { it.parsedBody == null }.map { it.descriptor.name }}")
+            }
+        }
+
+        return mainResult + pending.map { fn ->
+            val symbol = symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                ?: error("Symbol for ${fn.descriptor.name} not found")
+            ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList())
+        }
     }
 }
