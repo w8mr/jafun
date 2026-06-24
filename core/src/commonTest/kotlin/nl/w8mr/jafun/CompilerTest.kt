@@ -1535,7 +1535,156 @@ class CompilerTest {
         }
     }
 
+    @Test
+    fun forwardRefExplicitIntReturn() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        b()
+                    }
+                    fun b(): Int {
+                        42
+                    }
+                    println a()"""
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()I"
+                        invokeStatic("Script", "b", "()I")
+                        ireturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
 
+    @Test
+    fun forwardRefImplicitIntReturn() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        b()
+                    }
+                    fun b() {
+                        42
+                    }
+                    println a()"""
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()I"
+                        invokeStatic("Script", "b", "()I")
+                        ireturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun forwardRefChain() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        b() + 1
+                    }
+                    fun b() {
+                        c()
+                    }
+                    fun c(): Int {
+                        10
+                    }
+                    println a()"""
+                expectedOutput = "11\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()I"
+                        invokeStatic("Script", "b", "()I")
+                        loadConstant(1)
+                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        ireturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()I"
+                        invokeStatic("Script", "c", "()I")
+                        ireturn()
+                    }
+                    method {
+                        name = "c"
+                        signature = "()I"
+                        loadConstant(10)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun mutualRecursion() {
+        test {
+            file {
+                code = """
+                    fun a(x: Int): Int {
+                        when {
+                            x == 0 -> 0
+                            else -> b(x - 1)
+                        }
+                    }
+                    fun b(x: Int): Int {
+                        a(x)
+                    }
+                    println a(3)"""
+                expectedOutput = "0\n"
+            }
+        }
+    }
 
     @Test
     fun stackNeutralTest() {
