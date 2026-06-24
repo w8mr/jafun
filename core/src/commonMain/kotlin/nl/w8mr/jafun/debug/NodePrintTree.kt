@@ -95,7 +95,7 @@ private fun Indenter.print(element: Printable) {
 
         is ExpressionNode.MethodInvocation -> {
             -((element.field as? Type.JFField)?.name ?: "") // TODO Variable
-            -(element.method.name)
+            -(element.methodName)
             +"("
             if (element.arguments.isNotEmpty()) {
                 indent {
@@ -105,7 +105,7 @@ private fun Indenter.print(element: Printable) {
                 }
             }
             -")" // Closing parenthesis
-            +": ${element.method.rtn}" // Return type on the same line, then newline via '+'
+            +": ${element.type()}" // Return type on the same line, then newline via '+'
         }
 
         is ExpressionNode.When -> {

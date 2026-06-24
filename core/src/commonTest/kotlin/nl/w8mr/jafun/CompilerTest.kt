@@ -288,14 +288,28 @@ class CompilerTest {
             fun invocation(
                 method: Type.JFMethod,
                 vararg parameters: ExpressionNode.Phase2_3Expression,
-            ) = ExpressionNode.MethodInvocation(method, null, parameters.toList())
+            ) = ExpressionNode.MethodInvocation(
+                methodName = method.name,
+                parentPath = method.parentPath,
+                parameters = method.parameters,
+                rtnLookup = { method.rtn },
+                field = null,
+                arguments = parameters.toList(),
+            )
 
 
             fun invocation(
                 method: Type.JFMethod,
                 field: Type.JFField,
                 vararg parameters: ExpressionNode.Phase2_3Expression,
-            ) = ExpressionNode.MethodInvocation(method, field, parameters.toList())
+            ) = ExpressionNode.MethodInvocation(
+                methodName = method.name,
+                parentPath = method.parentPath,
+                parameters = method.parameters,
+                rtnLookup = { method.rtn },
+                field = field,
+                arguments = parameters.toList(),
+            )
 
             fun function(
                 method: Type.JFMethod,

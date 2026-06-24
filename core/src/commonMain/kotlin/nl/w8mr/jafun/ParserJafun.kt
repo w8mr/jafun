@@ -270,8 +270,6 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         )
                     symbolMapManager.replaceType(name.value, symbol)
 
-                    queue.add(Phase1Method(name.value, it.tokens.drop(1).dropLast(1)))
-
                     val block = ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
 
                     symbol to block
@@ -507,7 +505,17 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         when {
             method.static -> {
                 (method.rtn as? JFClass)?.let { symbolMapManager.addClassToSymbolMap(it,it.path) }
-                ExpressionNode.MethodInvocation(method, null, arguments)
+                ExpressionNode.MethodInvocation(
+                    methodName = method.name,
+                    parentPath = method.parentPath,
+                    parameters = method.parameters,
+                    rtnLookup = {
+                        val current = symbolMapManager.findSingleOrNull(method.name) as? JFMethod
+                        current?.rtn ?: method.rtn
+                    },
+                    field = null,
+                    arguments = arguments,
+                )
             }
             else -> null
         }
@@ -518,27 +526,26 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         arguments: List<ExpressionNode.Phase2Expression>,
     ): ExpressionNode.Phase2Expression =
         when {
-            !method.static -> ExpressionNode.MethodInvocation(method, field, arguments)
+            !method.static -> ExpressionNode.MethodInvocation(
+                methodName = method.name,
+                parentPath = method.parentPath,
+                parameters = method.parameters,
+                rtnLookup = {
+                    val current = symbolMapManager.findSingleOrNull(method.name) as? JFMethod
+                    current?.rtn ?: method.rtn
+                },
+                field = field,
+                arguments = arguments,
+            )
             else -> error("Method is static")
         }
 
-    data class Phase1Method(val methodName: String, val body: List<ExpressionNode.Phase1Token>)
-    data class Phase2Method(val methodName: String, val body: Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>>)
-
-    val queue = ArrayDeque<Phase1Method>()
-    val result = mutableMapOf<String, Phase2Method>()
-
     fun parse(input: List<ExpressionNode.Phase1Token>): Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>> {
         val (mainTokens, functions) = structurePass(input)
-        queue.add(Phase1Method("main", input))
-        while (queue.isNotEmpty()) {
-            val method = queue.removeFirst()
-            val source = ListContext(method.body)
-            result[method.methodName] = Phase2Method(method.methodName, expressions.parse(source))
-        }
-
-        parseBodies(functions, emptyList())
-        return result["main"]?.body ?: error("No main method")
+        val mainParseResult = expressions.parse(ListContext(mainTokens))
+        val mainExprs = mainParseResult.first ?: emptyList()
+        val allExpressions = parseBodies(functions, mainExprs)
+        return allExpressions to Parser.Success(emptyList())
     }
 
     // --- Two-phase parser support (Step 1) ---
@@ -586,25 +593,22 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 if (i >= tokens.size) error("Expected body for function '$name'")
                 val curlyBlock = tokens[i] as ExpressionNode.CurlyBlock
 
-                symbolMapManager.add(
+                val jfm = JFMethod(
+                    parameters,
+                    JFClass("Script"),
                     name,
-                    JFMethod(
-                        parameters,
-                        JFClass("Script"),
-                        name,
-                        returnType,
-                        static = true,
-                        operator = false,
-                        associativity = PREFIX,
-                    ),
+                    returnType,
+                    static = true,
+                    operator = false,
+                    associativity = PREFIX,
                 )
+                symbolMapManager.replaceType(name, jfm)
 
-                val nested = symbolMapManager.override(curlyBlock.symbolMap) {
+                symbolMapManager.override(curlyBlock.symbolMap) {
                     structurePass(curlyBlock.tokens)
                 }
 
-                functions.add(FunDescriptor(name, curlyBlock.tokens, curlyBlock.symbolMap, returnType))
-                functions.addAll(nested.functions)
+                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType))
             } else {
                 mainTokens.add(token)
             }
@@ -670,33 +674,36 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         while (changed) {
             changed = false
             for (fn in pending.filter { it.parsedBody == null }) {
-                try {
-                    val (body, _) = symbolMapManager.override(fn.descriptor.symbolMap) {
-                        expressions.parse(ListContext(fn.descriptor.bodyTokens))
+                val body = symbolMapManager.override(fn.descriptor.symbolMap) {
+                    expressions(fn.descriptor.bodyTokens)
+                }
+                val inferredType = body.lastOrNull()?.type() ?: OperandType.Unit
+                val currentType = rtnCache[fn.descriptor.name] ?: OperandType.Unknown
+                if (inferredType != currentType) {
+                    rtnCache[fn.descriptor.name] = inferredType
+                    changed = true
+                    val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
+                        symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
                     }
-                    if (body == null) continue
-                    val inferredType = body.lastOrNull()?.type() ?: OperandType.Unit
-                    val currentType = rtnCache[fn.descriptor.name] ?: OperandType.Unknown
-                    if (inferredType != currentType) {
-                        rtnCache[fn.descriptor.name] = inferredType
-                        changed = true
-                        val currentSymbol = symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
-                        if (currentSymbol != null) {
+                    if (currentSymbol != null) {
+                        symbolMapManager.override(fn.descriptor.symbolMap) {
                             symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
                         }
                     }
-                    fn.parsedBody = body
-                } catch (_: Exception) { }
+                }
+                fn.parsedBody = body
             }
             if (!changed && pending.any { it.parsedBody == null }) {
                 error("Unresolvable functions: ${pending.filter { it.parsedBody == null }.map { it.descriptor.name }}")
             }
         }
 
-        return mainResult + pending.map { fn ->
-            val symbol = symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
-                ?: error("Symbol for ${fn.descriptor.name} not found")
+        val functionNodes = pending.map { fn ->
+            val symbol = symbolMapManager.override(fn.descriptor.symbolMap) {
+                symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+            } ?: error("Symbol for ${fn.descriptor.name} not found")
             ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList())
         }
+        return functionNodes + mainResult
     }
 }

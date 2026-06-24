@@ -263,12 +263,16 @@ class SimpleParserTest {
             ExpressionNode.StringTemplate(listOf(
                 ExpressionNode.StringLiteral("abc"),
                 ExpressionNode.MethodInvocation(
-                    JFMethod(listOf(
+                    methodName = "+",
+                    parentPath = "jafun.lang.IntKt",
+                    parameters = listOf(
                         JFVariableSymbol("param1", OperandType.SInt32, IdentifierCache),
-                        JFVariableSymbol("param2", OperandType.SInt32, IdentifierCache)),
-                        JFClass("IntKt", JFPackage("lang", JFPackage("jafun"))),
-                        "+",
-                        OperandType.SInt32, true, true, Associativity.INFIXL, 100), null, listOf(ExpressionNode.IntegerLiteral(21), ExpressionNode.IntegerLiteral(21)))
+                        JFVariableSymbol("param2", OperandType.SInt32, IdentifierCache),
+                    ),
+                    rtnLookup = { OperandType.SInt32 },
+                    field = null,
+                    arguments = listOf(ExpressionNode.IntegerLiteral(21), ExpressionNode.IntegerLiteral(21)),
+                )
             )),
             5,
         )

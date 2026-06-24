@@ -78,12 +78,34 @@ sealed interface ExpressionNode: Printable {
         val arguments: List<Phase2_3Expression>
     }
 
-    data class MethodInvocation(
-        val method: Type.JFMethod,
+    class MethodInvocation(
+        val methodName: String,
+        val parentPath: String,
+        val parameters: List<Type.JFVariableSymbol>,
+        val rtnLookup: () -> OperandType<*>,
         val field: Type.InvocationTarget?,
         override val arguments: List<Phase2_3Expression>
     ) : Invocation {
-        override fun type() = method.rtn
+        override fun type(): OperandType<*> = rtnLookup()
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is MethodInvocation) return false
+            return methodName == other.methodName &&
+                    parentPath == other.parentPath &&
+                    parameters == other.parameters &&
+                    field == other.field &&
+                    arguments == other.arguments
+        }
+        override fun hashCode(): Int {
+            var result = methodName.hashCode()
+            result = 31 * result + parentPath.hashCode()
+            result = 31 * result + parameters.hashCode()
+            result = 31 * result + (field?.hashCode() ?: 0)
+            result = 31 * result + arguments.hashCode()
+            return result
+        }
+        override fun toString(): String =
+            "MethodInvocation(methodName=$methodName, parentPath=$parentPath, parameters=$parameters, field=$field, arguments=$arguments)"
     }
 
     data class ConstructorInvocation(

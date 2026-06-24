@@ -73,25 +73,25 @@ class JVMBackend {
 
                         instruction.arguments.forEach { compile(it) }
                         with(method) {
-                            val methodClassName = instruction.method.parentPath.replace('.', '/')
+                            val methodClassName = instruction.parentPath.replace('.', '/')
                             val methodSignature =
-                                "(${instruction.method.parameters.joinToString("") { signature(it.type) }})" +
-                                        signature(instruction.method.rtn)
+                                "(${instruction.parameters.joinToString("") { signature(it.type) }})" +
+                                        signature(instruction.type())
                             when (instruction.field) {
                                 null -> invokeStatic(
                                     methodClassName,
-                                    instruction.method.name.replaceIllegalCharacters(),
+                                    instruction.methodName.replaceIllegalCharacters(),
                                     methodSignature
                                 )
 
                                 else -> invokeVirtual(
                                     methodClassName,
-                                    instruction.method.name.replaceIllegalCharacters(),
+                                    instruction.methodName.replaceIllegalCharacters(),
                                     methodSignature
                                 )
                             }
                         }
-                        if ((asStatement) && (instruction.method.rtn != OperandType.Unit)) pop()
+                        if ((asStatement) && (instruction.type() != OperandType.Unit)) pop()
                     }
 
                     is ExpressionNode.ValAssignment -> {

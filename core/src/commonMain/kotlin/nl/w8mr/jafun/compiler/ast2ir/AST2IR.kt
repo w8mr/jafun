@@ -49,7 +49,14 @@ private fun createWhenConditionExpression(
 ): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
         val symbol = IdentifierCache.findMethod(subjVar.type, "==", listOf(subjVar.type, condition.type()))
-        ExpressionNode.MethodInvocation(symbol, null, listOf(ExpressionNode.Variable(subjVar), condition))
+        ExpressionNode.MethodInvocation(
+            methodName = symbol.name,
+            parentPath = symbol.parentPath,
+            parameters = symbol.parameters,
+            rtnLookup = { symbol.rtn },
+            field = null,
+            arguments = listOf(ExpressionNode.Variable(subjVar), condition),
+        )
     } ?: condition // If no subject variable, the condition is used directly
 }
 
@@ -59,8 +66,15 @@ fun compileExpressionNode(
 ) {
     when (node) {
         is ExpressionNode.MethodInvocation -> {
-            val arguments = loadArguments(builder, node.arguments, node.method.parameters.map(Type.JFVariableSymbol::type))
-            builder.add(ExpressionNode.MethodInvocation(node.method, node.field, arguments))
+            val arguments = loadArguments(builder, node.arguments, node.parameters.map(Type.JFVariableSymbol::type))
+            builder.add(ExpressionNode.MethodInvocation(
+                methodName = node.methodName,
+                parentPath = node.parentPath,
+                parameters = node.parameters,
+                rtnLookup = node.rtnLookup,
+                field = node.field,
+                arguments = arguments,
+            ))
         }
         is ExpressionNode.ConstructorInvocation -> {
             val arguments = loadArguments(builder, node.arguments, node.cons.parameters.map(Type.JFVariableSymbol::type))

@@ -51,5 +51,7 @@ The compiler supports four extension points:
 ## Key Design Decisions
 
 - **Two-phase parsing**: Phase1Parser handles tokenization and basic structure (function signatures, variable declarations). ParserJafun is a Pratt parser that handles operator precedence and type resolution.
-- **Immutable IR nodes**: All `ExpressionNode` data classes use `val` fields. Updates to symbols (e.g., return type inference) create new instances via `copy()`.
+- **Two-phase body parsing**: ParserJafun runs a `structurePass()` to extract function signatures first, then `parseBodies()` to iteratively parse function bodies with forward-reference resolution.
+- **`MethodInvocation` lazy symbol lookup**: Stores `methodName`/`parentPath`/`parameters` and a `rtnLookup` lambda instead of a direct `JFMethod` reference. `type()` re-looks up from the symbol map, ensuring forward-referenced return types resolve correctly.
+- **Immutable IR nodes**: All `ExpressionNode` classes use `val` fields. `MethodInvocation` is a regular class (not data class) — its `equals`/`hashCode` explicitly exclude the `rtnLookup` lambda to avoid broken structural equality.
 - **Plugin-based compilation**: The pipeline allows injecting custom transformations at multiple stages without modifying core code.

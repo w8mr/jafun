@@ -44,80 +44,96 @@ symbolMapManager.pop()
 symbolMapManager.add(name.value, symbol)
 ```
 
-Note: The `optionalType` parsing starts with `owsnl` (optional whitespace/newline), so `tokens.firstOrNull()` is always whitespace, never an `Identifier`. This means explicit return type annotations (`: Int`) are NOT resolved correctly in Phase1 — the default always falls through to `OperandType.Unknown`. Phase2 re-parses the return type annotation independently (and correctly).
+Note: The `optionalType` parsing starts with `owsnl` (optional whitespace/newline), so `tokens.firstOrNull()` is always whitespace, never an `Identifier`. This means explicit return type annotations (`: Int`) are NOT resolved correctly in Phase1 — the default always falls through to `OperandType.Unknown`. ParserJafun re-parses the return type annotation independently (and correctly) via `extractReturnType()`.
 
-## ParserJafun (Pratt Parser + Semantic Analysis)
+## ParserJafun (Two-Phase Pratt Parser)
 
 **File**: `ParserJafun.kt`
 
-ParserJafun is a Pratt (top-down operator precedence) parser that consumes Phase1 tokens and produces a typed AST (`Phase2Expression`).
+ParserJafun uses a two-phase architecture to handle forward-referenced function return types.
 
-### Responsibilities
+### Two-Phase Flow
 
-- Resolve identifiers through the symbol map (variables, functions, types)
-- Handle operator precedence and associativity (infixL, infixR, prefix, postfix)
-- Resolve method dispatch (including operator methods in `jafun.lang.*Kt`)
-- Infer function return types from body expressions
-- Compile `when` expressions, `while` loops, string templates
-- Handle function definitions with parameter scoping
-
-### Function Parsing
-
-At `ParserJafun.kt:238-284`:
-
-```kotlin
-val function = combi {
-    // Parse signature
-    -funTerm                                      // "fun" keyword
-    val name = identifier.bind()
-    -lParenTerm
-    val parameters = (identifier ... complexIdentifier sepByAllowEmpty commaTerm).bind()
-    -rParenTerm
-    val returnType = optional(colon ... identifier).bind()
-    
-    // Parse body (inside CurlyBlock token)
-    val (symbol, block) = token<CurlyBlock>().map {
-        symbolMapManager.override(it.symbolMap) {
-            // Register parameters as variables
-            val arguments = parameters.map { ... }
-            val symbol = JFMethod(arguments, "Script", name.value,
-                returnType?.let { resolveType } ?: OperandType.Unit)
-            symbolMapManager.replaceType(name.value, symbol)
-            
-            // Queue body for parsing
-            queue.add(Phase1Method(name.value, it.tokens.drop(1).dropLast(1)))
-            
-            // Parse body immediately
-            val block = expressions(it.tokens.drop(1).dropLast(1))
-            symbol to block
-        }
-    }.bind()
-    
-    // Infer return type from body and update symbol map
-    val symbolWithReturnType = symbol.copy(rtn = block.expressions.lastOrNull()?.type() ?: OperandType.Unit)
-    symbolMapManager.replaceType(name.value, symbolWithReturnType)
-    
-    ExpressionNode.Function(symbolWithReturnType, block.expressions)
-}
+```
+parse(input)
+  │
+  ├─ structurePass(input) → (mainTokens, functions)
+  │     Walk tokens, extract function declarations, register symbols,
+  │     strip functions from token stream.
+  │     Nested functions registered but NOT collected (stay inline).
+  │
+  ├─ expressions.parse(ListContext(mainTokens)) → mainExprs
+  │     Parse remaining expressions (no top-level function declarations).
+  │     MethodInvocation nodes use lazy rtnLookup to resolve return types.
+  │
+  └─ parseBodies(functions, mainExprs) → allExpressions
+        Fixed-point loop: parse function bodies, infer return types,
+        update symbol map via replaceType(). Functions placed BEFORE main.
 ```
 
-### Queue-Based Processing
+### Structure Pass
 
-The `parse()` method at line 530 uses a queue (`ArrayDeque<Phase1Method>`) to process nested functions:
+`structurePass()` at `ParserJafun.kt:559` walks the token list linearly, finding `Keyword("fun")` tokens. For each function:
+
+1. Reads name, parameters (between parentheses), and optional return type annotation
+2. Calls `replaceType(name, JFMethod(...))` to register the symbol (replaces Phase1's registration)
+3. Recursively processes the CurlyBlock's tokens (registers nested functions in local scope)
+4. Collects top-level `FunDescriptor` objects (nested ones are NOT collected)
+5. Adds non-function tokens to `mainTokens`
+
+### Body Parsing
+
+`parseBodies()` at `ParserJafun.kt:683` iteratively parses function bodies:
 
 ```kotlin
-fun parse(input: List<Phase1Token>): ... {
-    queue.add(Phase1Method("main", input))
-    while (queue.isNotEmpty()) {
-        val method = queue.removeFirst()
-        val source = ListContext(method.body)
-        result[method.methodName] = Phase2Method(method.methodName, expressions.parse(source))
+for (fn in pending.filter { it.parsedBody == null }) {
+    val body = symbolMapManager.override(fn.descriptor.symbolMap) {
+        expressions(fn.descriptor.bodyTokens)   // body tokens without curly braces
     }
-    return result["main"]?.body
+    val inferredType = body.lastOrNull()?.type() ?: OperandType.Unit
+    val currentType = rtnCache[fn.descriptor.name]
+    if (inferredType != currentType) {
+        rtnCache[fn.descriptor.name] = inferredType
+        val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
+            symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+        }
+        if (currentSymbol != null) {
+            symbolMapManager.override(fn.descriptor.symbolMap) {
+                symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+            }
+        }
+    }
+    fn.parsedBody = body
 }
 ```
 
-The main method is processed first. When a `fun` declaration is encountered inside it, the function's body tokens are added to the queue. The queue is drained in FIFO order. Functions defined inside other functions are processed in the same iteration (since they're added during body parsing, which happens inline).
+Key details:
+- Symbol lookups and replacements happen INSIDE `override(fn.descriptor.symbolMap)` to handle nested function scopes correctly
+- The fixed-point loop converges when all function types stabilize (typically 1-2 iterations)
+- Functions are placed BEFORE main expressions in the final output (source order)
+
+### `MethodInvocation` Lazy Symbol Lookup
+
+`MethodInvocation` at `ExpressionNode.kt:81` is a **regular class** (not data class) that stores:
+
+```kotlin
+class MethodInvocation(
+    val methodName: String,
+    val parentPath: String,
+    val parameters: List<Type.JFVariableSymbol>,
+    val rtnLookup: () -> OperandType<*>,
+    val field: Type.InvocationTarget?,
+    override val arguments: List<Phase2_3Expression>
+) : Invocation {
+    override fun type(): OperandType<*> = rtnLookup()
+}
+```
+
+`rtnLookup` re-looks up the method from the symbol map each time `type()` is called. This ensures `MethodInvocation` nodes created during main-token parsing (before `parseBodies` has run) return the correct type after function body type inference completes.
+
+### Function Parsing (Nested/Local)
+
+The existing `function` parser at `ParserJafun.kt:239-283` handles nested/local functions inside CurlyBlocks. It registers the symbol, parses the body inline, infers the return type from the body, and creates `ExpressionNode.Function`. This parser is only reached for nested functions — top-level functions are stripped by `structurePass`.
 
 ### Operator Precedence and Associativity
 
