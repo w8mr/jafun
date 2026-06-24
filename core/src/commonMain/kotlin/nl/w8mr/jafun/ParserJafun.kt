@@ -682,19 +682,27 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 if (inferredType != currentType) {
                     rtnCache[fn.descriptor.name] = inferredType
                     changed = true
-                    val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
-                        symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
-                    }
-                    if (currentSymbol != null) {
-                        symbolMapManager.override(fn.descriptor.symbolMap) {
-                            symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+                    if (inferredType != OperandType.Unknown) {
+                        val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
+                            symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                        }
+                        if (currentSymbol != null) {
+                            symbolMapManager.override(fn.descriptor.symbolMap) {
+                                symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+                            }
                         }
                     }
                 }
-                fn.parsedBody = body
+                if (inferredType != OperandType.Unknown) {
+                    fn.parsedBody = body
+                }
             }
             if (!changed && pending.any { it.parsedBody == null }) {
-                error("Unresolvable functions: ${pending.filter { it.parsedBody == null }.map { it.descriptor.name }}")
+                for (fn in pending.filter { it.parsedBody == null }) {
+                    fn.parsedBody = symbolMapManager.override(fn.descriptor.symbolMap) {
+                        expressions(fn.descriptor.bodyTokens)
+                    }
+                }
             }
         }
 

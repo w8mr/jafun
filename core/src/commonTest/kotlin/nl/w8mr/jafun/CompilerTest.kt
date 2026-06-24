@@ -1486,7 +1486,6 @@ class CompilerTest {
     }
 
     @Test
-    @Ignore
     fun funForwardsFunctionCallFromFunction() {
         test {
             file {
