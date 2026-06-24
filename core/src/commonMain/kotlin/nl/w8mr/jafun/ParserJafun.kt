@@ -529,6 +529,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     val result = mutableMapOf<String, Phase2Method>()
 
     fun parse(input: List<ExpressionNode.Phase1Token>): Pair<List<ExpressionNode.Phase2Expression>?, Parser.Result<List<ExpressionNode.Phase2Expression>>> {
+        val (mainTokens, functions) = structurePass(input)
         queue.add(Phase1Method("main", input))
         while (queue.isNotEmpty()) {
             val method = queue.removeFirst()
