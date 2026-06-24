@@ -13,6 +13,7 @@ import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.LocalSymbolMap
+import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.ListContext
@@ -535,5 +536,117 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             result[method.methodName] = Phase2Method(method.methodName, expressions.parse(source))
         }
         return result["main"]?.body ?: error("No main method")
+    }
+
+    // --- Two-phase parser support (Step 1) ---
+
+    data class FunDescriptor(
+        val name: String,
+        val bodyTokens: List<ExpressionNode.Phase1Token>,
+        val symbolMap: SymbolMap,
+        val returnType: OperandType<*>,
+    )
+
+    data class StructureResult(
+        val mainTokens: List<ExpressionNode.Phase1Token>,
+        val functions: List<FunDescriptor>,
+    )
+
+    fun structurePass(tokens: List<ExpressionNode.Phase1Token>): StructureResult {
+        val mainTokens = mutableListOf<ExpressionNode.Phase1Token>()
+        val functions = mutableListOf<FunDescriptor>()
+        var i = 0
+
+        while (i < tokens.size) {
+            val token = tokens[i]
+            if (token is ExpressionNode.Keyword && token.value == "fun") {
+                i++
+                while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
+                if (i >= tokens.size) error("Expected function name")
+                val name = (tokens[i] as ExpressionNode.Identifier).value
+                i++
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.LeftParen) i++
+                if (i >= tokens.size) error("Expected '(' for function '$name'")
+                val leftParenIdx = i
+                i++
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.RightParen) i++
+                if (i >= tokens.size) error("Expected ')' for function '$name'")
+                val rightParenIdx = i
+                val parameters = parseParameters(tokens.subList(leftParenIdx + 1, rightParenIdx))
+
+                i++
+                val returnType = extractReturnType(tokens, i)
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.CurlyBlock) i++
+                if (i >= tokens.size) error("Expected body for function '$name'")
+                val curlyBlock = tokens[i] as ExpressionNode.CurlyBlock
+
+                symbolMapManager.add(
+                    name,
+                    JFMethod(
+                        parameters,
+                        JFClass("Script"),
+                        name,
+                        returnType,
+                        static = true,
+                        operator = false,
+                        associativity = PREFIX,
+                    ),
+                )
+
+                val nested = symbolMapManager.override(curlyBlock.symbolMap) {
+                    structurePass(curlyBlock.tokens)
+                }
+
+                functions.add(FunDescriptor(name, curlyBlock.tokens, curlyBlock.symbolMap, returnType))
+                functions.addAll(nested.functions)
+            } else {
+                mainTokens.add(token)
+            }
+            i++
+        }
+
+        return StructureResult(mainTokens, functions)
+    }
+
+    private fun parseParameters(tokens: List<ExpressionNode.Phase1Token>): List<JFVariableSymbol> {
+        if (tokens.isEmpty()) return emptyList()
+        val params = mutableListOf<JFVariableSymbol>()
+        val segments = mutableListOf(mutableListOf<ExpressionNode.Phase1Token>())
+        for (token in tokens) {
+            if (token is ExpressionNode.Comma) segments.add(mutableListOf()) else segments.last().add(token)
+        }
+        for (segment in segments) {
+            val nonWhitespace = segment.filter { it !is ExpressionNode.Whitespace && it !is ExpressionNode.Newline }
+            if (nonWhitespace.isEmpty()) continue
+            val colonIdx = nonWhitespace.indexOfFirst { it is ExpressionNode.Colon }
+            if (colonIdx < 0) error("Expected colon in parameter")
+            val name = (nonWhitespace.getOrNull(colonIdx - 1) as? ExpressionNode.Identifier)?.value
+                ?: error("Expected identifier before colon")
+            val typeName = (nonWhitespace.getOrNull(colonIdx + 1) as? ExpressionNode.Identifier)?.value
+                ?: error("Expected type after colon")
+            val type = symbolMapManager.findSingleOrNull(typeName) as? OperandType<*> ?: OperandType.Unknown
+            params.add(JFVariableSymbol(name, type))
+        }
+        return params
+    }
+
+    private fun extractReturnType(
+        tokens: List<ExpressionNode.Phase1Token>,
+        startIdx: Int,
+    ): OperandType<*> {
+        var j = startIdx
+        while (j < tokens.size && (tokens[j] is ExpressionNode.Whitespace || tokens[j] is ExpressionNode.Newline)) j++
+        if (j < tokens.size && tokens[j] is ExpressionNode.Colon) {
+            j++
+            while (j < tokens.size && (tokens[j] is ExpressionNode.Whitespace || tokens[j] is ExpressionNode.Newline)) j++
+            val typeName = (tokens.getOrNull(j) as? ExpressionNode.Identifier)?.value
+            if (typeName != null) {
+                return symbolMapManager.findSingleOrNull(typeName) as? OperandType<*> ?: OperandType.Unknown
+            }
+        }
+        return OperandType.Unknown
     }
 }
