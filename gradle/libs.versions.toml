@@ -1,6 +1,6 @@
 [versions]
-kotlin = "2.1.10"
-publish = "0.31.0"
+kotlin = "2.4.0"
+publish = "0.37.0"
 
 
 [libraries]

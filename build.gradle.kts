@@ -1,4 +1,3 @@
-import com.vanniktech.maven.publish.SonatypeHost
 import com.vanniktech.maven.publish.KotlinMultiplatform
 import com.vanniktech.maven.publish.JavadocJar
 
@@ -28,7 +27,7 @@ subprojects {
             sourcesJar = true,
             androidVariantsToPublish = emptyList<String>(),
         ))
-        publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+        publishToMavenCentral()
 
         coordinates("nl.w8mr.jafun", "core", "0.0.1")
 
