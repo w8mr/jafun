@@ -1687,6 +1687,156 @@ class CompilerTest {
     }
 
     @Test
+    fun forwardRefStringReturn() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        b()
+                    }
+                    fun b(): String {
+                        "hello"
+                    }
+                    println a()"""
+                expectedOutput = "hello\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()Ljava/lang/String;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()Ljava/lang/String;"
+                        invokeStatic("Script", "b", "()Ljava/lang/String;")
+                        areturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()Ljava/lang/String;"
+                        loadConstant("hello")
+                        areturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun forwardRefFromNestedFunction() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        fun nested() {
+                            b()
+                        }
+                        nested()
+                    }
+                    fun b(): String {
+                        "hello"
+                    }
+                    println a()"""
+                expectedOutput = "hello\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()Ljava/lang/String;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()Ljava/lang/String;"
+                        invokeStatic("Script", "nested", "()Ljava/lang/String;")
+                        areturn()
+                    }
+                    method {
+                        name = "nested"
+                        signature = "()Ljava/lang/String;"
+                        invokeStatic("Script", "b", "()Ljava/lang/String;")
+                        areturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()Ljava/lang/String;"
+                        loadConstant("hello")
+                        areturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun forwardRefBooleanReturn() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        b()
+                    }
+                    fun b(): Boolean {
+                        true
+                    }
+                    println a()"""
+                expectedOutput = "true\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "a", "()Z")
+                        invokeStatic("java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "a"
+                        signature = "()Z"
+                        invokeStatic("Script", "b", "()Z")
+                        ireturn()
+                    }
+                    method {
+                        name = "b"
+                        signature = "()Z"
+                        loadConstant(1)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun forwardRefWithConditionalGuard() {
+        test {
+            file {
+                code = """
+                    fun a() {
+                        when {
+                            1 == 1 -> b()
+                            else -> c()
+                        }
+                    }
+                    fun b(): String {
+                        "from b"
+                    }
+                    fun c(): String {
+                        "from c"
+                    }
+                    println a()"""
+                expectedOutput = "from b\n"
+            }
+        }
+    }
+
+    @Test
     fun stackNeutralTest() {
         test {
             file {
