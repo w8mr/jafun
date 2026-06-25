@@ -50,7 +50,8 @@ class CompilerTest {
     companion object {
         class TestContext() {
             var code: String? = null
-            var bytecode: ByteArray? = null
+            var bytecode: ByteArray? = null  // deprecated: use classBytecodes instead
+            var classBytecodes: MutableMap<String, ByteArray> = mutableMapOf()
             var mainParams: Array<String>? = null
             var phase2Expected: List<ExpressionNode.Phase2Expression>? = null
             var expectedOutput: String? = null
@@ -114,8 +115,21 @@ class CompilerTest {
                     file.expectedOutput ?: TODO("Handle no expected case")
                 )
 
+                // Validate all expected class bytecodes
+                for ((expectedClassName, expectedBytes) in file.classBytecodes) {
+                    val actualClassBytes = allClasses[expectedClassName] 
+                        ?: error("Expected class $expectedClassName not found in compiled output")
+                    
+                    if ((expectedBytes.zip(actualClassBytes).any { it.first != it.second })) {
+                        compareDecompiled(expectedBytes, null /* change to boolean */, result, result, actualClassBytes)
+                    } else {
+                        assertContentEquals(expectedBytes, actualClassBytes)
+                    }
+                }
+
+                // Backward compatibility: validate old bytecode field if set
                 val expectedBytes = file.bytecode
-                if (expectedBytes != null) {
+                if (expectedBytes != null && !file.classBytecodes.containsKey("Script")) {
                     if ((expectedBytes.zip(actualBytes).any { it.first != it.second })) {
                         compareDecompiled(expectedBytes, null /* change to boolean */, result, result, actualBytes)
                     } else {
@@ -145,7 +159,19 @@ class CompilerTest {
             var expectedOutput: String?
             fun params(vararg params: String)
 
+            /**
+             * Validate JVM IR (bytecode) for a generated class.
+             * 
+             * Usage:
+             *   - jvmIr { ... }                  // Validates "Script" class (default)
+             *   - jvmIr("Address") { ... }       // Validates "Address" class
+             *   - jvmIr("User") { ... }          // Validates "User" class
+             * 
+             * Can specify multiple jvmIr blocks to validate multiple generated classes.
+             * Each block describes the expected methods and bytecode for that class.
+             */
             fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit)
+            fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit)
             fun phase2(block: Phase2Builder.() -> Unit)
 
         }
@@ -158,7 +184,17 @@ class CompilerTest {
             }
 
             override fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
+                // Default to "Script" for backward compatibility
                 context.bytecode = classBuilder(block).write()
+                context.classBytecodes["Script"] = context.bytecode!!
+            }
+
+            override fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
+                val bytecode = classBuilder(block).write()
+                context.classBytecodes[className] = bytecode
+                if (className == "Script") {
+                    context.bytecode = bytecode
+                }
             }
 
             override fun phase2(block: Phase2Builder.() -> Unit) {
