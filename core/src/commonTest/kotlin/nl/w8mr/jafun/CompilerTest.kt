@@ -410,8 +410,7 @@ class CompilerTest {
                     +invocation(println, s("Hello World"))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -435,8 +434,7 @@ class CompilerTest {
                     +invocation(println, s("Hello World"))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -459,8 +457,7 @@ class CompilerTest {
                     +invocation(println, invocation(join, s("Hello"), s("World")))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -484,8 +481,7 @@ class CompilerTest {
                 code = """
             println reverse "Hello World""""
                 expectedOutput = "dlroW olleH\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -506,8 +502,7 @@ class CompilerTest {
                 code = """
             println join("Hello", "World")"""
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -532,8 +527,7 @@ class CompilerTest {
             val str1 = join("Hello", "World")
             println str1"""
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -559,8 +553,7 @@ class CompilerTest {
                 code = """
             println join(join("Hello World", "1"), join("2", "3"))"""
                 expectedOutput = "Hello World 1 2 3\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -595,8 +588,7 @@ class CompilerTest {
                     +invocation(join, s("Hello"), s("World"))
                 }
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -623,8 +615,7 @@ class CompilerTest {
                     print "Hello "
                     println "World""""
                 expectedOutput = "Hello World\nHello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -651,8 +642,7 @@ class CompilerTest {
                     +invocation(printStreamPrintln, systemOut, s("Hello World"))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -676,8 +666,7 @@ class CompilerTest {
                     +invocation(printStreamPrintln, systemOut, s("Hello World"))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -698,8 +687,7 @@ class CompilerTest {
                 code = "val num = 42\n" +
                     "println(\"The answer to the ultimate question of Life, the Universe, and Everything is \$num.\")"
                 expectedOutput = "The answer to the ultimate question of Life, the Universe, and Everything is 42.\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -732,8 +720,7 @@ class CompilerTest {
                         "val num2 = 21\n" +
                         "println(\"The answer to the ultimate question of Life, the Universe, and Everything is \${num + num2}.\")"
                 expectedOutput = "The answer to the ultimate question of Life, the Universe, and Everything is 42.\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -770,8 +757,7 @@ class CompilerTest {
                 code = """
                     1 + 2"""
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -793,8 +779,7 @@ class CompilerTest {
                 code = """
                     1 + 2 * 3"""
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -823,8 +808,7 @@ class CompilerTest {
                     +invocation(println, variable(symbol("str1", OperandType.StringType)))
                 }
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -848,8 +832,7 @@ class CompilerTest {
                     val str1 = "Hello"
                     println join(str1, str2)"""
                 expectedOutput = "Hello World\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -882,8 +865,7 @@ class CompilerTest {
                     +invocation(println, variable(symbol("i", OperandType.SInt32)))
                 }
                 expectedOutput = "128\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -925,8 +907,7 @@ class CompilerTest {
                     i = 2
                     println i"""
                 expectedOutput = "2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -952,8 +933,7 @@ class CompilerTest {
                     println(val i = 128)
                     println i"""
                 expectedOutput = "128\n128\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -980,8 +960,7 @@ class CompilerTest {
                     val i = 2 + 3
                     println i """
                 expectedOutput = "5\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1009,8 +988,7 @@ class CompilerTest {
                     val j = 11
                     println i + j"""
                 expectedOutput = "16\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1037,8 +1015,7 @@ class CompilerTest {
                 code = """
                     println 4 + 3 * 5 - 6 / 2"""
                 expectedOutput = "16\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1068,8 +1045,7 @@ class CompilerTest {
                     val a = 4 + 3 * 5 - 6 / 2
                     println a"""
                 expectedOutput = "16\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1100,8 +1076,7 @@ class CompilerTest {
                 code = """
                     println((4 + 3) * (6 - 4))"""
                 expectedOutput = "14\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1130,8 +1105,7 @@ class CompilerTest {
                     val def = 4
                     println abc+def"""
                 expectedOutput = "7\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1158,8 +1132,7 @@ class CompilerTest {
                 code = """
                     println 2**5*3"""
                 expectedOutput = "96\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1184,8 +1157,7 @@ class CompilerTest {
                 code = """
                     println 10 - 4 - 2"""
                 expectedOutput = "4\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1218,8 +1190,7 @@ class CompilerTest {
                 code = """
                     println 4 ** 3 ** 2"""
                 expectedOutput = "262144\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1244,8 +1215,7 @@ class CompilerTest {
                 code = """
                     println 5++"""
                 expectedOutput = "6\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1273,8 +1243,7 @@ class CompilerTest {
                 code = """
                     println 5 euro + 20 cent"""
                 expectedOutput = "520\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1312,8 +1281,7 @@ class CompilerTest {
                     +function(method("test", OperandType.Unit))
                 }
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1342,8 +1310,7 @@ class CompilerTest {
                     }
                 }
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1371,8 +1338,7 @@ class CompilerTest {
                     test
                     test()"""
                 expectedOutput = "2\n2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1414,8 +1380,7 @@ class CompilerTest {
                     +invocation(method("test", OperandType.Unit, symbol("a", OperandType.SInt32)), i(3))
                 }
                 expectedOutput = "4\n6\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1452,8 +1417,7 @@ class CompilerTest {
                     }
                     test("test: ",5)"""
                 expectedOutput = "test: 5\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1493,8 +1457,7 @@ class CompilerTest {
                     test("test: ", 5)
                     test2 "test: """"
                 expectedOutput = "test: 5\ntest: 10\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1543,8 +1506,7 @@ class CompilerTest {
                     test "test: "
                     test2("test: ", 5)"""
                 expectedOutput = "test: 10\ntest: 5\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1591,8 +1553,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1631,8 +1592,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1674,8 +1634,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "11\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1742,8 +1701,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "hello\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1784,8 +1742,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "hello\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1829,8 +1786,7 @@ class CompilerTest {
                     }
                     println a()"""
                 expectedOutput = "true\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -1897,8 +1853,7 @@ class CompilerTest {
                     1+2
                     1+2"""
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
 
                     method {
                         name = "main"
@@ -1935,8 +1890,7 @@ class CompilerTest {
                     }
                     println test()"""
                 expectedOutput = "3\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
 
                     method {
                         name = "main"
@@ -2018,8 +1972,7 @@ class CompilerTest {
                     )
                 }
                 expectedOutput = "6\n8\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2063,8 +2016,7 @@ class CompilerTest {
                     }
                 }
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2101,8 +2053,7 @@ class CompilerTest {
                     println prefixed "Test"
                     println(prefixed("Test2"))"""
                 expectedOutput = "PREFIXED: Test\nPREFIXED: Test2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2143,8 +2094,7 @@ class CompilerTest {
                     }
                     println a"""
                 expectedOutput = "6\n4\n2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2189,8 +2139,7 @@ class CompilerTest {
                     println 32767
                     println 32768"""
                 expectedOutput = "0\n1\n2\n3\n4\n5\n6\n127\n128\n32767\n32768\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2227,8 +2176,7 @@ class CompilerTest {
                     val b = true
                     println b"""
                 expectedOutput = "true\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2260,8 +2208,7 @@ class CompilerTest {
                     )
                 }
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2288,8 +2235,7 @@ class CompilerTest {
                 code = """
                     1 == 1""".trimIndent()
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2311,8 +2257,7 @@ class CompilerTest {
                 code = """
                     'a' == 'a'""".trimIndent()
                 expectedOutput = ""
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2340,8 +2285,7 @@ class CompilerTest {
                         else -> "More"
                     }"""
                 expectedOutput = "Two\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2387,8 +2331,7 @@ class CompilerTest {
                         else -> "More"
                     }"""
                 expectedOutput = "Two\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2433,8 +2376,7 @@ class CompilerTest {
                         else -> "More"
                     }"""
                 expectedOutput = "Two\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2496,8 +2438,7 @@ class CompilerTest {
                     )
                 }
                 expectedOutput = "Two\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2560,8 +2501,7 @@ class CompilerTest {
                     )
                 }
                 expectedOutput = "Two 2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2617,8 +2557,7 @@ class CompilerTest {
                     }
                     println factorial 6"""
                 expectedOutput = "720\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2700,8 +2639,7 @@ class CompilerTest {
                     }"""
 
                 expectedOutput = "0\n1\n2\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2745,8 +2683,7 @@ class CompilerTest {
                     println "End"
                     """
                 expectedOutput = "Start\n1\n2\n3\n2\n4\n6\n3\n6\n9\nEnd\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2861,8 +2798,7 @@ class CompilerTest {
                     println test.number
                 """.trimIndent()
                 expectedOutput = "1\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2889,8 +2825,7 @@ class CompilerTest {
                     printNumber(test)
                 """.trimIndent()
                 expectedOutput = "1\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -2968,8 +2903,7 @@ class CompilerTest {
                     test(a, b)
                 """.trimIndent()
                 expectedOutput = "20\nhello\n10\nworld\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3016,8 +2950,7 @@ class CompilerTest {
                     println makeAddress().number
                 """.trimIndent()
                 expectedOutput = "1\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3055,8 +2988,7 @@ class CompilerTest {
                     println a.number
                 """.trimIndent()
                 expectedOutput = "1\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3095,8 +3027,7 @@ class CompilerTest {
                     println makeId()
                 """.trimIndent()
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3129,8 +3060,7 @@ class CompilerTest {
                     println id
                 """.trimIndent()
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3164,8 +3094,7 @@ class CompilerTest {
                     println makeId().value
                 """.trimIndent()
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3198,8 +3127,7 @@ class CompilerTest {
                     println id.value
                 """.trimIndent()
                 expectedOutput = "42\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
@@ -3238,8 +3166,7 @@ class CompilerTest {
                     println b.number
                 """.trimIndent()
                 expectedOutput = "9\n"
-                jvmIr {
-                    name = "Script"
+                jvmIr("Script") {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
