@@ -109,3 +109,169 @@ Pre-defined methods are available as top-level properties in `Phase2Builder`: `p
 ## SimpleParserTest
 
 Located in `core/src/commonTest/kotlin/nl/w8mr/jafun/SimpleParserTest.kt`. Covers Phase1 tokenization and basic structure. Uses a simpler test pattern focused on parsing tokens rather than full compilation.
+
+## Multi-Class Bytecode Validation
+
+When the compiler generates multiple classes (e.g., a main Script class plus auxiliary classes like value classes), you can validate all of them in a single test using named `jvmIr` blocks:
+
+### Syntax
+
+```kotlin
+@Test
+fun vcChangeAddress() {
+    test {
+        file {
+            code = """
+                value class Address(number: Int, street: String)
+                fun increaseHouseNumber(address: Address, increment: Int): Address {
+                    Address(address.number + increment, address.street)
+                }
+                fun changeAddress(address: Address): Address {
+                    increaseHouseNumber(address, 5)
+                }
+                val a = Address(4, "Privet Drive")
+                val b = changeAddress(a)
+                println b.number
+            """.trimIndent()
+            expectedOutput = "9\n"
+            
+            // Validate Script class (default)
+            jvmIr {
+                name = "Script"
+                method { ... }
+            }
+            
+            // Validate Address class (by name)
+            jvmIr("Address") {
+                name = "Address"
+                field(access = 1u, "number", "I")
+                field(access = 1u, "street", "Ljava/lang/String;")
+                method { ... }
+            }
+            
+            // Can validate additional classes
+            jvmIr("OtherClass") {
+                name = "OtherClass"
+                method { ... }
+            }
+        }
+    }
+}
+```
+
+### API
+
+| Pattern | Purpose |
+|---------|---------|
+| `jvmIr { ... }` | Validates "Script" class (backward compatible) |
+| `jvmIr("ClassName") { ... }` | Validates class named "ClassName" |
+| Multiple `jvmIr` blocks | Each validates a different generated class |
+
+### Field Definition
+
+Use kasmine's `field()` function to define expected class fields:
+
+```kotlin
+field(access = 1u, name: String, type: String)
+```
+
+Access flags (common values):
+- `1u` — `ACC_PUBLIC`
+- `2u` — `ACC_PRIVATE` (default)
+- `9u` — `ACC_PUBLIC + ACC_STATIC`
+
+Type descriptors:
+- `"I"` — int
+- `"Z"` — boolean
+- `"Ljava/lang/String;"` — String
+- `"LClassName;"` — custom class reference
+
+### Constructor Methods
+
+For constructors, use `name = "<init>"` with the appropriate signature and **set the access flag**:
+
+```kotlin
+method {
+    name = "<init>"
+    signature = "(ILjava/lang/String;)V"
+    access = 1u  // ACC_PUBLIC (REQUIRED: default is 9u = ACC_PUBLIC|ACC_STATIC)
+    parameter("this")
+    parameter("number")
+    parameter("street")
+    // Emit bytecode using local var references
+    aload("this")
+    invokeSpecial("java/lang/Object", "<init>", "()V")
+    aload("this")
+    iload("number")
+    putField("ClassName", "number", "I")
+    `return`()
+}
+```
+
+### Local Variable Handling in kasmine
+
+A critical insight: kasmine's `parameter()` function registers local variable slots, not just method parameters. In a constructor:
+
+1. Calling `parameter("this")` reserves slot 0
+2. Calling `parameter("number")` reserves slot 1
+3. Calling `parameter("street")` reserves slot 2
+
+Then you reference these in instructions by their registered names:
+- `aload("this")` — loads slot 0
+- `iload("number")` — loads slot 1
+- `aload("street")` — loads slot 2
+
+**Slot assignment order matters**: The first `parameter()` call gets slot 0, second gets slot 1, etc. This must match the JVM method signature order for correct bytecode generation.
+
+### Example: Generated Value Class Constructor
+
+For a value class `Address(number: Int, street: String)`, the compiler generates:
+
+```
+public Address(int, java.lang.String);
+  Code:
+     0: aload         0
+     2: invokespecial Object."<init>":()V
+     5: aload         0
+     7: iload         1
+     9: putfield      Address.number:I
+    12: aload         0
+    14: aload         2
+    16: putfield      Address.street:Ljava/lang/String;
+    19: return
+```
+
+To validate this in a test:
+
+```kotlin
+jvmIr("Address") {
+    name = "Address"
+    field(access = 1u, "number", "I")
+    field(access = 1u, "street", "Ljava/lang/String;")
+    method {
+        name = "<init>"
+        signature = "(ILjava/lang/String;)V"
+        access = 1u  // Non-static instance method
+        parameter("this")      // slot 0
+        parameter("number")    // slot 1
+        parameter("street")    // slot 2
+        aload("this")
+        invokeSpecial("java/lang/Object", "<init>", "()V")
+        aload("this")
+        iload("number")
+        putField("Address", "number", "I")
+        aload("this")
+        aload("street")
+        putField("Address", "street", "Ljava/lang/String;")
+        `return`()
+    }
+}
+```
+
+### Bytecode Comparison Details
+
+- **Decompilation-based**: Both expected and actual bytecode are decompiled using `javap -v` and compared as text, not raw bytes
+- **Name-tolerant**: Different local variable names that map to the same JVM slot produce identical decompiled output
+- **Detailed error messages**: When bytecode doesn't match, both the expected and actual javap output are shown side-by-side
+
+

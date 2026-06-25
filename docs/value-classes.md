@@ -370,3 +370,118 @@ When a method takes a value class parameter:
 - Single-field VC returns unwrap to field type via `effectiveJvmType()`
 - Multi-field VC returns stay as object references
 - Consistency enforced at both declaration and call site
+
+## Testing Value Classes with Multi-Class Validation
+
+### vcChangeAddress Test Case
+
+The `vcChangeAddress` test demonstrates comprehensive value class validation including both the main Script class and the generated Value Class:
+
+**Source Code:**
+```kotlin
+value class Address(number: Int, street: String)
+fun increaseHouseNumber(address: Address, increment: Int): Address {
+    Address(address.number + increment, address.street)
+}
+fun changeAddress(address: Address): Address {
+    increaseHouseNumber(address, 5)
+}
+val a = Address(4, "Privet Drive")
+val b = changeAddress(a)
+println b.number
+```
+
+**Compiled Output:**
+1. **Script class** — Main entry point with three methods:
+   - `main([String): void` — Entry point
+   - `changeAddress(I, String): Address` — VC parameter expanded
+   - `increaseHouseNumber(I, String, I): Address` — VC parameter + extra int parameter expanded
+
+2. **Address class** — Value class materialized:
+   - Two public fields: `number: int`, `street: String`
+   - Constructor `<init>(int, String): void` that initializes both fields
+
+**Key Bytecode Patterns:**
+
+Script.changeAddress signature: `(ILjava/lang/String;)LAddress;`
+- Takes expanded VC fields as individual parameters
+- Returns materialized Address object
+
+Script.increaseHouseNumber signature: `(ILjava/lang/String;I)LAddress;`
+- Takes expanded VC fields (number: I, street: String)
+- Takes additional parameter (increment: I)
+- Returns materialized Address object
+
+Address.<init> signature: `(ILjava/lang/String;)V`
+- Non-static instance method (not ACC_STATIC)
+- Takes field values as parameters in order
+- Initializes fields via putfield instructions
+
+### Test Validation
+
+The test validates both classes using named jvmIr blocks:
+
+```kotlin
+// Validate Script class
+jvmIr {
+    name = "Script"
+    method { name = "main"; signature = "([Ljava/lang/String;)V"; ... }
+    method { name = "changeAddress"; signature = "(ILjava/lang/String;)LAddress;"; ... }
+    method { name = "increaseHouseNumber"; signature = "(ILjava/lang/String;I)LAddress;"; ... }
+}
+
+// Validate Address class
+jvmIr("Address") {
+    name = "Address"
+    field(access = 1u, "number", "I")
+    field(access = 1u, "street", "Ljava/lang/String;")
+    method {
+        name = "<init>"
+        signature = "(ILjava/lang/String;)V"
+        access = 1u  // Critical: non-static instance method
+        parameter("this")
+        parameter("number")
+        parameter("street")
+        // Initialize fields via putfield
+    }
+}
+```
+
+## Learnings and Insights
+
+### Multi-Field VC Parameter Expansion
+
+When a function receives a multi-field value class parameter, the compiler:
+1. Expands the VC into individual field parameters in the JVM signature
+2. Creates `expandedFields` entries on the parameter symbol
+3. When accessing a field (e.g., `address.number`), resolves to the corresponding expanded parameter
+4. Zero-copy: no intermediate object allocation for field access
+
+This enables passing VCs "by value" at the JVM level without allocating heap objects for parameter passing.
+
+### Generated Class Files
+
+For each value class used in the code, the compiler generates a corresponding `.class` file:
+- Class name matches the VC name (e.g., `Address.class`)
+- Contains public fields (one per constructor parameter)
+- Contains a constructor that initializes all fields
+- No methods (getters are handled via IR-level field expansion)
+
+### Why Multi-Class Testing Matters
+
+Value class code generation involves subtle interactions:
+1. VC materialization (for returns) vs expansion (for parameters)
+2. Field ordering in generated class vs parameter ordering in function signatures
+3. Method access flags (especially for constructors)
+
+Testing both the Script class and generated VC classes together ensures:
+- Field expansion matches actual class field definitions
+- Parameter ordering is consistent across all sites
+- Constructor signatures are valid
+- No mismatches between IR-level expansion and bytecode-level class definition
+
+### Access Flag Pitfall
+
+When manually defining constructors in test bytecode, **always set `access = 1u`** for instance methods. Kasmine defaults to `9u` (ACC_PUBLIC | ACC_STATIC), which is invalid for constructors and causes bytecode verification failures.
+
+
