@@ -170,11 +170,52 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         ExpressionNode.Phase1List(`fun`, whitespace1, name, whitespace2, lp, whitespace3, parameters, rp, optionalType, whitespace4, body)
     }
 
+    val valueClassDeclaration = combi {
+        val `value` = string("value").map { ExpressionNode.Keyword(it) }.bind()
+        val white1 = owsnl.bind()
+        val `class` = string("class").map { ExpressionNode.Keyword(it) }.bind()
+        val white2 = owsnl.bind()
+        val name = identifier.bind()
+        val white3 = owsnl.bind()
+        val lp = leftParen.bind()
+        val white4 = owsnl.bind()
+
+        val parameters = mutableListOf<Type.JFVariableSymbol>()
+        val paramList = ((seq(identifier, owsnl, colon, owsnl, complexIdentifierPhase1, owsnl) map { it ->
+            val id = it.getOrNull(0) as? ExpressionNode.Identifier ?: error("Identifier not found")
+            val type = ((it.getOrNull(4) as? ExpressionNode.Phase1List ?: error("Type not found"))
+                .tokens.singleOrNull() as? Identifier ?: error("Type not simple")).value
+                .let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown
+            parameters += Type.JFVariableSymbol(id.value, type)
+            it
+        } map ExpressionNode::Phase1List) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(ExpressionNode.Comma) }.dropLast(1)) }).bind()
+
+        val rp = rightParen.bind()
+
+        val jfClass = Type.JFClass(name.value, kind = Type.ClassKind.VALUE_CLASS)
+        symbolMapManager.add(name.value, jfClass)
+
+        val cons = Type.JFConstructor(parameters, jfClass)
+        jfClass.constructor = cons
+        symbolMapManager.add(jfClass, cons.name, cons)
+
+        for ((index, param) in parameters.withIndex()) {
+            val getter = Type.JFMethod(
+                emptyList(), jfClass, param.name, param.type,
+                static = false, operator = false, associativity = PREFIX, precedence = 10,
+            )
+            symbolMapManager.add(jfClass, param.name, getter)
+        }
+
+        ExpressionNode.Phase1List(`value`, white1, `class`, white2, name, white3, lp, white4, paramList, rp)
+    }
+
     val phase1Tokens: Parser<Char, List<ExpressionNode.Phase1Token>> = zeroOrMore(oneOf(
         integerLiteral_term,
         stringLiteral_term,
         charLiteral_term,
         booleanLiteral_term,
+        valueClassDeclaration,
         valDeclaration,
         varDeclaration,
         funDeclaration,

@@ -53,7 +53,7 @@ private fun Indenter.print(element: Printable) {
             -"method "
             -element.name
             -"("
-            -element.parameterTypes.joinToString(", ") { typeName(it) }
+            -element.parameters.joinToString(", ") { typeName(it.type) }
             -"): "
             -typeName(element.returnType)
             +" {"
@@ -75,6 +75,16 @@ private fun Indenter.print(element: Printable) {
         is ExpressionNode.CharLiteral -> +"CharLiteral(\'${element.value}\')"
         is ExpressionNode.IntegerLiteral -> +"Int32Literal(${element.value})"
         is ExpressionNode.BooleanLiteral -> +"BooleanLiteral(${element.value})"
+
+        is ExpressionNode.FieldAccess -> {
+            -"${element.fieldName}"
+            +"("
+            indent {
+                print(element.instance)
+            }
+            -")"
+            +": ${element.type()}"
+        }
 
         is ExpressionNode.ExpressionList -> {
             element.expressions.forEach { print(it) }

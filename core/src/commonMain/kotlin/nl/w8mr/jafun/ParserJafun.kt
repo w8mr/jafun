@@ -318,11 +318,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 when (stop) {
                     true -> break
                     false -> {
-                        current =
-                            when (val rhs = (owsnl and methodRhs(current.value, minPrecedence) and ows).bindAsResult()) {
-                                is Failure -> break
-                                is Success -> rhs
-                            }
+                        current = when (val rhs = (owsnl and oneOf(
+                            methodRhs(current.value, minPrecedence),
+                            fieldRhs(current.value),
+                        ) and ows).bindAsResult()) {
+                            is Success -> rhs
+                            is Failure -> break
+                        }
                     }
                 }
             }
@@ -372,32 +374,29 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             methodInvocation(symbol.method, symbol.field, arguments)
                         }
 
-                        is JFVariableMethod -> {
-                            oneOf(
-                                combi<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression> {
-                                    val arguments =
-                                        when (symbol.method.associativity) {
-                                            PREFIX -> methodArguments(symbol.method, minPrecedence)
-                                            else -> fail("Method does not have the right associativity")
-                                        }
-                                    methodInvocation(symbol.method, symbol.variable, arguments)
-                                },
-                                combi {
-                                    // Extention function
-                                    val arguments =
-                                        when (symbol.method.associativity) {
-                                            PREFIX -> methodArguments(
-                                                symbol.method,
-                                                minPrecedence,
-                                                ExpressionNode.Variable(symbol.variable)
-                                            )
-
-                                            else -> fail("Method does not have the right associativity")
-                                        }
-                                    methodInvocation(symbol.method, arguments) ?: fail("Method not found")
-                                }
-                            ).bind()
-                        } // TODO: remove duplication
+                        is JFVariableMethod -> oneOf(
+                            combi { vcFieldAccess(symbol) ?: fail("Not a value class getter") },
+                            combi<ExpressionNode.Phase1Token, ExpressionNode.Phase2Expression> {
+                                val arguments =
+                                    when (symbol.method.associativity) {
+                                        PREFIX -> methodArguments(symbol.method, minPrecedence)
+                                        else -> fail("Method does not have the right associativity")
+                                    }
+                                methodInvocation(symbol.method, symbol.variable, arguments)
+                            },
+                            combi {
+                                val arguments =
+                                    when (symbol.method.associativity) {
+                                        PREFIX -> methodArguments(
+                                            symbol.method,
+                                            minPrecedence,
+                                            ExpressionNode.Variable(symbol.variable)
+                                        )
+                                        else -> fail("Method does not have the right associativity")
+                                    }
+                                methodInvocation(symbol.method, arguments) ?: fail("Method not found")
+                            }
+                        ).bind() // TODO: remove duplication
                         else -> fail("Method or variable not found")
                     }
                 }
@@ -435,6 +434,40 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 }.singleOrNull() ?: fail("No single method ($identifier) not found")
             result
         }
+
+    private fun fieldRhs(
+        lhsExpression: ExpressionNode.Phase2Expression,
+    ): Parser<ExpressionNode.Phase1Token, ExpressionNode.FieldAccess> = combi {
+        val fieldName = (dot and owsnl and identifier).bind().value
+        val lhsType = lhsExpression.type()
+        val methods = symbolMapManager.find(lhsType, fieldName).filterIsInstance<JFMethod>()
+        val getter = methods.singleOrNull { it.parameters.isEmpty() } ?: fail("No getter for $fieldName")
+        val fieldIndex = symbolMapManager.find(lhsType).filterIsInstance<Type.JFConstructor>()
+            .flatMap { it.parameters }.indexOfFirst { it.name == fieldName }
+        ExpressionNode.FieldAccess(
+            instance = lhsExpression,
+            fieldName = fieldName,
+            fieldIndex = if (fieldIndex >= 0) fieldIndex else 0,
+            fieldType = getter.rtn,
+            arguments = emptyList(),
+        )
+    }
+
+    private fun vcFieldAccess(symbol: JFVariableMethod): ExpressionNode.FieldAccess? {
+        val lhsType = symbol.variable.type
+        if (lhsType is Type.JFClass && lhsType.kind == Type.ClassKind.VALUE_CLASS && symbol.method.parameters.isEmpty()) {
+            val fields = symbolMapManager.find(lhsType).filterIsInstance<Type.JFConstructor>().flatMap { it.parameters }
+            val fieldIndex = fields.indexOfFirst { it.name == symbol.method.name }
+            return ExpressionNode.FieldAccess(
+                instance = ExpressionNode.Variable(symbol.variable),
+                fieldName = symbol.method.name,
+                fieldIndex = if (fieldIndex >= 0) fieldIndex else 0,
+                fieldType = symbol.method.rtn,
+                arguments = emptyList(),
+            )
+        }
+        return null
+    }
 
     private fun ExpressionNode.Phase2Expression?.asList() =
         when (this) {
@@ -569,7 +602,23 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
         while (i < tokens.size) {
             val token = tokens[i]
-            if (token is ExpressionNode.Keyword && token.value == "fun") {
+            if (token is ExpressionNode.Keyword && token.value == "value") {
+                i++
+                while (i < tokens.size && (tokens[i] !is ExpressionNode.Keyword || (tokens[i] as ExpressionNode.Keyword).value != "class")) i++
+                if (i < tokens.size) i++ // skip "class"
+                while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
+                if (i < tokens.size) i++ // skip class name
+                while (i < tokens.size && tokens[i] !is ExpressionNode.LeftParen) i++
+                if (i < tokens.size) i++ // skip "("
+                var depth = 1
+                while (i < tokens.size && depth > 0) {
+                    when (tokens[i]) {
+                        is ExpressionNode.LeftParen -> depth++
+                        is ExpressionNode.RightParen -> depth--
+                    }
+                    i++
+                }
+            } else if (token is ExpressionNode.Keyword && token.value == "fun") {
                 i++
                 while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
                 if (i >= tokens.size) error("Expected function name")

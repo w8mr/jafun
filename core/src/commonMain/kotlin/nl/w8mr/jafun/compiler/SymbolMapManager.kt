@@ -54,6 +54,12 @@ class SymbolMapManager {
         typeSig: Type,
     ) = currentSymbolMap.add(null, path, typeSig)
 
+    fun add(
+        parent: TypeSymbol,
+        path: String,
+        typeSig: Type,
+    ) = currentSymbolMap.add(parent, path, typeSig)
+
 
     fun replaceType(
         path: String,

@@ -116,6 +116,16 @@ sealed interface ExpressionNode: Printable {
     }
 
 
+    data class FieldAccess(
+        val instance: Phase2_3Expression,
+        val fieldName: String,
+        val fieldIndex: Int,
+        val fieldType: OperandType<*>,
+        override val arguments: List<Phase2_3Expression>,
+    ) : Invocation {
+        override fun type(): OperandType<*> = fieldType
+    }
+
     data class When(val subject: Phase2_3Expression?, val matches: List<Pair<Phase2_3Expression, Phase2_3Expression>>) : Phase2Expression {
         override fun type() = matches.firstOrNull()?.second?.type() ?: OperandType.Unit
         // Type is based on first branch? Or common type? Original used last. Let's use first non-null or Unit.

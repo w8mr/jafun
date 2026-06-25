@@ -147,3 +147,12 @@ fun Int.+(other: Int): Int = this + other
 ```
 
 The Pratt parser uses precedence and associativity to build the correct parse tree. Higher precedence binds tighter. `INFIXL` groups left-to-right, `INFIXR` groups right-to-left.
+
+### Constraints
+
+- `CurlyBlock.tokens` includes `LeftCurly` and `RightCurly` brace tokens — must drop both ends before passing to `expressions` or `parseBodies`.
+- Parsek `zeroOrMore` silently returns an empty list when its inner parser can't match (never fails). Do not rely on `zeroOrMore` to signal parse errors.
+- `Parser.invoke` (operator) throws on failure; `Parser.parse` returns `Pair<R?, Result<R>>` with a `parsek.Result.Failure` on error.
+- `structurePass` uses `replaceType()` instead of `add()` for function symbols, since Phase1's `funDeclaration` already registered them. Using `add()` would produce duplicate entries.
+- Nested functions are handled by the inline `function` parser in `prattParser` during body parsing, not by `parseBodies` (which only processes top-level functions).
+- `extractReturnType` defaults to `OperandType.Unknown` (not `Unit`) for functions without explicit return type — `parseBodies` infers and updates via `replaceType()`.

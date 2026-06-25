@@ -34,12 +34,14 @@ class JVMBackend {
                     }
 
                     is ExpressionNode.ConstructorInvocation -> {
+                        val classType = instruction.type()
+                        val internalName = classType.path.replace('.', '/')
                         val consSignature =
                             "(${instruction.cons.parameters.joinToString("") { signature(it.type) }})V"
-                        new(instruction.type().path.replace('.', '/'))
+                        new(internalName)
                         dup()
                         instruction.arguments.forEach { compile(it) }
-                        invokeSpecial(instruction.type().path.replace('.', '/'), "<init>", consSignature)
+                        invokeSpecial(internalName, "<init>", consSignature)
                     }
                     is ExpressionNode.MethodInvocation -> {
                         when (instruction.field) {
@@ -164,6 +166,17 @@ class JVMBackend {
                         conversion(instruction.from, instruction.to)
                     }
 
+                    is ExpressionNode.FieldAccess -> {
+                        compile(instruction.instance)
+                        val ownerType = instruction.instance.type() as Type.JFClass
+                        getField(
+                            ownerType.path.replace('.', '/'),
+                            instruction.fieldName,
+                            signature(instruction.fieldType),
+                        )
+                        if (asStatement && instruction.type() != OperandType.Unit) pop()
+                    }
+
                     else -> TODO()
                 }
             }
@@ -259,8 +272,10 @@ fun buildClass(
         classContext.methods.forEach { m ->
             method {
                 name = m.name
-                signature = "(${m.parameterTypes.joinToString("", transform = ::signature)})" +
+                signature = "(${m.parameters.joinToString("", transform = { signature(it.type) })})" +
                     signature(m.returnType)
+                // Pre-register parameter variable names to reserve correct local slots
+                m.parameters.forEach { p -> p.varName?.let { parameter(it) } }
                 val context = JVMBackend.Context(this)
                 val lastIndex = m.instructions.size - 1
                 m.instructions.forEachIndexed { index, instruction ->

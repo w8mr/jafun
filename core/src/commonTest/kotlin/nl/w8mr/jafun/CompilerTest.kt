@@ -2807,5 +2807,159 @@ class CompilerTest {
         }
     }
 
+    @Test
+    fun valueClass() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int, city: String)
+                    
+                    val test = Address("Test", 1, "Test")
+                    println test.number
+                """.trimIndent()
+                expectedOutput = "1\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(1)
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun valueClassFunctionParam() {
+        test {
+            file {
+                code = """
+                    value class Address(number: Int, street: String)
+                    fun printNumber(input: Address) {
+                        println input.number
+                    }
+                    val test = Address(1, "x")
+                    printNumber(test)
+                """.trimIndent()
+                expectedOutput = "1\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(1)
+                        loadConstant("x")
+                        invokeStatic("Script", "printNumber", "(ILjava/lang/String;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "printNumber"
+                        signature = "(ILjava/lang/String;)V"
+                        parameter("input_number")
+                        parameter("input_street")
+                        iload("input_number")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun functionParamReverseAccessOrder() {
+        test {
+            file {
+                code = """
+                    fun test() {
+                        fun subtract(a: Int, b: Int): Int {
+                            b - a
+                        }
+                        println subtract(3, 5)
+                    }
+                    test()
+                """.trimIndent()
+                expectedOutput = "2\n"
+            }
+        }
+    }
+
+    @Test
+    fun functionParamForwardAccessOrder() {
+        test {
+            file {
+                code = """
+                    fun test() {
+                        fun subtract(a: Int, b: Int): Int {
+                            a - b
+                        }
+                        println subtract(3, 5)
+                    }
+                    test()
+                """.trimIndent()
+                expectedOutput = "-2\n"
+            }
+        }
+    }
+
+    @Test
+    fun valueClassTwoParamsReverseFieldOrder() {
+        test {
+            file {
+                code = """
+                    value class A(x: Int, y: String)
+                    value class B(p: String, q: Int)
+                    fun test(a: A, b: B) {
+                        println b.q
+                        println a.y
+                        println a.x
+                        println b.p
+                    }
+                    val a = A(10, "hello")
+                    val b = B("world", 20)
+                    test(a, b)
+                """.trimIndent()
+                expectedOutput = "20\nhello\n10\nworld\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(10)
+                        loadConstant("hello")
+                        loadConstant("world")
+                        loadConstant(20)
+                        invokeStatic("Script", "test", "(ILjava/lang/String;Ljava/lang/String;I)V")
+                        `return`()
+                    }
+                    method {
+                        name = "test"
+                        signature = "(ILjava/lang/String;Ljava/lang/String;I)V"
+                        parameter("a_x")
+                        parameter("a_y")
+                        parameter("b_p")
+                        parameter("b_q")
+                        iload("b_q")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        aload("a_y")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        iload("a_x")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        aload("b_p")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                }
+            }
+        }
+    }
+
 }
 

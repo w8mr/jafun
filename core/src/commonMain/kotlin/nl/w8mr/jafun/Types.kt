@@ -1,6 +1,7 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.Associativity
+import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.debug.Printable
@@ -28,8 +29,12 @@ interface Type : TypeSymbol {
 
     interface PackageParent : Parent
 
-    data class JFClass(override val name: String, override val parent: ClassParent? = null) :
-        Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent
+    enum class ClassKind { NORMAL, VALUE_CLASS }
+
+    data class JFClass(override val name: String, override val parent: ClassParent? = null, val kind: ClassKind = ClassKind.NORMAL) :
+        Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent {
+        var constructor: JFConstructor? = null
+    }
 
     data class JFPackage(override val name: String, override val parent: PackageParent? = null) :
         Type, HasParent<PackageParent?>, MethodParent, FieldParent, ClassParent, PackageParent
@@ -76,6 +81,9 @@ interface Type : TypeSymbol {
         val mutable: Boolean = false,
         val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
+        var constructorArgs: List<ExpressionNode.Phase2_3Expression>? = null
+        var expandedFields: List<Pair<String, OperandType<*>>>? = null
+
         override fun equals(other: Any?): Boolean =
             when (other) {
                 null -> false

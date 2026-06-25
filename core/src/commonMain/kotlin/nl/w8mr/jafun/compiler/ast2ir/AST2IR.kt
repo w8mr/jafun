@@ -3,6 +3,8 @@ package nl.w8mr.jafun.compiler.ast2ir
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.compiler.SymbolMap
+import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.compileMethod
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
@@ -66,11 +68,12 @@ fun compileExpressionNode(
 ) {
     when (node) {
         is ExpressionNode.MethodInvocation -> {
-            val arguments = loadArguments(builder, node.arguments, node.parameters.map(Type.JFVariableSymbol::type))
+            val (expandedParams, expandedRawArgs) = expandValueClassParams(node.parameters, node.arguments)
+            val arguments = loadArguments(builder, expandedRawArgs, expandedParams.map { it.type })
             builder.add(ExpressionNode.MethodInvocation(
                 methodName = node.methodName,
                 parentPath = node.parentPath,
-                parameters = node.parameters,
+                parameters = expandedParams,
                 rtnLookup = node.rtnLookup,
                 field = node.field,
                 arguments = arguments,
@@ -132,16 +135,24 @@ fun compileExpressionNode(
             builder.add(ExpressionNode.WhenPhase3(conditionAndBodyPairs))
         }
         is ExpressionNode.Function -> {
+            val symbol = node.symbol
+            val parameters = buildFunctionParameters(symbol, node)
             compileMethod(
-                builder.parent.parent, // This assumes specific builder nesting
+                builder.parent.parent,
                 node.block,
-                node.symbol.name,
-                node.symbol.rtn,
-                node.symbol.parameters.map(Type.JFVariableSymbol::type),
+                symbol.name,
+                symbol.rtn,
+                parameters,
             )
         }
         is ExpressionNode.ValAssignment -> {
-            builder.add(ExpressionNode.ValAssignment(node.variableSymbol, compileAsCodeBlock(builder, node.expression)))
+            val expr = compileAsCodeBlock(builder, node.expression)
+            val varType = node.variableSymbol.type
+            if (varType is Type.JFClass && varType.kind == Type.ClassKind.VALUE_CLASS && expr is ExpressionNode.ConstructorInvocation) {
+                node.variableSymbol.constructorArgs = expr.arguments
+                return
+            }
+            builder.add(ExpressionNode.ValAssignment(node.variableSymbol, expr))
         }
         is ExpressionNode.VarAssignment -> {
             builder.add(ExpressionNode.VarAssignment(node.variableSymbol, compileAsCodeBlock(builder, node.expression)))
@@ -150,10 +161,137 @@ fun compileExpressionNode(
             builder.add(ExpressionNode.ExpressionList(node.expressions.map { compileAsCodeBlock(builder, it) }))
         }
         is ExpressionNode.While -> {
-            builder.add(ExpressionNode.WhilePhase3(compileAsCodeBlock(builder, node.condition), compileAsCodeBlock(builder, node.expressions)))
+            builder.add(ExpressionNode.WhilePhase3(
+                compileAsCodeBlock(builder, node.condition),
+                compileAsCodeBlock(builder, node.expressions),
+            ))
+        }
+        is ExpressionNode.FieldAccess -> {
+            val instance = compileAsCodeBlock(builder, node.instance)
+            if (instance is ExpressionNode.Variable) {
+                val varName = instance.variableSymbol.name
+                val constructorArgs = instance.variableSymbol.constructorArgs
+                if (constructorArgs != null) {
+                    val value = constructorArgs.getOrNull(node.fieldIndex)
+                    if (value != null) {
+                        builder.add(value)
+                        return
+                    }
+                }
+                val expandedFields = instance.variableSymbol.expandedFields
+                if (expandedFields != null) {
+                    val (fieldName, fieldType) = expandedFields.getOrNull(node.fieldIndex)
+                        ?: error("Field index ${node.fieldIndex} not found in expansion of $varName")
+                    builder.add(
+                        ExpressionNode.Variable(
+                            Type.JFVariableSymbol(
+                                name = "${varName}_$fieldName",
+                                type = fieldType,
+                                symbolMap = instance.variableSymbol.symbolMap,
+                                initialized = true,
+                            )
+                        )
+                    )
+                    return
+                }
+            }
+            builder.add(ExpressionNode.FieldAccess(
+                instance = instance,
+                fieldName = node.fieldName,
+                fieldIndex = node.fieldIndex,
+                fieldType = node.fieldType,
+                arguments = emptyList(),
+            ))
         }
         is ExpressionNode.Phase2_3Expression -> {
             builder.add(node)
         }
+    }
+}
+
+private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? {
+    return vc.constructor
+}
+
+private fun buildFunctionParameters(
+    symbol: Type.JFMethod,
+    node: ExpressionNode.Function,
+): List<Parameter> {
+    val paramNames = symbol.parameters.map { it.name }.toSet()
+    val paramRefSymbolMap = node.block.mapNotNull { e -> findParamSymbolMap(e, paramNames) }.firstOrNull()
+    val actualSymbolMapId = paramRefSymbolMap?.symbolMapId
+    return symbol.parameters.flatMap { param ->
+        val type = param.type
+        if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS) {
+            val cons = findConstructor(type)
+            if (cons != null) {
+                val fieldExpansions = cons.parameters.map { it.name to it.type }
+                param.expandedFields = fieldExpansions
+                if (paramRefSymbolMap != null) {
+                    (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
+                        ?.expandedFields = fieldExpansions
+                }
+                fieldExpansions.map { (fieldName, fieldType) ->
+                    val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_$fieldName" else null
+                    Parameter(fieldType, varName)
+                }
+            } else emptyList()
+        } else {
+            val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
+            listOf(Parameter(type, varName))
+        }
+    }
+}
+
+private fun expandValueClassParams(
+    parameters: List<Type.JFVariableSymbol>,
+    arguments: List<ExpressionNode.Phase2_3Expression>,
+): Pair<List<Type.JFVariableSymbol>, List<ExpressionNode.Phase2_3Expression>> {
+    val (expandedParams, expandedRawArgs) = parameters.zip(arguments).flatMap { (param, arg) ->
+        val cons = (param.type as? Type.JFClass)?.takeIf { it.kind == Type.ClassKind.VALUE_CLASS }?.let { findConstructor(it) }
+        cons?.parameters?.mapIndexed { fieldIndex, fieldParam ->
+            param.copy(name = "${param.name}_${fieldParam.name}", type = fieldParam.type) to
+                ExpressionNode.FieldAccess(
+                    instance = arg, fieldName = fieldParam.name,
+                    fieldIndex = fieldIndex, fieldType = fieldParam.type,
+                    arguments = emptyList(),
+                )
+        } ?: listOf(param to arg)
+    }.unzip()
+    return Pair(expandedParams, expandedRawArgs)
+}
+
+private fun findParamSymbolMap(
+    expr: ExpressionNode.Phase2_3Expression,
+    paramNames: Set<String>,
+): SymbolMap? {
+    return when (expr) {
+        is ExpressionNode.Variable -> {
+            if (expr.variableSymbol.name in paramNames) expr.variableSymbol.symbolMap else null
+        }
+        is ExpressionNode.MethodInvocation -> {
+            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.ValAssignment -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.VarAssignment -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.ExpressionList -> {
+            expr.expressions.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.ConstructorInvocation -> {
+            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.FieldAccess -> findParamSymbolMap(expr.instance, paramNames)
+        is ExpressionNode.Convert -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.WhenPhase3 -> {
+            expr.matches.firstNotNullOfOrNull { (_, e) -> findParamSymbolMap(e, paramNames) }
+        }
+        is ExpressionNode.Function -> {
+            findParamSymbolMap(ExpressionNode.ExpressionList(expr.block), paramNames)
+        }
+        is ExpressionNode.WhilePhase3 -> {
+            findParamSymbolMap(expr.expressions, paramNames)
+                ?: findParamSymbolMap(expr.condition, paramNames)
+        }
+        else -> null
     }
 }

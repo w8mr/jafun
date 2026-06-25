@@ -2,6 +2,7 @@ package nl.w8mr.jafun.compiler.ir2jvm
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.debug.Printable
 
 object IRBuilder {
@@ -21,12 +22,12 @@ object IRBuilder {
     data class MethodContext(
         val name: String,
         val returnType: OperandType<*>,
-        val parameterTypes: List<OperandType<*>>,
+        val parameters: List<Parameter>,
         val instructions: MutableList<ExpressionNode.Phase2_3Expression> = mutableListOf(),
         val parent: ClassContext,
     ): Printable {
         override fun toString(): String =
-            "MethodContext(name=$name, returnType=$returnType, parameterType=$parameterTypes, instructions=$instructions"
+            "MethodContext(name=$name, returnType=$returnType, parameters=$parameters, instructions=$instructions"
     }
 
     class BuilderDSL(val context: BuilderContext) {
@@ -45,10 +46,10 @@ object IRBuilder {
         fun method(
             name: String,
             returnType: OperandType<*>,
-            parameterTypes: List<OperandType<*>>,
+            parameters: List<Parameter>,
             init: MethodDSL.() -> Unit,
         ) {
-            val methodContext = MethodContext(name, returnType, parameterTypes, parent = context)
+            val methodContext = MethodContext(name, returnType, parameters, parent = context)
             context.methods.add(methodContext)
             init.invoke(MethodDSL(methodContext, this))
         }

@@ -91,12 +91,10 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
 //                )
 //            } // TODO: look into this.
         val returnType: OperandType<*> = OperandType.Unit
-        val parameterTypes: List<OperandType<*>> =
-            listOf(OperandType.Array(OperandType.StringType))
         val builder =
             IRBuilder.define {
                 `class`(className) {
-                    compileMethod(this, parsed, methodName, returnType, parameterTypes)
+                    compileMethod(this, parsed, methodName, returnType, listOf(Parameter(OperandType.Array(OperandType.StringType))))
                 }
             }
 
@@ -118,15 +116,17 @@ annotation class FunctionPrecedence(val precedence: Int)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionName(val name: String)
 
+data class Parameter(val type: OperandType<*>, val varName: String? = null)
+
 fun compileMethod(
     builder: IRBuilder.ClassDSL,
     expression: List<ExpressionNode.Phase2_3Expression>,
     methodName: String,
     returnType: OperandType<*>,
-    parameterTypes: List<OperandType<*>>,
+    parameters: List<Parameter>,
 ) {
     with(builder) {
-        method(methodName, returnType, parameterTypes) {
+        method(methodName, returnType, parameters) {
             codeBlock {
                 expression.size - 1
                 expression.forEachIndexed { index, statement ->
