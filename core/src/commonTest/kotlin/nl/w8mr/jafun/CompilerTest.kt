@@ -170,7 +170,6 @@ class CompilerTest {
              * Can specify multiple jvmIr blocks to validate multiple generated classes.
              * Each block describes the expected methods and bytecode for that class.
              */
-            fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit)
             fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit)
             fun phase2(block: Phase2Builder.() -> Unit)
 
@@ -181,16 +180,6 @@ class CompilerTest {
             override var expectedOutput by context::expectedOutput
             override fun params(vararg params: String) {
                 context.mainParams = params.toList().toTypedArray()
-            }
-
-            override fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
-                // Default to "Script" for backward compatibility
-                val wrappedBlock: ClassBuilder.ClassDSL.DSL.() -> Unit = {
-                    name = "Script"  // Auto-set the class name
-                    block()          // Run user's block
-                }
-                val bytecode = classBuilder(wrappedBlock).write()
-                context.classBytecodes["Script"] = bytecode
             }
 
             override fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
@@ -3230,9 +3219,53 @@ class CompilerTest {
                         aload("street")
                         putField("Address", "street", "Ljava/lang/String;")
                         `return`()
-                    }
+                     }
                 }
             }
         }
     }
+
+    @Test
+    fun vcNestedIdInUser() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    value class User(id: Id, name: String)
+                    fun getUserName(user: User): String {
+                        user.name
+                    }
+                    val u = User(Id(42), "Alice")
+                    println getUserName(u)
+                """.trimIndent()
+                expectedOutput = "Alice\n"
+                jvmIr("Script") {
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        // Both User and Id are fully inlined at call site
+                        // User(Id(42), "Alice") expands to just (42, "Alice")
+                        loadConstant(42)           // id value (from Id)
+                        loadConstant("Alice")      // name
+                        invokeStatic("Script", "getUserName", "(ILjava/lang/String;)Ljava/lang/String;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "getUserName"
+                        signature = "(ILjava/lang/String;)Ljava/lang/String;"
+                        // Parameters are fully expanded: id (int) and name (String)
+                        parameter("user_id")
+                        parameter("user_name")
+                         // Return user.name (second parameter)
+                         aload("user_name")
+                         areturn()
+                     }
+                 }
+             }
+         }
+     }
 }
+
+
+
