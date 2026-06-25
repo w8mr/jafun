@@ -366,3 +366,101 @@ public static int test(int id, String name) {
 - [ ] No "Type issue" errors for valid nested access
 - [ ] Clear error messages for invalid nested access
 - [ ] Performance regression < 5%
+
+## Implementation Progress
+
+### Completed (Commit f112d34)
+
+1. ✅ Added test cases for nested VC field access
+   - `vcNestedIdAccess`: Tests `user.id.value` access
+   - `vcChainedNestedAccess`: Tests `box.topLeft.x` access
+   - Both tests fail with expected "Type issue" error
+
+2. ✅ Created `ExpandedField` data class in Types.kt
+   - Tracks field name, type, source VC, and source VC fields
+   - Provides helper methods: `hasField()`, `getFieldType()`, `getFieldMetadata()`
+   - Supports recursive metadata for nested nesting
+
+3. ✅ Updated `parameterToParameters()` in AST2IR.kt
+   - Creates `ExpandedField` objects with nested VC tracking
+   - Extracts sourceVC and sourceVCFields for single-field VC parameters
+   - Properly unwraps nested VCs during parameter expansion
+
+### In Progress / Discovered Issue
+
+**Problem**: The current metadata-based approach is insufficient. Phase3 IR needs to see the FULLY RESOLVED variable name, not an intermediate one with metadata.
+
+**Current Behavior**:
+- `user.id.value` resolves to intermediate Variable("user_id") with expandedFields metadata
+- Phase3 IR sees: `method getId(Id, String): Int32 { user_id: Id }`
+- JVM backend fails: expects Int32 but sees Id type
+
+**Root Cause**: 
+The nested field access is being deferred with metadata instead of being immediately resolved in the access chain.
+
+### Revised Approach Needed
+
+Instead of:
+```
+FieldAccess(FieldAccess(var, field1), field2)
+  → Returns Variable("var_field1") with expandedFields metadata for field2
+  → Defers resolution to next iteration
+```
+
+Should do:
+```
+FieldAccess(FieldAccess(var, field1), field2)
+  → Immediately detect nested VC access
+  → Resolve full chain to Variable("var_field1_field2")
+  → Return fully resolved variable
+```
+
+### Modified Algorithm
+
+```kotlin
+fun compileFieldAccess(instance, fieldName, fieldIndex) {
+    val evaluated = evaluate(instance)
+    
+    if (evaluated is Variable with expandedFields) {
+        val field = find in expandedFields by index or name
+        val resultVar = Variable("${evaluated.name}_${field.name}", field.type)
+        
+        // RECURSIVELY RESOLVE nested accesses!
+        if (field.sourceVCFields != null) {
+            resultVar.expandedFields = field.sourceVCFields
+            // Don't return here - if the next level also has nested fields,
+            // the NEXT FieldAccess will see this resultVar and continue resolving
+        }
+        
+        return resultVar
+    }
+}
+```
+
+This way, each field access automatically continues through nested VCs until it reaches a leaf type.
+
+### Next Implementation Steps
+
+1. **Verify field indexing** - Ensure fieldIndex matches position in sourceVCFields
+2. **Test intermediate values** - Add debug output to trace the access chain
+3. **Recursively expand** - Ensure nested metadata is preserved for chained accesses
+4. **Update JVM backend** - May need to handle nested types in type validation
+
+### Files to Continue Work On
+
+- `core/src/commonMain/kotlin/nl/w8mr/jafun/compiler/ast2ir/AST2IR.kt:198-244`
+  - Modify field access resolution to continue through nested VCs
+  - Ensure full access chain is resolved before returning
+  
+- `core/src/commonMain/kotlin/nl/w8mr/jafun/compiler/ir2jvm/JVMBackend.kt:358-361`
+  - Enhance `effectiveJvmType()` to recursively unwrap single-field VCs
+  - May need additional type consistency checks
+
+### Test Status
+
+- Tests added: 2 (vcNestedIdAccess, vcChainedNestedAccess)
+- Failing: Both with "Type issue"
+- Expected after fix: Both should pass
+- Regression risk: Low (isolated to VC field access)
+- All existing tests should remain passing
+
