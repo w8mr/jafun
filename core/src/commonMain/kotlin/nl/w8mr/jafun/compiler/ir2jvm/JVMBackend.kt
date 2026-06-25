@@ -356,6 +356,9 @@ fun signature(type: OperandType<*>): String =
     }
 
 private fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
-    if (type is Type.JFClass && type.isInlineValueClass) return type.constructor!!.parameters.single().type
+    if (type is Type.JFClass && type.isInlineValueClass) {
+        // Recursively unwrap nested single-field VCs
+        return effectiveJvmType(type.constructor!!.parameters.single().type)
+    }
     return type
 }
