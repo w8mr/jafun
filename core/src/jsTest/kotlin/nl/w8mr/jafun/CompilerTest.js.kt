@@ -23,7 +23,7 @@ actual fun writeFile(
  * Skipping run for now in JS, always assert as true
  */
 actual fun runAndAssertOutput(
-    actualBytes: ByteArray,
+    actualBytes: Map<String, ByteArray>,
     className: String,
     methodName: String,
     params: Array<String>?,

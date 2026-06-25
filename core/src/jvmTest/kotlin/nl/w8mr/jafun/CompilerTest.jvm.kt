@@ -27,7 +27,7 @@ actual fun compareDecompiled(
 }
 
 fun runAndCatchOutput(
-    bytes: ByteArray,
+    classes: Map<String, ByteArray>,
     className: String,
     methodName: String,
     params: Array<String>?
@@ -36,7 +36,13 @@ fun runAndCatchOutput(
     val output = ByteArrayOutputStream()
     System.setOut(PrintStream(output))
     try {
-        runMethod(bytes, className, methodName, params)
+        val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
+        var scriptClass: Class<*>? = null
+        classes.forEach { (name, bytes) ->
+            val cls = loader.define(name, bytes)
+            if (name == className) scriptClass = cls
+        }
+        scriptClass!!.getMethod(methodName, Array<String>::class.java).invoke(null, params)
         System.setOut(oldOut)
     } catch (t: Throwable) {
         System.setOut(oldOut)
@@ -45,17 +51,6 @@ fun runAndCatchOutput(
     }
     val result = String(output.toByteArray())
     return result
-}
-
-fun runMethod(
-    bytes: ByteArray,
-    className: String,
-    methodName: String,
-    params: Array<String>?,
-) {
-    val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
-    val scriptClass = loader.define(className, bytes)
-    scriptClass.getMethod(methodName, Array<String>::class.java).invoke(null, params)
 }
 
 actual fun writeFile(
@@ -69,7 +64,7 @@ actual fun writeFile(
 }
 
 actual fun runAndAssertOutput(
-    actualBytes: ByteArray,
+    actualBytes: Map<String, ByteArray>,
     className: String,
     methodName: String,
     params: Array<String>?,

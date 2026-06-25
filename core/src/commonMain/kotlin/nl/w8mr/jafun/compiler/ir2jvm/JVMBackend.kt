@@ -254,12 +254,48 @@ class JVMBackend {
     }
 }
 
+fun compileAll(
+    builder: IRBuilder.BuilderContext,
+): Map<String, ByteArray> {
+    val result = mutableMapOf<String, ByteArray>()
+    builder.classes.forEach { (name, classContext) ->
+        result[name] = buildClass(name, classContext).write()
+    }
+    builder.valueClasses.forEach { (name, vc) ->
+        result[name] = buildValueClass(vc).write()
+    }
+    return result
+}
+
+fun buildValueClass(vc: IRBuilder.ValueClassDef): ClassBuilder =
+    classBuilder {
+        name = vc.name
+        vc.fields.forEach { (fieldName, fieldType) ->
+            field(name = fieldName, type = signature(fieldType))
+        }
+        method {
+            name = "<init>"
+            access = 1u
+            signature = "(${vc.fields.joinToString("") { signature(it.second) }})V"
+            parameter("thisRef")
+            vc.fields.forEach { (fieldName, _) -> parameter("p_$fieldName") }
+            vc.fields.forEach { (fieldName, fieldType) ->
+                aload("thisRef")
+                when (fieldType) {
+                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> iload("p_$fieldName")
+                    else -> aload("p_$fieldName")
+                }
+                putField(vc.name, fieldName, signature(fieldType))
+            }
+            `return`()
+        }
+    }
+
 fun compileJVM(
     className: String,
     builder: IRBuilder.BuilderContext,
 ): ByteArray {
     val clazz = buildClass(className, builder.classes[className] ?: error("Class not found: $className"))
-
     return clazz.write()
 }
 

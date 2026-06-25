@@ -4,7 +4,10 @@ import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
+import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.TypeSymbol
 import nl.w8mr.jafun.compiler.ir2jvm.buildClass
+import nl.w8mr.jafun.compiler.ir2jvm.compileAll
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
@@ -20,14 +23,14 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
 
     interface Phase2Plugin : Plugin<List<ExpressionNode.Phase2Expression>>
     interface Phase3Plugin : Plugin<IRBuilder.ClassContext>
-    interface JVMPlugin : Plugin<ByteArray>
+    interface JVMPlugin : Plugin<Map<String, ByteArray>>
     interface JVMIRPlugin : Plugin<ClassDef>
 
     sealed interface PluginType<T, Plugin> {
         object Phase2 : PluginType<List<ExpressionNode.Phase2Expression>, Phase2Plugin>
         object Phase3 : PluginType<IRBuilder.ClassContext, Phase3Plugin>
         object JVMIR : PluginType<ClassDef, JVMIRPlugin>
-        object JVM : PluginType<ByteArray, JVMPlugin>
+        object JVM : PluginType<Map<String, ByteArray>, JVMPlugin>
     }
 
     fun <T, P: Plugin<T>> registerPlugin(type: PluginType<T, in P>, plugin: P): P {
@@ -40,7 +43,7 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
     private fun <T, P: Plugin<T>> PluginType<T, P>.run(input: T): T =
         getPlugins(this)?.fold(input) { context, plugin -> plugin.handle(context) } ?: input
 
-    fun compile(code: String, className: String, methodName: String): ByteArray {
+    fun compile(code: String, className: String, methodName: String): Map<String, ByteArray> {
         val symbolMap = SymbolMapManager()
         symbolMap.reset()
         val phase1 = Phase1Parser(symbolMap).parse(code).first ?: error("Phase 1 parsing failed")
@@ -55,44 +58,42 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
                 val parsed = parseResult.first
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
-                val classContext = ast2ir(className, updatedParsed, methodName)
+                val valueClasses = extractValueClasses(symbolMap)
+                val classContext = ast2ir(className, updatedParsed, methodName, valueClasses)
                 val updatedContext = Phase3.run(classContext)
 
-                val clazz = buildClass(className, updatedContext)
-                clazz.classDef = JVMIR.run(clazz.classDef)
-
-                val actualBytes = clazz.write()
-                JVM.run(actualBytes)
+                val builder = IRBuilder.BuilderContext(
+                    classes = mutableMapOf(className to updatedContext),
+                    valueClasses = valueClasses.toMutableMap()
+                )
+                val allClasses = compileAll(builder)
+                JVM.run(allClasses)
             }
         }
+    }
+
+    private fun extractValueClasses(symbolMap: SymbolMapManager): Map<String, IRBuilder.ValueClassDef> {
+        val result = mutableMapOf<String, IRBuilder.ValueClassDef>()
+        val topSymbols = symbolMap.find(null as TypeSymbol?)
+        for (sym in topSymbols) {
+            if (sym is Type.JFClass && sym.kind == Type.ClassKind.VALUE_CLASS) {
+                val fields = sym.constructor?.parameters?.map { it.name to it.type } ?: emptyList()
+                result[sym.name] = IRBuilder.ValueClassDef(sym.name, fields)
+            }
+        }
+        return result
     }
 
     private fun ast2ir(
         className: String,
         parsed: List<ExpressionNode.Phase2Expression>,
-        methodName: String
+        methodName: String,
+        valueClasses: Map<String, IRBuilder.ValueClassDef>
     ): IRBuilder.ClassContext {
-//        ParserJafun.symbolMap.currentSymbolMap =
-//            LocalSymbolMap(IdentifierCache.reset()).apply {
-//                add(
-//                    null,
-//                    "arguments",
-//                    Type.JFVariableSymbol(
-//                        "param1",
-//                        OperandType.Array(
-//                            Type.JFClass(
-//                                "String",
-//                                Type.JFPackage("lang", Type.JFPackage("java"))
-//                            )
-//                        ),
-//                        this,
-//                        false,
-//                    ),
-//                )
-//            } // TODO: look into this.
         val returnType: OperandType<*> = OperandType.Unit
         val builder =
             IRBuilder.define {
+                valueClasses.forEach { (name, vc) -> addValueClass(name, vc) }
                 `class`(className) {
                     compileMethod(this, parsed, methodName, returnType, listOf(Parameter(OperandType.Array(OperandType.StringType))))
                 }

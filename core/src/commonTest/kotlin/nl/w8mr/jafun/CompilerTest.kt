@@ -38,7 +38,7 @@ expect fun writeFile(
 )
 
 expect fun runAndAssertOutput(
-    actualBytes: ByteArray,
+    actualBytes: Map<String, ByteArray>,
     className: String,
     methodName: String,
     params: Array<String>?,
@@ -78,7 +78,7 @@ class CompilerTest {
 
                 val className = "Script"
                 val methodName = "main"
-                val actualBytes = try {
+                val allClasses = try {
                     compiler.compile(code, className, methodName)
                 } catch (e: Throwable) {
                     e.printStackTrace()
@@ -88,6 +88,9 @@ class CompilerTest {
                     println("IR:\n ${jvmirPlugin.jvmir?.print()}")
                     throw e
                 }
+
+                val actualBytes = allClasses[className] ?: error("Script class not found")
+                allClasses.forEach { (name, bytes) -> writeFile(name, bytes) }
 
          //       println("Phase1: ${parsePhase1.first?.joinToString("") { it.prettyPrint() } }}")
 
@@ -103,9 +106,8 @@ class CompilerTest {
                 println("Phase3:\n ${phase3Plugin.phase3?.prettyPrint()}")
                 println("IR:\n ${jvmirPlugin.jvmir?.print()}")
 
-                writeFile(className, actualBytes)
                 val result = runAndAssertOutput(
-                    actualBytes,
+                    allClasses,
                     className,
                     methodName,
                     file.mainParams,

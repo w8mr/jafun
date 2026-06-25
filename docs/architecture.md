@@ -27,18 +27,18 @@ Phase3 plugins (optional)
     │
     ▼
 JVMBackend (JVM bytecode emission)
-    │  Produces: ByteArray (.class file)
+    │  Produces: Map<String, ByteArray> (one .class per class/value class)
     │  Uses: kasmine library for bytecode generation
     ▼
 JVMIR / JVM plugins (optional)
     │
     ▼
-.class file (ByteArray)
+.class files (Map<String, ByteArray>)
 ```
 
 ## Entry Point
 
-`Compiler.compile(code, className, methodName)` in `Compiler.kt:43` orchestrates the pipeline.
+`Compiler.compile(code, className, methodName)` in `Compiler.kt:44` orchestrates the pipeline, returning a `Map<String, ByteArray>` of all generated `.class` files (main class + value classes).
 
 ## Plugin System
 
@@ -46,7 +46,7 @@ The compiler supports four extension points:
 - `Phase2Plugin` — transforms the typed AST before IR conversion
 - `Phase3Plugin` — transforms the class IR before bytecode emission
 - `JVMIRPlugin` — transforms the `ClassDef` (kasmine model) before writing
-- `JVMPlugin` — transforms the final byte array
+- `JVMPlugin` — transforms the `Map<String, ByteArray>`
 
 ## Key Design Decisions
 
@@ -57,4 +57,4 @@ The compiler supports four extension points:
   - `parseBodies()` processes only top-level functions (those collected by the outermost `structurePass` call). It runs a fixed-point loop over function descriptors, parsing each body inside its correct symbol map scope (`symbolMapManager.override(fn.descriptor.symbolMap)`) and updating the return type via `replaceType()` when the inferred type differs. Symbol lookups and replacements happen inside the override.
 - **`MethodInvocation` lazy symbol lookup**: Stores `methodName`/`parentPath`/`parameters` and a `rtnLookup` lambda instead of a direct `JFMethod` reference. `type()` re-looks up from the symbol map, ensuring forward-referenced return types resolve correctly.
 - **Immutable IR nodes**: All `ExpressionNode` classes use `val` fields. `MethodInvocation` is a regular class (not data class) — its `equals`/`hashCode` explicitly exclude the `rtnLookup` lambda to avoid broken structural equality.
-- **Plugin-based compilation**: The pipeline allows injecting custom transformations at multiple stages without modifying core code.
+- **Multi-class output**: `compile()` returns `Map<String, ByteArray>` — the main class plus any value class `.class` files. `compileAll()` in `JVMBackend.kt` iterates builder classes and value classes, generating each via `buildClass`/`buildValueClass`.
