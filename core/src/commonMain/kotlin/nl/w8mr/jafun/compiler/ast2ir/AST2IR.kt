@@ -219,12 +219,10 @@ fun compileExpressionNode(
                         ?: error("Field ${node.fieldName} (index ${node.fieldIndex}) not found in expansion of $varName")
                     
                     // Create a Variable for this expanded field
-                    // If the field type is itself a single-field VC, recursively unwrap it
-                    val unwrappedType = recursivelyUnwrapVC(field.type)
-                    
+                    // Keep the field type as-is; unwrapping happens via identity shortcut
                     val expandedVar = Type.JFVariableSymbol(
                         name = "${varName}_${field.name}",
-                        type = unwrappedType,
+                        type = field.type,
                         symbolMap = instance.variableSymbol.symbolMap,
                         initialized = true,
                     )
@@ -264,18 +262,18 @@ private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? {
 }
 
 /**
- * Recursively unwraps a type if it's a single-field VC.
- * Returns the innermost non-VC type.
+ * Unwraps a single level if it's a single-field VC.
+ * Does NOT recurse - only unwraps one level.
  */
-private fun recursivelyUnwrapVC(type: OperandType<*>): OperandType<*> {
+private fun unwrapVCOnce(type: OperandType<*>): OperandType<*> {
     if (type !is Type.JFClass) return type
     if (type.kind != Type.ClassKind.VALUE_CLASS) return type
     
     val cons = findConstructor(type)
     if (cons == null || cons.parameters.size != 1) return type
     
-    // Single-field VC - unwrap and recurse
-    return recursivelyUnwrapVC(cons.parameters[0].type)
+    // Single-field VC - unwrap one level
+    return cons.parameters[0].type
 }
 
 private fun buildFunctionParameters(
@@ -320,9 +318,8 @@ private fun buildFunctionParameters(
                 }
                  fieldExpansions.map { field ->
                      val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_${field.name}" else null
-                     // Recursively unwrap the field type if it's a single-field VC
-                     val unwrappedType = recursivelyUnwrapVC(field.type)
-                     Parameter(unwrappedType, varName)
+                     // Keep the field type as-is; unwrapping happens via identity shortcut in field access
+                     Parameter(field.type, varName)
                  }
             } else emptyList()
         } else {

@@ -331,11 +331,11 @@ fun buildClass(
                         `return`()
                     }
                     is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType ->
-                        if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) ireturn() else error("Type issue")
                     is OperandType.StringType ->
-                        if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) areturn() else error("Type issue")
                     is Type.JFClass ->
-                        if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) areturn() else error("Type issue")
                     else -> TODO()
                 }
             }
