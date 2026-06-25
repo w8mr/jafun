@@ -185,8 +185,12 @@ class CompilerTest {
 
             override fun jvmIr(block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
                 // Default to "Script" for backward compatibility
-                context.bytecode = classBuilder(block).write()
-                context.classBytecodes["Script"] = context.bytecode!!
+                val wrappedBlock: ClassBuilder.ClassDSL.DSL.() -> Unit = {
+                    name = "Script"  // Auto-set the class name
+                    block()          // Run user's block
+                }
+                val bytecode = classBuilder(wrappedBlock).write()
+                context.classBytecodes["Script"] = bytecode
             }
 
             override fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
@@ -196,9 +200,6 @@ class CompilerTest {
                 }
                 val bytecode = classBuilder(wrappedBlock).write()
                 context.classBytecodes[className] = bytecode
-                if (className == "Script") {
-                    context.bytecode = bytecode
-                }
             }
 
             override fun phase2(block: Phase2Builder.() -> Unit) {
