@@ -190,7 +190,11 @@ class CompilerTest {
             }
 
             override fun jvmIr(className: String, block: ClassBuilder.ClassDSL.DSL.() -> Unit) {
-                val bytecode = classBuilder(block).write()
+                val wrappedBlock: ClassBuilder.ClassDSL.DSL.() -> Unit = {
+                    name = className  // Auto-set the class name
+                    block()           // Run user's block
+                }
+                val bytecode = classBuilder(wrappedBlock).write()
                 context.classBytecodes[className] = bytecode
                 if (className == "Script") {
                     context.bytecode = bytecode
@@ -3276,7 +3280,6 @@ class CompilerTest {
                     }
                 }
                 jvmIr("Address") {
-                    name = "Address"
                     // Public fields for value class Address(number: Int, street: String)
                     field(access = 1u, "number", "I")
                     field(access = 1u, "street", "Ljava/lang/String;")
