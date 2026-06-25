@@ -190,8 +190,13 @@ fun compileExpressionNode(
                 return
             }
             // For single-field VC instances, field access is identity
+            // BUT: if the instance is a parameter with expandedFields, we need to resolve through the expansion
             val instanceType = node.instance.type()
-            if (instanceType is Type.JFClass && instanceType.isInlineValueClass) {
+            val shouldBypassIdentityShortcut = 
+                (node.instance is ExpressionNode.Variable) && 
+                ((node.instance as ExpressionNode.Variable).variableSymbol.expandedFields != null)
+            
+            if (instanceType is Type.JFClass && instanceType.isInlineValueClass && !shouldBypassIdentityShortcut) {
                 builder.add(compileAsCodeBlock(builder, node.instance))
                 return
             }
@@ -214,9 +219,12 @@ fun compileExpressionNode(
                         ?: error("Field ${node.fieldName} (index ${node.fieldIndex}) not found in expansion of $varName")
                     
                     // Create a Variable for this expanded field
+                    // If the field type is itself a single-field VC, recursively unwrap it
+                    val unwrappedType = recursivelyUnwrapVC(field.type)
+                    
                     val expandedVar = Type.JFVariableSymbol(
                         name = "${varName}_${field.name}",
-                        type = field.type,
+                        type = unwrappedType,
                         symbolMap = instance.variableSymbol.symbolMap,
                         initialized = true,
                     )
@@ -255,6 +263,21 @@ private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? {
     return vc.constructor
 }
 
+/**
+ * Recursively unwraps a type if it's a single-field VC.
+ * Returns the innermost non-VC type.
+ */
+private fun recursivelyUnwrapVC(type: OperandType<*>): OperandType<*> {
+    if (type !is Type.JFClass) return type
+    if (type.kind != Type.ClassKind.VALUE_CLASS) return type
+    
+    val cons = findConstructor(type)
+    if (cons == null || cons.parameters.size != 1) return type
+    
+    // Single-field VC - unwrap and recurse
+    return recursivelyUnwrapVC(cons.parameters[0].type)
+}
+
 private fun buildFunctionParameters(
     symbol: Type.JFMethod,
     node: ExpressionNode.Function,
@@ -267,33 +290,40 @@ private fun buildFunctionParameters(
         if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS) {
             val cons = findConstructor(type)
             if (cons != null) {
-                // Create ExpandedField objects with nested VC metadata
-                val fieldExpansions = cons.parameters.map { vcParam ->
-                    val fieldType = vcParam.type
-                    
-                    // Check if this field is itself a single-field VC
-                    val sourceVCFields = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-                        val nestedCons = findConstructor(fieldType)
-                        nestedCons?.parameters?.map { it.name to it.type }
-                    } else null
-                    
-                    Type.ExpandedField(
-                        name = vcParam.name,
-                        type = fieldType,
-                        sourceVC = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) fieldType else null,
-                        sourceVCFields = sourceVCFields
-                    )
-                }
+                 // Create ExpandedField objects with nested VC metadata
+                 val fieldExpansions = cons.parameters.map { vcParam ->
+                     val fieldType = vcParam.type
+                     
+                     // Check if this field is itself a single-field VC
+                     val sourceVCFields = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+                         val nestedCons = findConstructor(fieldType)
+                         if (nestedCons != null) {
+                             nestedCons.parameters.map { it.name to it.type }
+                         } else {
+                             // Constructor not yet initialized - can't extract fields
+                             null
+                         }
+                     } else null
+                     
+                     Type.ExpandedField(
+                         name = vcParam.name,
+                         type = fieldType,
+                         sourceVC = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS && sourceVCFields != null) fieldType else null,
+                         sourceVCFields = sourceVCFields
+                     )
+                 }
                 
                 param.expandedFields = fieldExpansions
                 if (paramRefSymbolMap != null) {
                     (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
                         ?.expandedFields = fieldExpansions
                 }
-                fieldExpansions.map { field ->
-                    val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_${field.name}" else null
-                    Parameter(field.type, varName)
-                }
+                 fieldExpansions.map { field ->
+                     val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_${field.name}" else null
+                     // Recursively unwrap the field type if it's a single-field VC
+                     val unwrappedType = recursivelyUnwrapVC(field.type)
+                     Parameter(unwrappedType, varName)
+                 }
             } else emptyList()
         } else {
             val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
