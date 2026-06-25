@@ -34,6 +34,8 @@ interface Type : TypeSymbol {
     data class JFClass(override val name: String, override val parent: ClassParent? = null, val kind: ClassKind = ClassKind.NORMAL) :
         Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent {
         var constructor: JFConstructor? = null
+        val isInlineValueClass: Boolean
+            get() = kind == ClassKind.VALUE_CLASS && constructor?.parameters?.size == 1
     }
 
     data class JFPackage(override val name: String, override val parent: PackageParent? = null) :

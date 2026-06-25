@@ -35,13 +35,17 @@ class JVMBackend {
 
                     is ExpressionNode.ConstructorInvocation -> {
                         val classType = instruction.type()
-                        val internalName = classType.path.replace('.', '/')
-                        val consSignature =
-                            "(${instruction.cons.parameters.joinToString("") { signature(it.type) }})V"
-                        new(internalName)
-                        dup()
-                        instruction.arguments.forEach { compile(it) }
-                        invokeSpecial(internalName, "<init>", consSignature)
+                        if (classType is Type.JFClass && classType.isInlineValueClass) {
+                            instruction.arguments.forEach { compile(it) }
+                        } else {
+                            val internalName = classType.path.replace('.', '/')
+                            val consSignature =
+                                "(${instruction.cons.parameters.joinToString("") { signature(it.type) }})V"
+                            new(internalName)
+                            dup()
+                            instruction.arguments.forEach { compile(it) }
+                            invokeSpecial(internalName, "<init>", consSignature)
+                        }
                     }
                     is ExpressionNode.MethodInvocation -> {
                         when (instruction.field) {
@@ -77,8 +81,8 @@ class JVMBackend {
                         with(method) {
                             val methodClassName = instruction.parentPath.replace('.', '/')
                             val methodSignature =
-                                "(${instruction.parameters.joinToString("") { signature(it.type) }})" +
-                                        signature(instruction.type())
+                                "(${instruction.parameters.joinToString("") { signature(effectiveJvmType(it.type)) }})" +
+                                        signature(effectiveJvmType(instruction.type()))
                             when (instruction.field) {
                                 null -> invokeStatic(
                                     methodClassName,
@@ -184,7 +188,7 @@ class JVMBackend {
         private fun ClassBuilder.MethodDSL.DSL.storeVariable(instruction: ExpressionNode.Assignment) {
             val variableName =
                 "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (instruction.expression.type()) {
+            when (effectiveJvmType(instruction.expression.type())) {
                 is OperandType.SInt32 -> istore(variableName)
                 is OperandType.StringType -> astore(variableName)
                 is OperandType.UInt1 -> istore(variableName)
@@ -201,7 +205,9 @@ class JVMBackend {
             from: OperandType<*>,
             to: OperandType<*>
         ) {
-            when (from) {
+            val effectiveFrom = effectiveJvmType(from)
+            if (effectiveFrom != from) return conversion(effectiveFrom, to)
+            when (effectiveFrom) {
                 is OperandType.SInt32 -> when (to) {
                     is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
                     is Type.JFClass -> invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -218,18 +224,18 @@ class JVMBackend {
                 is Type.JFClass -> when (to) {
                     is Type.JFClass -> when {
                         to.path == "java.lang.Object" -> {}
-                        from.path == to.path -> {}
-                        else -> TODO("Conversion not defined for ${from.path} -> ${to.path}")
+                        effectiveFrom.path == to.path -> {}
+                        else -> TODO("Conversion not defined for ${effectiveFrom.path} -> ${to.path}")
                     }
-                    else -> TODO("Conversion not defined for ${from.path} -> ${to}")
+                    else -> TODO("Conversion not defined for ${effectiveFrom.path} -> ${to}")
                 }
-                else -> TODO("Conversion not defined for ${from} -> ${to}")
+                else -> TODO("Conversion not defined for ${effectiveFrom} -> ${to}")
             }
         }
 
         fun ClassBuilder.MethodDSL.DSL.loadVariable(instruction: ExpressionNode.Variable) {
             val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (instruction.variableSymbol.type) {
+            when (effectiveJvmType(instruction.variableSymbol.type)) {
                 is OperandType.SInt32 -> iload(variableName)
                 is OperandType.StringType -> aload(variableName)
                 is OperandType.UInt1 -> iload(variableName)
@@ -271,7 +277,7 @@ fun buildValueClass(vc: IRBuilder.ValueClassDef): ClassBuilder =
     classBuilder {
         name = vc.name
         vc.fields.forEach { (fieldName, fieldType) ->
-            field(name = fieldName, type = signature(fieldType))
+            field(access = 1u, name = fieldName, type = signature(fieldType))
         }
         method {
             name = "<init>"
@@ -279,6 +285,8 @@ fun buildValueClass(vc: IRBuilder.ValueClassDef): ClassBuilder =
             signature = "(${vc.fields.joinToString("") { signature(it.second) }})V"
             parameter("thisRef")
             vc.fields.forEach { (fieldName, _) -> parameter("p_$fieldName") }
+            aload("thisRef")
+            invokeSpecial("java/lang/Object", "<init>", "()V")
             vc.fields.forEach { (fieldName, fieldType) ->
                 aload("thisRef")
                 when (fieldType) {
@@ -308,8 +316,8 @@ fun buildClass(
         classContext.methods.forEach { m ->
             method {
                 name = m.name
-                signature = "(${m.parameters.joinToString("", transform = { signature(it.type) })})" +
-                    signature(m.returnType)
+                signature = "(${m.parameters.joinToString("", transform = { signature(effectiveJvmType(it.type)) })})" +
+                    signature(effectiveJvmType(m.returnType))
                 // Pre-register parameter variable names to reserve correct local slots
                 m.parameters.forEach { p -> p.varName?.let { parameter(it) } }
                 val context = JVMBackend.Context(this)
@@ -325,6 +333,8 @@ fun buildClass(
                     is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType ->
                         if (m.instructions.last().type()==m.returnType) ireturn() else error("Type issue")
                     is OperandType.StringType ->
+                        if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
+                    is Type.JFClass ->
                         if (m.instructions.last().type()==m.returnType) areturn() else error("Type issue")
                     else -> TODO()
                 }
@@ -344,3 +354,8 @@ fun signature(type: OperandType<*>): String =
         is OperandType.Generic -> TODO()
         is Type.JFClass -> "L${type.path.replace('.', '/')};" // TODO: check if this needs to bee JFObject?
     }
+
+private fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
+    if (type is Type.JFClass && type.isInlineValueClass) return type.constructor!!.parameters.single().type
+    return type
+}

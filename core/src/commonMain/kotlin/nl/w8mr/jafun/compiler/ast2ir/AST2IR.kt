@@ -81,7 +81,12 @@ fun compileExpressionNode(
         }
         is ExpressionNode.ConstructorInvocation -> {
             val arguments = loadArguments(builder, node.arguments, node.cons.parameters.map(Type.JFVariableSymbol::type))
-            builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
+            val classType = node.cons.parent as? Type.JFClass
+            if (classType != null && classType.isInlineValueClass) {
+                builder.add(arguments.single())
+            } else {
+                builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
+            }
         }
         is ExpressionNode.When -> {
             val subjectVariable =
@@ -137,11 +142,16 @@ fun compileExpressionNode(
         is ExpressionNode.Function -> {
             val symbol = node.symbol
             val parameters = buildFunctionParameters(symbol, node)
+            val returnType = if (symbol.rtn is Type.JFClass) {
+                val vc = symbol.rtn as Type.JFClass
+                if (vc.isInlineValueClass) vc.constructor!!.parameters.single().type
+                else symbol.rtn
+            } else symbol.rtn
             compileMethod(
                 builder.parent.parent,
                 node.block,
                 symbol.name,
-                symbol.rtn,
+                returnType,
                 parameters,
             )
         }
@@ -167,6 +177,24 @@ fun compileExpressionNode(
             ))
         }
         is ExpressionNode.FieldAccess -> {
+            val ciShortcut: ExpressionNode.Phase2_3Expression? =
+                if (node.instance is ExpressionNode.ConstructorInvocation) {
+                    val ci = node.instance
+                    val vcType = ci.type()
+                    if (vcType is Type.JFClass && vcType.isInlineValueClass) {
+                        ci.arguments[node.fieldIndex]
+                    } else null
+                } else null
+            if (ciShortcut != null) {
+                builder.add(compileAsCodeBlock(builder, ciShortcut))
+                return
+            }
+            // For single-field VC instances, field access is identity
+            val instanceType = node.instance.type()
+            if (instanceType is Type.JFClass && instanceType.isInlineValueClass) {
+                builder.add(compileAsCodeBlock(builder, node.instance))
+                return
+            }
             val instance = compileAsCodeBlock(builder, node.instance)
             if (instance is ExpressionNode.Variable) {
                 val varName = instance.variableSymbol.name

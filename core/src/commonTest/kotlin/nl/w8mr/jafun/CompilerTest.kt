@@ -2963,5 +2963,283 @@ class CompilerTest {
         }
     }
 
-}
+    @Test
+    fun vcReturnMultiField() {
+        test {
+            file {
+                code = """
+                    value class Address(number: Int, street: String)
+                    fun makeAddress(): Address {
+                        Address(1, "street")
+                    }
+                    println makeAddress().number
+                """.trimIndent()
+                expectedOutput = "1\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeAddress", "()LAddress;")
+                        getField("Address", "number", "I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeAddress"
+                        signature = "()LAddress;"
+                        `new`("Address")
+                        dup()
+                        loadConstant(1)
+                        loadConstant("street")
+                        invokeSpecial("Address", "<init>", "(ILjava/lang/String;)V")
+                        areturn()
+                    }
+                }
+            }
+        }
+    }
 
+    @Test
+    fun vcReturnMultiFieldWithVal() {
+        test {
+            file {
+                code = """
+                    value class Address(number: Int, street: String)
+                    fun makeAddress(): Address {
+                        Address(1, "street")
+                    }
+                    val a = makeAddress()
+                    println a.number
+                """.trimIndent()
+                expectedOutput = "1\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeAddress", "()LAddress;")
+                        astore("a")
+                        aload("a")
+                        getField("Address", "number", "I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeAddress"
+                        signature = "()LAddress;"
+                        `new`("Address")
+                        dup()
+                        loadConstant(1)
+                        loadConstant("street")
+                        invokeSpecial("Address", "<init>", "(ILjava/lang/String;)V")
+                        areturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun vcReturnSingleField() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    fun makeId(): Id {
+                        Id(42)
+                    }
+                    println makeId()
+                """.trimIndent()
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeId", "()I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeId"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun vcReturnSingleFieldWithVal() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    fun makeId(): Id {
+                        Id(42)
+                    }
+                    val id = makeId()
+                    println id
+                """.trimIndent()
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeId", "()I")
+                        istore("id")
+                        iload("id")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeId"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun vcReturnSingleFieldFieldAccess() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    fun makeId(): Id {
+                        Id(42)
+                    }
+                    println makeId().value
+                """.trimIndent()
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeId", "()I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeId"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun vcReturnSingleFieldFieldAccessWithVal() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    fun makeId(): Id {
+                        Id(42)
+                    }
+                    val id = makeId()
+                    println id.value
+                """.trimIndent()
+                expectedOutput = "42\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        invokeStatic("Script", "makeId", "()I")
+                        istore("id")
+                        iload("id")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "makeId"
+                        signature = "()I"
+                        loadConstant(42)
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun vcChangeAddress() {
+        test {
+            file {
+                code = """
+                    value class Address(number: Int, street: String)
+                    fun increaseHouseNumber(address: Address, increment: Int): Address {
+                        Address(address.number + increment, address.street)
+                    }
+                    fun changeAddress(address: Address): Address {
+                        increaseHouseNumber(address, 5)
+                    }
+                    val a = Address(4, "Privet Drive")
+                    val b = changeAddress(a)
+                    println b.number
+                """.trimIndent()
+                expectedOutput = "9\n"
+                jvmIr {
+                    name = "Script"
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(4)
+                        loadConstant("Privet Drive")
+                        invokeStatic("Script", "changeAddress", "(ILjava/lang/String;)LAddress;")
+                        astore("b")
+                        aload("b")
+                        getField("Address", "number", "I")
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "increaseHouseNumber"
+                        signature = "(ILjava/lang/String;I)LAddress;"
+                        parameter("address_number")
+                        parameter("address_street")
+                        parameter("increment")
+                        new("Address")
+                        dup()
+                        iload("address_number")
+                        iload("increment")
+                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        aload("address_street")
+                        invokeSpecial("Address", "<init>", "(ILjava/lang/String;)V")
+                        areturn()
+                    }
+                    method {
+                        name = "changeAddress"
+                        signature = "(ILjava/lang/String;)LAddress;"
+                        parameter("address_number")
+                        parameter("address_street")
+                        iload("address_number")
+                        aload("address_street")
+                        loadConstant(5)
+                        invokeStatic("Script", "increaseHouseNumber", "(ILjava/lang/String;I)LAddress;")
+                        areturn()
+                    }
+                }
+            }
+        }
+    }
+}

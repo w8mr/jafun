@@ -537,7 +537,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     ): ExpressionNode.MethodInvocation? =
         when {
             method.static -> {
-                (method.rtn as? JFClass)?.let { symbolMapManager.addClassToSymbolMap(it,it.path) }
+                (method.rtn as? JFClass)?.let { jfClass ->
+                    if (jfClass.kind != Type.ClassKind.VALUE_CLASS) {
+                        symbolMapManager.addClassToSymbolMap(jfClass, jfClass.path)
+                    }
+                }
                 ExpressionNode.MethodInvocation(
                     methodName = method.name,
                     parentPath = method.parentPath,

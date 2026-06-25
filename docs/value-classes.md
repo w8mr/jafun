@@ -275,9 +275,98 @@ if (paramRefSymbolMap != null) {
 }
 ```
 
+## Single-field vs Multi-field Value Classes
+
+### Single-field Value Classes (Inlined)
+
+A single-field value class is inlined to its field type at the JVM level:
+
+```kotlin
+value class Id(id: Int)
+```
+
+- In JVM signatures: `I` (int), not `LId;`
+- Method return type: unwrapped to `Int` via `effectiveJvmType()`
+- Constructor arguments: passed as single primitive, not object reference
+- Example: `increaseHouseNumber(address: Address, increment: Int)` with single-field `increment: Int` becomes `(...)I` in JVM signature
+
+### Multi-field Value Classes (Boxed)
+
+A multi-field value class is boxed as an object reference:
+
+```kotlin
+value class Address(number: Int, street: String)
+```
+
+- In JVM signatures: `LAddress;` (object reference)
+- Method return type: stays as object reference
+- Constructor arguments: expanded into individual field parameters in JVM signature, e.g., `(I, Ljava/lang/String;, ...)`
+- Field access: resolved via `expandedFields` shortcut for parameters, or `getfield` for object materialization
+
+## Effective JVM Type (`effectiveJvmType()`)
+
+To ensure consistency between single-field VC declarations and call sites, the compiler applies `effectiveJvmType()` mapping:
+
+- **Single-field VC**: `effectiveJvmType(Id) → I` (unwrapped to field type)
+- **Multi-field VC**: `effectiveJvmType(Address) → LAddress;` (stays boxed)
+
+This is applied in three places:
+1. **Method declaration signature** (`JVMBackend.buildClass()`, line 38)
+2. **Method invocation signature** (`JVMBackend` MethodInvocation handler, line 85)
+3. **Return type handling** (`AST2IR.buildFunctionParameters()`, line 145)
+
+Without `effectiveJvmType()`, a single-field VC return would mismatch: the declaration would produce `()LId;` but the call site would try to unwrap it to `()I`, causing a `VerifyError`.
+
+## Helper Property: `isInlineValueClass`
+
+To avoid scattered `kind == VALUE_CLASS && cons.parameters.size == 1` checks throughout the codebase, a helper property was added to `Type.JFClass`:
+
+```kotlin
+val isInlineValueClass: Boolean
+    get() = kind == ClassKind.VALUE_CLASS && constructor?.parameters?.size == 1
+```
+
+Usage locations:
+- `JVMBackend.kt:38` — Determine if method return type should be unwrapped
+- `JVMBackend.kt:85` — Match method invocation signature to declaration
+- `JVMBackend.kt:320` — Handle constructor argument expansion
+- `JVMBackend.kt:361` — Compile ConstructorInvocation with proper unwrapping
+- `AST2IR.kt:85` — Inline single-field VC in constructor invocation
+- `AST2IR.kt:145` — Build function return type signature
+
+This consolidation makes the compiler logic more maintainable and reduces the risk of missing cases.
+
 ## Tests
 
 | Test | Description |
 |------|-------------|
 | `valueClass()` | Local `val` declaration and field access (scalar expansion only) |
 | `valueClassFunctionParam()` | Value class passed as a function parameter with scalar expansion |
+| `valueClassTwoParamsReverseFieldOrder()` | Multi-field VC with field access in different order than declaration |
+| `vcReturnMultiField()` | Return multi-field VC instance from method |
+| `vcReturnMultiFieldWithVal()` | Assign multi-field VC to local `val`, then return |
+| `vcReturnSingleField()` | Return single-field VC instance from method (unwrapped in JVM signature) |
+| `vcReturnSingleFieldWithVal()` | Assign single-field VC to local `val`, then return (unwrapped) |
+| `vcReturnSingleFieldFieldAccess()` | Access field on single-field VC return value |
+| `vcReturnSingleFieldFieldAccessWithVal()` | Assign single-field VC to `val`, access field, return |
+| `vcChangeAddress()` | Multi-field VC parameter passing, field access in nested function, chained method calls returning new VC instance |
+
+## Implementation Details: Value Class Method Parameters
+
+When a method takes a value class parameter:
+
+### For Single-field VCs:
+- Parameter is expanded to its field type in JVM signature, e.g., `fun increase(id: Id)` → JVM `(I)`
+- Field access on parameter resolves via `expandedFields` to the individual field local variable
+- No object materialization needed
+
+### For Multi-field VCs:
+- Constructor parameters are expanded as individual fields in JVM signature, e.g., `fun change(address: Address, inc: Int)` → JVM `(ILjava/lang/String;I)`
+- Field access on parameter resolves via `expandedFields` shortcut to the corresponding expanded field local variable
+- Example: `address.number` resolves to `Variable("address_number")` (the local variable for the expanded field)
+- Allows zero-copy field access within function body
+
+### Return Type Mapping:
+- Single-field VC returns unwrap to field type via `effectiveJvmType()`
+- Multi-field VC returns stay as object references
+- Consistency enforced at both declaration and call site
