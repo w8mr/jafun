@@ -76,6 +76,40 @@ interface Type : TypeSymbol {
         override val name get() = "${variable.path}.${method.name}"
     }
 
+    /**
+     * Represents an expanded field from a value class parameter.
+     * Tracks both the direct type and source VC metadata for nested field access.
+     *
+     * Example: When User(id: Id, name: String) is expanded:
+     * - ExpandedField("id", SInt32, sourceVC=IdClass, sourceVCFields=[("value", SInt32)])
+     * - ExpandedField("name", StringType, sourceVC=null, sourceVCFields=null)
+     */
+    data class ExpandedField(
+        val name: String,
+        val type: OperandType<*>,
+        val sourceVC: JFClass? = null,
+        val sourceVCFields: List<Pair<String, OperandType<*>>>? = null
+    ) {
+        fun hasField(fieldName: String): Boolean =
+            sourceVCFields?.any { it.first == fieldName } ?: false
+
+        fun getFieldType(fieldName: String): OperandType<*> =
+            sourceVCFields?.first { it.first == fieldName }?.second
+                ?: error("Field $fieldName not found in $name")
+
+        fun getFieldMetadata(fieldName: String): ExpandedField? {
+            val fieldType = sourceVCFields?.first { it.first == fieldName }?.second
+            return if (fieldType != null) {
+                ExpandedField(
+                    name = "${this.name}_$fieldName",
+                    type = fieldType,
+                    sourceVC = sourceVC,
+                    sourceVCFields = null  // Leaf level, no further nesting needed
+                )
+            } else null
+        }
+    }
+
     data class JFVariableSymbol(
         override val name: String,
         val type: OperandType<*>,
@@ -84,7 +118,7 @@ interface Type : TypeSymbol {
         val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
         var constructorArgs: List<ExpressionNode.Phase2_3Expression>? = null
-        var expandedFields: List<Pair<String, OperandType<*>>>? = null
+        var expandedFields: List<ExpandedField>? = null
 
         override fun equals(other: Any?): Boolean =
             when (other) {

@@ -208,18 +208,32 @@ fun compileExpressionNode(
                 }
                 val expandedFields = instance.variableSymbol.expandedFields
                 if (expandedFields != null) {
-                    val (fieldName, fieldType) = expandedFields.getOrNull(node.fieldIndex)
-                        ?: error("Field index ${node.fieldIndex} not found in expansion of $varName")
-                    builder.add(
-                        ExpressionNode.Variable(
-                            Type.JFVariableSymbol(
-                                name = "${varName}_$fieldName",
-                                type = fieldType,
-                                symbolMap = instance.variableSymbol.symbolMap,
-                                initialized = true,
-                            )
-                        )
+                    // Try to find field by index first
+                    val field = expandedFields.getOrNull(node.fieldIndex)
+                        ?: expandedFields.find { it.name == node.fieldName }
+                        ?: error("Field ${node.fieldName} (index ${node.fieldIndex}) not found in expansion of $varName")
+                    
+                    // Create a Variable for this expanded field
+                    val expandedVar = Type.JFVariableSymbol(
+                        name = "${varName}_${field.name}",
+                        type = field.type,
+                        symbolMap = instance.variableSymbol.symbolMap,
+                        initialized = true,
                     )
+                    
+                    // Store metadata for nested VC field access
+                    if (field.sourceVC != null && field.sourceVCFields != null) {
+                        expandedVar.expandedFields = field.sourceVCFields.map { (nestedFieldName, nestedFieldType) ->
+                            Type.ExpandedField(
+                                name = nestedFieldName,
+                                type = nestedFieldType,
+                                sourceVC = null,
+                                sourceVCFields = null
+                            )
+                        }
+                    }
+                    
+                    builder.add(ExpressionNode.Variable(expandedVar))
                     return
                 }
             }
@@ -253,15 +267,32 @@ private fun buildFunctionParameters(
         if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS) {
             val cons = findConstructor(type)
             if (cons != null) {
-                val fieldExpansions = cons.parameters.map { it.name to it.type }
+                // Create ExpandedField objects with nested VC metadata
+                val fieldExpansions = cons.parameters.map { vcParam ->
+                    val fieldType = vcParam.type
+                    
+                    // Check if this field is itself a single-field VC
+                    val sourceVCFields = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+                        val nestedCons = findConstructor(fieldType)
+                        nestedCons?.parameters?.map { it.name to it.type }
+                    } else null
+                    
+                    Type.ExpandedField(
+                        name = vcParam.name,
+                        type = fieldType,
+                        sourceVC = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) fieldType else null,
+                        sourceVCFields = sourceVCFields
+                    )
+                }
+                
                 param.expandedFields = fieldExpansions
                 if (paramRefSymbolMap != null) {
                     (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
                         ?.expandedFields = fieldExpansions
                 }
-                fieldExpansions.map { (fieldName, fieldType) ->
-                    val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_$fieldName" else null
-                    Parameter(fieldType, varName)
+                fieldExpansions.map { field ->
+                    val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_${field.name}" else null
+                    Parameter(field.type, varName)
                 }
             } else emptyList()
         } else {

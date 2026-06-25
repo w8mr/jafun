@@ -3265,6 +3265,42 @@ class CompilerTest {
              }
          }
      }
+
+    @Test
+    fun vcNestedIdAccess() {
+        test {
+            file {
+                code = """
+                    value class Id(value: Int)
+                    value class User(id: Id, name: String)
+                    fun getId(user: User): Int {
+                        user.id.value
+                    }
+                    val u = User(Id(42), "Alice")
+                    println getId(u)
+                """.trimIndent()
+                expectedOutput = "42\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcChainedNestedAccess() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int)
+                    value class Box(topLeft: Point)
+                    fun getX(box: Box): Int {
+                        box.topLeft.x
+                    }
+                    val b = Box(Point(99))
+                    println getX(b)
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
 }
 
 
