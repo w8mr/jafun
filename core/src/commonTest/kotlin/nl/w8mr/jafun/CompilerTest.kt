@@ -3275,6 +3275,32 @@ class CompilerTest {
                         areturn()
                     }
                 }
+                jvmIr("Address") {
+                    name = "Address"
+                    // Public fields for value class Address(number: Int, street: String)
+                    field(access = 1u, "number", "I")
+                    field(access = 1u, "street", "Ljava/lang/String;")
+                    method {
+                        name = "<init>"
+                        signature = "(ILjava/lang/String;)V"
+                        access = 1u  // ACC_PUBLIC (not static)
+                        // Register local variables: this, number, street
+                        // In kasmine, parameter() just creates local var slots
+                        parameter("this")
+                        parameter("number")
+                        parameter("street")
+                        // Emit constructor bytecode
+                        aload("this")
+                        invokeSpecial("java/lang/Object", "<init>", "()V")
+                        aload("this")
+                        iload("number")
+                        putField("Address", "number", "I")
+                        aload("this")
+                        aload("street")
+                        putField("Address", "street", "Ljava/lang/String;")
+                        `return`()
+                    }
+                }
             }
         }
     }
