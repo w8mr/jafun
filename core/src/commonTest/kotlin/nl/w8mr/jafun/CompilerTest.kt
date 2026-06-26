@@ -3448,6 +3448,38 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun testVarWithInlineVC() {
+        test {
+            file {
+                code = """
+                    value class Box(x: Int)
+                    var b = Box(99)
+                    println b.x
+                    b = Box(100)
+                    println b.x
+                """.trimIndent()
+                expectedOutput = "99\n100\n"
+            }
+        }
+    }
+
+    @Test
+    fun testVarWithMultiFieldVC() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    var p = Point(1, 2)
+                    println p.x
+                    p = Point(3, 4)
+                    println p.x
+                """.trimIndent()
+                expectedOutput = "1\n3\n"
+            }
+        }
+    }
 }
 
 

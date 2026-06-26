@@ -13,6 +13,8 @@ import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
+import nl.w8mr.jafun.compiler.ir2jvm.ParameterExpansionPhase
+import nl.w8mr.jafun.compiler.ir2jvm.ValExpansionPhase
 import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.parsek.Parser
 
@@ -61,9 +63,10 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
                 val valueClasses = extractValueClasses(symbolMap)
                 val classContext = ast2ir(className, updatedParsed, methodName, valueClasses)
                 val updatedContext = Phase3.run(classContext)
+                val vcContext = runVCPhases(updatedContext)
 
                 val builder = IRBuilder.BuilderContext(
-                    classes = mutableMapOf(className to updatedContext),
+                    classes = mutableMapOf(className to vcContext),
                     valueClasses = valueClasses.toMutableMap()
                 )
                 val allClasses = compileAll(builder)
@@ -101,6 +104,13 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
 
         val classContext = builder.classes[className] ?: error("Class not found: $className")
         return classContext
+    }
+
+    private fun runVCPhases(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
+        var result = context
+        result = ParameterExpansionPhase().handle(result)
+        result = ValExpansionPhase.handle(result)
+        return result
     }
 }
 

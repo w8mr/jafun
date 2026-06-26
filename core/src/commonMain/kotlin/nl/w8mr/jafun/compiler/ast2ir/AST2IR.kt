@@ -73,8 +73,8 @@ private fun createWhenConditionExpression(
 }
 
 /**
- * Expand a ValAssignment of a multi-field VC into multiple ValAssignment nodes
- * of primitive types.
+ * Expand an Assignment of a multi-field VC into multiple Assignment nodes
+ * of primitive types (val for val, var for var).
  * 
  * Example: val b = Box(Point(1,2), Point(3,4)) with type Box(topLeft: Point, bottomRight: Point)
  * becomes:
@@ -83,22 +83,21 @@ private fun createWhenConditionExpression(
  *   val b_bottomRight_x = <expr>
  *   val b_bottomRight_y = <expr>
  *   
- * The original symbol `b` is updated with expandedFields storing the hierarchical structure
+ * The original symbol is updated with expandedFields storing the hierarchical structure
  * so that b.topLeft resolves correctly and knows that topLeft has x and y.
  */
-private fun expandValAssignmentIfNeeded(
-    assignment: ExpressionNode.ValAssignment,
-    builder: IRBuilder.CodeBlockDSL,
+internal fun expandAssignmentIfNeeded(
+    assignment: ExpressionNode.Assignment,
 ): List<ExpressionNode.Phase2_3Expression> {
     val varType = assignment.variableSymbol.type
     
     // Only expand VC types
     if (varType !is Type.JFClass || varType.kind != Type.ClassKind.VALUE_CLASS) {
-        return listOf(assignment)
+        return listOf(assignment as ExpressionNode.Phase2_3Expression)
     }
     // We can only expand when the RHS is a constructor invocation with known values
     if (assignment.expression !is ExpressionNode.ConstructorInvocation) {
-        return listOf(assignment)
+        return listOf(assignment as ExpressionNode.Phase2_3Expression)
     }
     val ci = assignment.expression as ExpressionNode.ConstructorInvocation
     
@@ -180,16 +179,38 @@ private fun expandValAssignmentIfNeeded(
             if (remainingPath.isEmpty()) {
                 arg
             } else {
-                createNestedFieldAccess(remainingPath, arg)
+                // Resolve through expanded field symbols when the arg is a variable
+                val resolvedFromVariable = if (arg is ExpressionNode.Variable) {
+                    val fieldPath = remainingPath.joinToString("_")
+                    arg.variableSymbol.expandedFieldSymbols?.get(fieldPath)
+                        ?.let { ExpressionNode.Variable(it) }
+                } else {
+                    null
+                }
+                // When arg is a ConstructorInvocation, extract the matching constructor argument
+                val resolvedFromConstructor = if (arg is ExpressionNode.ConstructorInvocation && resolvedFromVariable == null) {
+                    val fieldName = remainingPath[0]
+                    val fieldIndex = arg.cons.parameters.indexOfFirst { it.name == fieldName }
+                    if (fieldIndex >= 0 && fieldIndex < arg.arguments.size) {
+                        val fieldArg = arg.arguments[fieldIndex]
+                        if (remainingPath.size == 1) fieldArg
+                        else createNestedFieldAccess(remainingPath.drop(1), fieldArg)
+                    } else null
+                } else null
+                resolvedFromVariable ?: resolvedFromConstructor ?: createNestedFieldAccess(remainingPath, arg)
             }
         } else {
             error("Could not match field path ${field.path} to constructor arguments")
         }
     }
     
-    // Create separate ValAssignment for each expanded variable
+    // Create separate Assignment for each expanded variable (val for val, var for var)
     return expandedVars.mapIndexed { index, expandedVar ->
-        ExpressionNode.ValAssignment(expandedVar, expandedArgs[index])
+        if (assignment.variableSymbol.mutable) {
+            ExpressionNode.VarAssignment(expandedVar, expandedArgs[index])
+        } else {
+            ExpressionNode.ValAssignment(expandedVar, expandedArgs[index])
+        }
     }
 }
 
@@ -273,52 +294,54 @@ fun compileExpressionNode(
         }
         is ExpressionNode.Function -> {
             val symbol = node.symbol
-            val parameters = buildFunctionParameters(symbol, node).map { p ->
-                val unwrapped = effectiveJvmType(p.type)
-                if (unwrapped != p.type) Parameter(unwrapped, p.varName) else p
+            // Keep side effects (sets expandedFields, skipExpansion, effectiveType on symbol params)
+            buildFunctionParameters(symbol, node)
+
+            // Create naive (unexpanded) parameters matching the original method signature
+            val paramNames = symbol.parameters.map { it.name }.toSet()
+            val paramRefSymbolMap = node.block.mapNotNull { e -> findParamSymbolMap(e, paramNames) }.firstOrNull()
+            val actualSymbolMapId = paramRefSymbolMap?.symbolMapId
+            val naiveParameters = symbol.parameters.map { param ->
+                val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
+                Parameter(param.type, varName)
             }
-            val returnType = effectiveJvmType(symbol.rtn)
             compileMethod(
                 builder.parent.parent,
                 node.block,
                 symbol.name,
-                returnType,
-                parameters,
+                symbol.rtn,
+                naiveParameters,
             )
         }
         is ExpressionNode.ValAssignment -> {
-            // Expand multi-field VC assignments into separate primitive assignments
-            val expansions = expandValAssignmentIfNeeded(node, builder)
-            expansions.forEach { expanded ->
-                when (expanded) {
-                    is ExpressionNode.ValAssignment -> {
-                        val varType = expanded.variableSymbol.type
-                        val originalExprIsVCConstructor = expanded.expression is ExpressionNode.ConstructorInvocation && 
-                            varType is Type.JFClass && varType.kind == Type.ClassKind.VALUE_CLASS
-                        
-                        val expr = compileAsCodeBlock(builder, expanded.expression)
-                        
-                        // Store constructor args metadata if applicable
-                        if (originalExprIsVCConstructor && expanded.expression is ExpressionNode.ConstructorInvocation) {
-                            val ci = expanded.expression as ExpressionNode.ConstructorInvocation
-                            if (varType is Type.JFClass && varType.isInlineValueClass) {
-                                expanded.variableSymbol.constructorArgs = ci.arguments
-                            } else {
-                                expanded.variableSymbol.constructorArgs = ci.arguments
-                            }
-                        }
-                        val compiledVar = ExpressionNode.ValAssignment(expanded.variableSymbol, expr)
-                        compiledVar.variableSymbol.effectiveType = effectiveJvmType(varType)
-                        builder.add(compiledVar)
-                    }
-                    else -> builder.add(expanded)
-                }
+            // Keep side effects: sets expandedFields, expandedFieldSymbols on original variable symbol
+            expandAssignmentIfNeeded(node)
+
+            // For VCs where Phase 4b will expand the ValAssignment (expandedFieldSymbols != null),
+            // keep the original CI expression so the expander sees the full argument structure.
+            // This is necessary because compileAsCodeBlock unwraps inline VC constructor arguments
+            // (e.g., Id(42) → Lit(42)), which would prevent Phase 4b from extracting nested fields.
+            val expr = if (node.variableSymbol.expandedFieldSymbols != null) {
+                node.expression
+            } else {
+                compileAsCodeBlock(builder, node.expression)
             }
+            node.variableSymbol.effectiveType = effectiveJvmType(node.variableSymbol.type)
+            builder.add(ExpressionNode.ValAssignment(node.variableSymbol, expr))
         }
         is ExpressionNode.VarAssignment -> {
-            val compiledExpr = compileAsCodeBlock(builder, node.expression)
+            // Keep side effects: sets expandedFields, expandedFieldSymbols on original variable symbol
+            expandAssignmentIfNeeded(node)
+
+            // For VCs where Phase 4c will expand the VarAssignment (expandedFieldSymbols != null),
+            // keep the original CI expression so the expander sees the full argument structure.
+            val expr = if (node.variableSymbol.expandedFieldSymbols != null) {
+                node.expression
+            } else {
+                compileAsCodeBlock(builder, node.expression)
+            }
             node.variableSymbol.effectiveType = effectiveJvmType(node.variableSymbol.type)
-            builder.add(ExpressionNode.VarAssignment(node.variableSymbol, compiledExpr))
+            builder.add(ExpressionNode.VarAssignment(node.variableSymbol, expr))
         }
         is ExpressionNode.ExpressionList -> {
             builder.add(ExpressionNode.ExpressionList(node.expressions.map { compileAsCodeBlock(builder, it) }))
@@ -549,10 +572,10 @@ private fun expandValueClassParams(
                 val expandedParamName = "${param.name}_${field.path}"
                 val expandedParam = param.copy(name = expandedParamName, type = field.type)
                 
-                // Create expression to extract this field from the expanded variable
-                // E.g., for "topLeft_x", extract from variable b
-                val pathComponents = field.path.split("_")
-                val expandedArg = createNestedFieldAccess(pathComponents, arg)
+                // Try resolving through expandedFieldSymbols first (e.g., "id_value" -> Variable(u_id_value))
+                val expandedArg = variable.expandedFieldSymbols?.get(field.path)
+                    ?.let { ExpressionNode.Variable(it) }
+                    ?: createNestedFieldAccess(field.path.split("_"), arg)
                 
                 expandedParam to expandedArg
             }
