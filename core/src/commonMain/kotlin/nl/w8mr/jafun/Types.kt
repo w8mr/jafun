@@ -91,26 +91,7 @@ interface Type : TypeSymbol {
         val sourceVC: JFClass? = null,
         val sourceVCFields: List<Pair<String, OperandType<*>>>? = null,
         val actualSymbol: JFVariableSymbol? = null  // Reference to actual stored symbol
-    ) {
-        fun hasField(fieldName: String): Boolean =
-            sourceVCFields?.any { it.first == fieldName } ?: false
-
-        fun getFieldType(fieldName: String): OperandType<*> =
-            sourceVCFields?.first { it.first == fieldName }?.second
-                ?: error("Field $fieldName not found in $name")
-
-        fun getFieldMetadata(fieldName: String): ExpandedField? {
-            val fieldType = sourceVCFields?.first { it.first == fieldName }?.second
-            return if (fieldType != null) {
-                ExpandedField(
-                    name = "${this.name}_$fieldName",
-                    type = fieldType,
-                    sourceVC = sourceVC,
-                    sourceVCFields = null  // Leaf level, no further nesting needed
-                )
-            } else null
-        }
-    }
+    )
 
     data class JFVariableSymbol(
         override val name: String,
