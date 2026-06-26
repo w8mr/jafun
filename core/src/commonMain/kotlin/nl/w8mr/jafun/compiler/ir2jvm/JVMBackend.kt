@@ -317,8 +317,8 @@ fun buildClass(
         classContext.methods.forEach { m ->
             method {
                 name = m.name
-                signature = "(${m.parameters.joinToString("", transform = { signature(effectiveJvmType(it.type)) })})" +
-                    signature(effectiveJvmType(m.returnType))
+                signature = "(${m.parameters.joinToString("", transform = { signature(it.type) })})" +
+                    signature(m.returnType)
                 // Pre-register parameter variable names to reserve correct local slots
                 m.parameters.forEach { p -> p.varName?.let { parameter(it) } }
                 val context = JVMBackend.Context(this)
@@ -332,11 +332,11 @@ fun buildClass(
                         `return`()
                     }
                     is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType ->
-                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) ireturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) ireturn() else error("Type issue")
                     is OperandType.StringType ->
-                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) areturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) areturn() else error("Type issue")
                     is Type.JFClass ->
-                        if (effectiveJvmType(m.instructions.last().type())==effectiveJvmType(m.returnType)) areturn() else error("Type issue")
+                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) areturn() else error("Type issue")
                     else -> TODO()
                 }
             }
