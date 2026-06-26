@@ -55,7 +55,7 @@ Supporting functions:
 - **`effectiveVariableType(type)`** — Unwraps single-field VC chains to the innermost type. `Box(topLeft: Point)` → `Point`, `Id(value: Int)` → `Int`, `UserId(id: Id(value: Int))` → `Int`.
 - **`expandVariable(variable)`** — Expands a `JFVariableSymbol` into one symbol per flattened primitive, appending the flatten path: `b` of type `Box(topLeft: Point)` → `[b_topLeft_x: Int, b_topLeft_y: Int]`.
 - **`createNestedFieldAccess(pathComponents, arg)`** — Creates a chain of `FieldAccess` nodes from a path like `["topLeft", "x"]`.
-- **`needsFlattening(type)`, `flattenedSize(type)`, `signatureForType(type)`** — Utility functions.
+- **`signatureForType(type)`** — Generates a JVM descriptor character for a type.
 
 ### Variable expansion (`expandValAssignmentIfNeeded`)
 
@@ -148,15 +148,11 @@ This allows the cached expanded variable to be "re-boxed" on demand when passed 
 
 ### Field access resolution (`compileExpressionNode` — FieldAccess handler)
 
-For `b.topLeft.x`:
+Field access uses two paths:
 
-1. **`constructorArgs` check**: If the variable was `val`-assigned from a `ConstructorInvocation` AND has stored constructor args, extract the arg directly by `fieldIndex`. This bypasses object materialization entirely.
-
-2. **`expandedFields` check**: If the variable has expanded fields (from function parameter expansion), find the matching field by `fieldName` in the expansion list. For multi-field VCs, this creates a `Variable` referencing the corresponding expanded param. For single-field VCs wrapping multi-field VCs, this creates a synthetic intermediate variable with its own `expandedFields` for further chain resolution.
-
-3. **Identity shortcut**: If the instance type is a single-field VC (`isInlineValueClass`), just return the instance itself (no field access needed — the VC IS its field).
-
-4. **JVM `getfield`**: Fall through to a real `FieldAccess` node → `getfield` in bytecode. This happens for function return values (object materialization).
+- **`tryResolveExpandedFieldAccess`** (extracted helper in `AST2IR.kt`): Handles Variable instances with `constructorArgs` or `expandedFields`, resolving field accesses through the expanded representation without materializing the object.
+- **Identity shortcut**: If the instance type is a single-field VC (`isInlineValueClass`) and does NOT have `expandedFields`, just return the instance itself (the VC IS its field).
+- **JVM `getfield`**: Fall through to a real `FieldAccess` node → `getfield` in bytecode. This happens for function return values (object materialization).
 
 ### Return type unwrapping (`compileMethod`)
 
@@ -189,13 +185,13 @@ This is handled in `compileMethod` via `isInlineValueClass` check, and must be c
 ## Key Decisions
 
 - **Recursive flattening at IR level**: `VCFlattening.kt` handles all nesting via `flattenType`, separate from `AST2IR.kt` which integrates it.
-- **`isMultiFieldVC` vs `shouldExpandVC`**: `isMultiFieldVC` (in VCFlattening.kt) is the pure type-check used for val expansion; `shouldExpandVC` (in AST2IR.kt) adds return-type awareness by checking `returnsWrappedType`.
+- **`isMultiFieldVC` vs `shouldExpandVC`**: `isMultiFieldVC` (in VCFlattening.kt) is the pure type-check used for val expansion; `shouldExpandVC` (in VCFlattening.kt) determines if a function parameter should be expanded in the JVM signature, with the integration in AST2IR.kt applying the `returnsWrappedType` guard.
 - **Reconstruction, not identity pass-through**: When an expanded variable is passed to a function needing the object form, the compiler reconstructs the VC from primitives rather than trying to keep a reference. This is simpler and avoids aliasing issues.
 - **`expandedFieldSymbols` as a side-channel**: Tracks the actual `JFVariableSymbol` objects created during expansion so that reconstruction creates `Variable` nodes referencing the correct symbols.
 
 ## Tests
 
-### VCFlatteningTests (26 tests)
+### VCFlatteningTests (44 tests)
 
 | Tests | What |
 |-------|------|
@@ -204,6 +200,9 @@ This is handled in `compileMethod` via `isInlineValueClass` check, and must be c
 | 11-17 | `isMultiFieldVC` — all edge cases (primitive, normal class, single-field wrapping primitive, multi-field, single-field wrapping multi-field, deep chain true, deep chain false) |
 | 18-23 | `effectiveVariableType` — all unwrapping cases |
 | 24-26 | `createNestedFieldAccess` — empty, single, two-level paths |
+| 27-30 | `shouldExpandVC` — no constructor, multi-field, single-field wrapping primitive, single-field wrapping VC |
+| 31-36 | `reconstructVCFromExpanded` — no constructor, multi-field all present, missing field, nested VC, nested missing field, single-field wrapping primitive |
+| 37-44 | `expandParameterRecursively` — primitive, null baseName, multi-field, single-field, single-field wrapping multi-field (guard), non-VC, no constructor, multi-field with nested single-field VCs |
 
 ### CompilerTest (integration)
 
