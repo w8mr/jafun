@@ -110,14 +110,6 @@ fun expandVariable(variable: Type.JFVariableSymbol): List<Type.JFVariableSymbol>
 }
 
 /**
- * Checks if a type needs flattening into multiple variables.
- * Returns true if the type is a VC (single-field or multi-field).
- */
-fun needsFlattening(type: OperandType<*>): Boolean {
-    return type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS
-}
-
-/**
  * Checks if a type is a multi-field VC that needs expansion at the top level.
  * Also returns true for single-field VCs that contain multi-field VCs.
  */
@@ -137,14 +129,6 @@ fun isMultiFieldVC(type: OperandType<*>): Boolean {
     }
     
     return false
-}
-
-/**
- * Gets the count of flattened primitives for a type.
- * Useful for allocating space in bytecode (e.g., local variable slots).
- */
-fun flattenedSize(type: OperandType<*>): Int {
-    return flattenType(type).size
 }
 
 /**
