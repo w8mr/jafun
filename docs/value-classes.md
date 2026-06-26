@@ -92,12 +92,9 @@ For a single-field VC where the function's return type matches the wrapped field
 fun getPoint(box: Box): Point { box.topLeft }
 ```
 
-Here `Box.wrappedType = Point = returnType`, so the Box parameter stays unexpanded in the JVM signature (`(LBox;)LPoint;`). This is necessary because:
-- The function body returns `box.topLeft`, which resolves via identity shortcut to `box` itself
-- If the parameter were expanded, `box` wouldn't exist as a real variable
-- The caller passes a reconstructed `Box` object, not expanded primitives
+Here `Box.wrappedType = Point = returnType`, so the Box parameter stays unexpanded in the JVM signature (`(LPoint;)LPoint;`). When this guard triggers, `param.skipExpansion = true` is set on the parameter symbol.
 
-When this guard triggers, `param.skipExpansion = true` is set on the parameter symbol.
+The `skipExpansion` param retains the original VC type (`Box`) in `variableSymbol.type`, while `variableSymbol.effectiveType` carries the unwrapped type (`Point`) for JVM load/store decisions. The `effectiveType` field was introduced in Phase 4.1 to eliminate `effectiveJvmType` calls from `loadVariable`/`storeVariable`.
 
 `expandedFieldSymbols` is a map on `JFVariableSymbol` tracking the actual symbol objects created during variable expansion — keyed by flattened field path (e.g., `"topLeft_x"`) and valued by the real `JFVariableSymbol`. This is used during reconstruction to reference the exact same symbols.
 
@@ -138,13 +135,10 @@ println getPoint(b).x          // getPoint takes Box, returns Point
 At the call to `getPoint(b)`:
 1. `param.skipExpansion` is true (function returns the wrapped type)
 2. `b` has `expandedFieldSymbols`: `{"topLeft_x" → b_topLeft_x, "topLeft_y" → b_topLeft_y}`
-3. Reconstructs `Box(Point(b_topLeft_x, b_topLeft_y))` by walking the type hierarchy:
-   - `Box.constructor(topLeft: Point)` → recurse with prefix `"topLeft"`
-   - `Point.constructor(x: Int, y: Int)` → look up `"topLeft_x"`, `"topLeft_y"` in expandedFieldSymbols
-   - Builds `ConstructorInvocation(Point, [Variable(b_topLeft_x), Variable(b_topLeft_y)])`
-   - Builds `ConstructorInvocation(Box, [ConstructorInvocation(Point, ...)])`
+3. Reconstructs `ConstructorInvocation(Point, [Variable(b_topLeft_x), Variable(b_topLeft_y)])` by walking the type hierarchy (single-field VC wrappers like `Box` are stripped by `reconstructVCFromExpanded`)
+4. The reconstructed `ConstructorInvocation(Point, ...)` is the argument to `getPoint`
 
-This allows the cached expanded variable to be "re-boxed" on demand when passed to functions that need the object form.
+Single-field VC wrappers (`Box` wrapping `Point`) are eliminated from reconstructed `ConstructorInvocation` nodes in Phase 4.4 by the `compileExpressionNode` ConstructorInvocation handler, which checks `isInlineValueClass` and unwraps the constructor to its single argument. This avoids JVM `getfield`/`getstatic` of the wrapper class.
 
 ### Field access resolution (`compileExpressionNode` — FieldAccess handler)
 
@@ -154,7 +148,7 @@ Field access uses two paths:
 - **Identity shortcut**: If the instance type is a single-field VC (`isInlineValueClass`) and does NOT have `expandedFields`, just return the instance itself (the VC IS its field).
 - **JVM `getfield`**: Fall through to a real `FieldAccess` node → `getfield` in bytecode. This happens for function return values (object materialization).
 
-### Return type unwrapping (`compileMethod`)
+### Return type unwrapping
 
 When a function returns a single-field VC, the return type is unwrapped:
 
@@ -169,7 +163,7 @@ fun makeAddress(): Address { Address(1, "street") }
 // JVM: ()LAddress;
 ```
 
-This is handled in `compileMethod` via `isInlineValueClass` check, and must be consistent between declaration and call site to avoid `VerifyError`.
+Unwrapping happens in the Function handler (`compileExpressionNode` in `AST2IR.kt`) via `effectiveJvmType(symbol.rtn)`. The unwrapped type propagates through `MethodContext.returnType` and into the JVM descriptor via `buildClass`. Return type consistency between declaration and call site is enforced by wrapping `rtnLookup` with `effectiveJvmType` in the MethodInvocation handler (Phase 4.2).
 
 ## `JFVariableSymbol` Runtime State
 
@@ -181,6 +175,7 @@ This is handled in `compileMethod` via `isInlineValueClass` check, and must be c
 | `expandedFields` | `buildFunctionParameters` or `expandValAssignmentIfNeeded` | Field-to-primitive mapping |
 | `expandedFieldSymbols` | `expandValAssignmentIfNeeded` | Maps flattened paths to actual symbols (for reconstruction) |
 | `skipExpansion` | `buildFunctionParameters` | Prevents call-site expansion when `returnsWrappedType` |
+| `effectiveType` | ValAssignment/VarAssignment handlers, `buildFunctionParameters`, `tryResolveExpandedFieldAccess` | Unwrapped JVM type for load/store opcode selection; `null` means same as `type` |
 
 ## Key Decisions
 
@@ -209,14 +204,16 @@ This is handled in `compileMethod` via `isInlineValueClass` check, and must be c
 | Test | Scenarios |
 |------|-----------|
 | `testSimpleBoxAccess` | Single-field VC wrapping multi-field VC, chained field access |
-| `testBoxSingleField` | Function returning wrapped type with intermediate expanded val **(reconstruction path)** |
-| `testBoxSingleFieldWorking` | Same function, inline ConstructorInvocation arg (no reconstruction) |
+| `testBoxSingleField` | Function returning wrapped type with intermediate expanded val (reconstruction + inline wrapper) |
+| `testBoxSingleFieldWorking` | Same function, inline ConstructorInvocation arg |
 | `debugChainedAccess` | Field access chain on expanded function parameter |
 | `testMultiFieldVCFieldAccess` | Multi-field VC as function parameter |
-| `testMultiArgReconstruction` | Function with both reconstruction-needed (Box) and normal-expansion (Point) params |
+| `testMultiArgReconstruction` | Function with both skipExpansion (Box) and normal-expansion (Point) params |
 | `vcChainedNestedAccess` | Box with two multi-field VCs, function returning Int |
 | `vcChangeAddress` | Full multi-field VC lifecycle with multi-class bytecode validation |
 | `vcReturnMultiFieldWithVal` | Function return assigned to val, field access |
+| `vcNestedIdAccess` | Nested single-field VCs through function boundary |
+| `vcNestedIdInUser` | Nested Id inside User, function returning String |
 
 ## Disjoint-Symbols Problem
 

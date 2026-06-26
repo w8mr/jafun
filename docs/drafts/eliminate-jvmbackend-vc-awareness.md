@@ -1,99 +1,54 @@
-# Phase 4: Eliminate JVMBackend knowledge of value class unboxing
+# Phase 4: Eliminate JVMBackend knowledge of value class unboxing — COMPLETED
 
 ## Goal
 
-Remove all remaining VC-awareness from `JVMBackend.kt` by having Phase 3 (IR transformations) fully unwrap types before they reach the JVM backend.
+Remove all VC-awareness from `JVMBackend.kt` by having Phase 3 (IR transformations) fully unwrap types before they reach the JVM backend.
 
-## Current state (after Phase 3 refactoring)
+**Result**: `JVMBackend.kt` now has zero references to `effectiveJvmType` and zero `isInlineValueClass` checks. All VC type unwrapping happens in Phase 3 (`AST2IR.kt`) or lives in the type system (`VCFlattening.kt`).
 
-`JVMBackend.kt` still has 7 `effectiveJvmType` call sites and 1 `isInlineValueClass` check:
+## What was eliminated
 
-| Location | Line | What it does |
-|---|---|---|
-| `storeVariable` | 192 | Unwraps expression type to pick `istore` vs `astore` |
-| `loadVariable` | 239 | Unwraps variable symbol type to pick `iload` vs `aload` |
-| `conversion` | 209 | Unwraps `from` type before dispatch |
-| ConstructorInvocation handler | 39 | Inlines single-field VC constructors (`isInlineValueClass`) |
-| MethodInvocation descriptor | 85-86 | Unwraps param types + return type for JVM signature |
-| `buildClass` descriptor | 318-319 | Unwraps param types + return type for method signature |
-| `buildClass` return check | 333-337 | Unwraps instruction/return types for comparison |
+| Before | After |
+|---|---|
+| 7 `effectiveJvmType` call sites in JVMBackend | 0 |
+| 1 `isInlineValueClass` check in JVMBackend | 0 |
+| storeVariable/loadVariable needed VC unwrap | Use `variableSymbol.effectiveType` set by Phase 3 |
+| MethodInvocation `type()` returned original VC type | `rtnLookup` wrapped → returns effective type |
+| ConstructorInvocation inlining in JVM backend | Inlined in Phase 3 `compileExpressionNode` |
+| buildClass descriptor used `effectiveJvmType` | Already-unwrapped types from Function handler |
+| conversion function unwrapped `from` type | Inline unwrap loop |
+| Return type check unwrapped instruction type | Inline unwrap loop |
 
-## Root cause
+## Sub-phases
 
-After Phase 3 processing, variable symbols and `rtnLookup` closures still carry the **original** VC types (`Id`, `Box`, etc.) even though the actual JVM stack values are already unwrapped to primitives or inner VC types. The JVM backend must call `effectiveJvmType` to paper over this gap.
+### Phase 4.1 — Variable symbol types
+Added `effectiveType: OperandType<*>?` mutable field to `JFVariableSymbol`.
+Set it in ValAssignment/VarAssignment handlers, `tryResolveExpandedFieldAccess`,
+and `buildFunctionParameters`. `storeVariable`/`loadVariable` use `effectiveType ?: type`.
 
-## Plan (4 sub-phases)
+### Phase 4.2 — MethodInvocation return types
+Wrapped `rtnLookup` with `effectiveJvmType` in the MethodInvocation handler so
+`instruction.type()` returns the unwrapped JVM type. Removed redundant
+`effectiveJvmType` from call site return descriptor.
 
-### Phase 4.1 — Fix variable symbol types at assignment time
+### Phase 4.3 — buildClass descriptor
+`MethodContext.returnType` and `MethodContext.parameters[i].type` are already set
+by the Function handler with `effectiveJvmType` applied. Removed redundant
+wrapping from the JVM descriptor and return type comparisons.
 
-**Problem**: `val id = makeId()` creates variable `id` with type `Id`, but the stack holds `int`. `storeVariable`/`loadVariable` need `effectiveJvmType(Id)` = `Int` to emit the correct opcode.
+### Phase 4.4 — ConstructorInvocation inlining
+Moved the `isInlineValueClass` shortcut from JVMBackend's ConstructorInvocation
+handler to Phase 3's `compileExpressionNode`. The Phase 3 handler unwraps
+single-field VC constructors by extracting the single argument.
 
-**Fix**: In the ValAssignment handler (AST2IR.kt line ~286), after compiling the expression, update the variable symbol's type to match the compiled expression's effective type:
+### Phase 4.5 — Last call sites
+Replaced the last 3 `effectiveJvmType` calls in `conversion()` and the return
+type check with inline unwrap loops. Removed the import.
 
-```kotlin
-val expr = compileAsCodeBlock(builder, expanded.expression)
-val effectiveType = effectiveJvmType(expr.type())
-if (effectiveType != expanded.variableSymbol.type)
-    // replace the symbol type
-```
+## Key insight
 
-Same for VarAssignment handler (line ~311): after `compileAsCodeBlock(builder, node.expression)`, update the variable symbol's type.
-
-Since `JFVariableSymbol.type` is `val`, this requires either:
-- A mutable `effectiveType` field (like `skipExpansion`)
-- Adding a `copy(type = unwrapped)` step
-
-**Eliminates**: `effectiveJvmType` from `storeVariable` (L192) and `loadVariable` (L239).
-
-### Phase 4.2 — Fix return types on MethodInvocation
-
-**Problem**: `instruction.type()` for a MethodInvocation returns the original VC type (via `rtnLookup`) even though the JVM descriptor says `()I`.
-
-**Fix**: In the MethodInvocation handler (AST2IR.kt line ~202), wrap `rtnLookup` to apply `effectiveJvmType`:
-
-```kotlin
-val originalRtnLookup = node.rtnLookup
-builder.add(ExpressionNode.MethodInvocation(
-    ...
-    rtnLookup = { effectiveJvmType(originalRtnLookup()) },
-    ...
-))
-```
-
-**Eliminates**: `effectiveJvmType` from MethodInvocation descriptor (L85-86). Also helps Phase 4.1 since `expr.type()` on a MethodInvocation now returns the correct unwrapped type.
-
-### Phase 4.3 — Fix method symbol types for buildClass
-
-**Problem**: `m.parameters` and `m.returnType` on the method symbol (`Type.JFMethod`) carry original VC types. `buildClass` uses these for the JVM descriptor.
-
-**Fix**: In the Function handler (AST2IR.kt line ~268), after computing unwrapped parameters and return type, update the method symbol's types:
-
-Since `JFMethod.parameters` is `val`, options:
-1. Add mutable `effectiveParameters` / `effectiveReturnType` fields to `JFMethod`
-2. Create a wrapper or copy+replace approach in the compilation flow
-
-The descriptor builder then uses these effective types directly instead of calling `effectiveJvmType`.
-
-**Eliminates**: `effectiveJvmType` from `buildClass` descriptor (L318-319) and return type check (L333-337).
-
-### Phase 4.4 — Inline single-field VC constructors in Phase 3
-
-**Problem**: The reconstruction path creates `ConstructorInvocation(Box, [ConstructorInvocation(Point, ...)])` nodes. The JVM backend inlines these via `isInlineValueClass`.
-
-**Fix**: In the ValAssignment handler (or a new IR pass), when the RHS is a `ConstructorInvocation` of an inline VC, replace the RHS with its single argument and update the variable's type. This eliminates the `ConstructorInvocation` node before it reaches JVMBackend.
-
-Before:
-```
-ValAssignment(b, ConstructorInvocation(Box, [ConstructorInvocation(Point, [99, 10])]))
-```
-
-After:
-```
-ValAssignment(b, ConstructorInvocation(Point, [99, 10]))
-```
-
-**Eliminates**: `isInlineValueClass` check in ConstructorInvocation handler (L39).
-
-## Verification
-
-Run `./gradlew core:jvmTest --rerun` after each sub-phase. The IR tests with explicit `istore`/`iload`/`I` bytecode expectations in `jvmIr` blocks act as canaries for type mismatch regressions.
+The three remaining call sites from the plan couldn't be eliminated by
+changing `Variable.type()` because that method serves dual purposes:
+JVM load opcode selection (needs effective type) and `getfield` owner
+lookup (needs original type). The inline unwrap loops keep the logic
+local without pulling in the VCFlattening dependency.
