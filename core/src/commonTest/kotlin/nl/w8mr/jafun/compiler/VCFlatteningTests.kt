@@ -4,6 +4,7 @@ import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -489,5 +490,284 @@ class VCFlatteningTests {
         assertEquals("topLeft", inner.fieldName, "Inner should access 'topLeft'")
         assertTrue(inner.instance is ExpressionNode.Variable, "Base should be a Variable")
         assertEquals("b", (inner.instance as ExpressionNode.Variable).variableSymbol.name)
+    }
+
+    // ============================================================================
+    // Test 27: shouldExpandVC — no constructor returns false
+    // ============================================================================
+
+    @Test
+    fun testShouldExpandVCNoConstructor() {
+        val vc = Type.JFClass("Empty", kind = Type.ClassKind.VALUE_CLASS)
+        assertTrue(!shouldExpandVC(vc), "VC without constructor should not expand")
+    }
+
+    // ============================================================================
+    // Test 28: shouldExpandVC — multi-field VC returns true
+    // ============================================================================
+
+    @Test
+    fun testShouldExpandVCMultiField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        assertTrue(shouldExpandVC(point), "Multi-field VC should expand")
+    }
+
+    // ============================================================================
+    // Test 29: shouldExpandVC — single-field wrapping primitive returns true
+    // ============================================================================
+
+    @Test
+    fun testShouldExpandVCSingleFieldPrimitive() {
+        val id = createVC("Id", "value" to createIntType())
+        assertTrue(shouldExpandVC(id), "Single-field VC wrapping primitive should expand")
+    }
+
+    // ============================================================================
+    // Test 30: shouldExpandVC — single-field wrapping VC returns true
+    // ============================================================================
+
+    @Test
+    fun testShouldExpandVCSingleFieldWrappingVC() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val box = createVC("Box", "topLeft" to point)
+        assertTrue(shouldExpandVC(box), "Single-field VC wrapping multi-field VC should expand")
+    }
+
+    // ============================================================================
+    // Test 31: reconstructVCFromExpanded — no constructor returns null
+    // ============================================================================
+
+    @Test
+    fun testReconstructNoConstructor() {
+        val vc = Type.JFClass("Empty", kind = Type.ClassKind.VALUE_CLASS)
+        val result = reconstructVCFromExpanded(vc, emptyMap())
+        assertEquals(null, result, "VC without constructor should return null")
+    }
+
+    // ============================================================================
+    // Test 32: reconstructVCFromExpanded — multi-field VC all fields present
+    // ============================================================================
+
+    @Test
+    fun testReconstructMultiField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val xSym = Type.JFVariableSymbol("x_val", createIntType())
+        val ySym = Type.JFVariableSymbol("y_val", createIntType())
+        val symbols = mapOf("x" to xSym, "y" to ySym)
+
+        val result = reconstructVCFromExpanded(point, symbols)
+        assertNotNull(result, "Should reconstruct")
+        assertTrue(result is ExpressionNode.ConstructorInvocation, "Should be ConstructorInvocation")
+        val ci = result as ExpressionNode.ConstructorInvocation
+        assertEquals(2, ci.arguments.size)
+        assertTrue(ci.arguments[0] is ExpressionNode.Variable)
+        assertEquals(xSym, (ci.arguments[0] as ExpressionNode.Variable).variableSymbol)
+        assertTrue(ci.arguments[1] is ExpressionNode.Variable)
+        assertEquals(ySym, (ci.arguments[1] as ExpressionNode.Variable).variableSymbol)
+    }
+
+    // ============================================================================
+    // Test 33: reconstructVCFromExpanded — missing field returns null
+    // ============================================================================
+
+    @Test
+    fun testReconstructMissingField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val symbols = mapOf("x" to Type.JFVariableSymbol("x_val", createIntType()))
+        val result = reconstructVCFromExpanded(point, symbols)
+        assertEquals(null, result, "Missing field should return null")
+    }
+
+    // ============================================================================
+    // Test 34: reconstructVCFromExpanded — single-field wrapping VC nested
+    // ============================================================================
+
+    @Test
+    fun testReconstructNestedVC() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val box = createVC("Box", "topLeft" to point)
+        val xSym = Type.JFVariableSymbol("x_val", createIntType())
+        val ySym = Type.JFVariableSymbol("y_val", createIntType())
+        val symbols = mapOf("topLeft_x" to xSym, "topLeft_y" to ySym)
+
+        val result = reconstructVCFromExpanded(box, symbols)
+        assertNotNull(result, "Should reconstruct")
+        assertTrue(result is ExpressionNode.ConstructorInvocation, "Should be ConstructorInvocation")
+        val boxCi = result as ExpressionNode.ConstructorInvocation
+        assertEquals(1, boxCi.arguments.size)
+        assertTrue(boxCi.arguments[0] is ExpressionNode.ConstructorInvocation, "Inner should be ConstructorInvocation")
+        val pointCi = boxCi.arguments[0] as ExpressionNode.ConstructorInvocation
+        assertEquals(2, pointCi.arguments.size)
+        assertTrue(pointCi.arguments[0] is ExpressionNode.Variable)
+        assertEquals(xSym, (pointCi.arguments[0] as ExpressionNode.Variable).variableSymbol)
+        assertTrue(pointCi.arguments[1] is ExpressionNode.Variable)
+        assertEquals(ySym, (pointCi.arguments[1] as ExpressionNode.Variable).variableSymbol)
+    }
+
+    // ============================================================================
+    // Test 35: reconstructVCFromExpanded — nested missing inner returns null
+    // ============================================================================
+
+    @Test
+    fun testReconstructNestedMissingField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val box = createVC("Box", "topLeft" to point)
+        val symbols = mapOf("topLeft_x" to Type.JFVariableSymbol("x_val", createIntType()))
+        val result = reconstructVCFromExpanded(box, symbols)
+        assertEquals(null, result, "Missing inner field should return null")
+    }
+
+    // ============================================================================
+    // Test 36: reconstructVCFromExpanded — single-field wrapping primitive
+    // ============================================================================
+
+    @Test
+    fun testReconstructSingleFieldPrimitive() {
+        val id = createVC("Id", "value" to createIntType())
+        val valSym = Type.JFVariableSymbol("v", createIntType())
+        val symbols = mapOf("value" to valSym)
+
+        val result = reconstructVCFromExpanded(id, symbols)
+        assertNotNull(result, "Should reconstruct")
+        assertTrue(result is ExpressionNode.ConstructorInvocation, "Should be ConstructorInvocation")
+        val ci = result as ExpressionNode.ConstructorInvocation
+        assertEquals(1, ci.arguments.size)
+        assertTrue(ci.arguments[0] is ExpressionNode.Variable)
+        assertEquals(valSym, (ci.arguments[0] as ExpressionNode.Variable).variableSymbol)
+    }
+
+    // ============================================================================
+    // Test 37: expandParameterRecursively — primitive type
+    // ============================================================================
+
+    @Test
+    fun testExpandParamPrimitive() {
+        val result = expandParameterRecursively(createIntType(), "x")
+        assertEquals(1, result.size)
+        assertEquals(createIntType(), result[0].type)
+        assertEquals("x", result[0].varName)
+    }
+
+    // ============================================================================
+    // Test 38: expandParameterRecursively — null baseName default
+    // ============================================================================
+
+    @Test
+    fun testExpandParamNullBaseName() {
+        val result = expandParameterRecursively(createIntType(), null)
+        assertEquals(1, result.size)
+        assertEquals(null, result[0].varName)
+    }
+
+    // ============================================================================
+    // Test 39: expandParameterRecursively — multi-field VC expands to fields
+    // ============================================================================
+
+    @Test
+    fun testExpandParamMultiField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val result = expandParameterRecursively(point, "p")
+        assertEquals(2, result.size, "Point should expand to 2 Parameters")
+        assertEquals("p_x", result[0].varName)
+        assertEquals(createIntType(), result[0].type)
+        assertEquals("p_y", result[1].varName)
+        assertEquals(createIntType(), result[1].type)
+    }
+
+    // ============================================================================
+    // Test 40: expandParameterRecursively — single-field VC kept as-is
+    // ============================================================================
+
+    @Test
+    fun testExpandParamSingleFieldPrimitive() {
+        val id = createVC("Id", "value" to createIntType())
+        val result = expandParameterRecursively(id, "id")
+        assertEquals(1, result.size, "Id should stay as 1 Parameter")
+        assertEquals("id", result[0].varName)
+        assertEquals(id, result[0].type)
+    }
+
+    // ============================================================================
+    // Test 41: expandParameterRecursively — single-field wrapping multi-field
+    // ============================================================================
+
+    @Test
+    fun testExpandParamSingleFieldWrappingMultiField() {
+        val point = createVC("Point",
+            "x" to createIntType(),
+            "y" to createIntType()
+        )
+        val box = createVC("Box", "topLeft" to point)
+        val result = expandParameterRecursively(box, "b")
+        // Guard: single-field wrapping multi-field VC stays as-is
+        assertEquals(1, result.size, "Box(topLeft: Point) should stay as 1 Parameter")
+        assertEquals("b", result[0].varName)
+        assertEquals(box, result[0].type)
+    }
+
+    // ============================================================================
+    // Test 42: expandParameterRecursively — non-VC class
+    // ============================================================================
+
+    @Test
+    fun testExpandParamNonVC() {
+        val cls = Type.JFClass("Normal")
+        val result = expandParameterRecursively(cls, "n")
+        assertEquals(1, result.size)
+        assertEquals(cls, result[0].type)
+        assertEquals("n", result[0].varName)
+    }
+
+    // ============================================================================
+    // Test 43: expandParameterRecursively — VC without constructor
+    // ============================================================================
+
+    @Test
+    fun testExpandParamNoConstructor() {
+        val vc = Type.JFClass("Empty", kind = Type.ClassKind.VALUE_CLASS)
+        val result = expandParameterRecursively(vc, "e")
+        assertEquals(1, result.size)
+        assertEquals(vc, result[0].type)
+    }
+
+    // ============================================================================
+    // Test 44: expandParameterRecursively — multi-field with nested single-field VCs
+    // ============================================================================
+
+    @Test
+    fun testExpandParamMultiFieldWithNestedSingles() {
+        val id = createVC("Id", "value" to createIntType())
+        val user = createVC("User",
+            "id" to id,
+            "name" to OperandType.StringType
+        )
+        val result = expandParameterRecursively(user, "u")
+        // User has id: Id, name: String → id stays as Id (single-field), name stays as String
+        assertEquals(2, result.size, "User should expand to 2 Parameters")
+        assertEquals("u_id", result[0].varName)
+        assertEquals(id, result[0].type)
+        assertEquals("u_name", result[1].varName)
+        assertEquals(OperandType.StringType, result[1].type)
     }
 }
