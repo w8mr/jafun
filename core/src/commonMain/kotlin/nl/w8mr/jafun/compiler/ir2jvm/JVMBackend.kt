@@ -4,7 +4,7 @@ import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.replaceIllegalCharacters
-import nl.w8mr.jafun.compiler.effectiveJvmType
+
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
 
@@ -202,8 +202,10 @@ class JVMBackend {
             from: OperandType<*>,
             to: OperandType<*>
         ) {
-            val effectiveFrom = effectiveJvmType(from)
-            if (effectiveFrom != from) return conversion(effectiveFrom, to)
+            var effectiveFrom = from
+            while (effectiveFrom is Type.JFClass && effectiveFrom.isInlineValueClass) {
+                effectiveFrom = effectiveFrom.constructor!!.parameters.single().type
+            }
             when (effectiveFrom) {
                 is OperandType.SInt32 -> when (to) {
                     is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
@@ -327,12 +329,20 @@ fun buildClass(
                         if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) != m.returnType) pop()
                         `return`()
                     }
-                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType ->
-                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) ireturn() else error("Type issue")
-                    is OperandType.StringType ->
-                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) areturn() else error("Type issue")
-                    is Type.JFClass ->
-                        if (effectiveJvmType(m.instructions.last().type())==m.returnType) areturn() else error("Type issue")
+                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType,
+                    is OperandType.StringType, is Type.JFClass -> {
+                        val lastType = m.instructions.last().type()
+                        var effectiveLastType = lastType
+                        while (effectiveLastType is Type.JFClass && effectiveLastType.isInlineValueClass) {
+                            effectiveLastType = effectiveLastType.constructor!!.parameters.single().type
+                        }
+                        if (effectiveLastType != m.returnType) error("Type issue: $effectiveLastType vs ${m.returnType}")
+                        when (m.returnType) {
+                            is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> ireturn()
+                            is OperandType.StringType, is Type.JFClass -> areturn()
+                            else -> error("Unreachable")
+                        }
+                    }
                     else -> TODO()
                 }
             }
