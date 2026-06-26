@@ -371,6 +371,14 @@ fun compileExpressionNode(
             if (instance is ExpressionNode.Variable) {
                 if (tryResolveExpandedFieldAccess(builder, node, instance)) return
             }
+            // If we reach here, the field could not be resolved by normal means or by expanded fields
+            if (instance is ExpressionNode.Variable && instance.variableSymbol.expandedFields != null) {
+                error("Field '${node.fieldName}' not found for value class ${instance.variableSymbol.type}")
+            }
+            // If we reach here and the instance is a Variable with known value class fields, error.
+            if (instance is ExpressionNode.Variable && instance.variableSymbol.expandedFields != null) {
+                error("Cannot resolve field '${node.fieldName}' in value class '${instance.variableSymbol.type}'")
+            }
             builder.add(ExpressionNode.FieldAccess(
                 instance = instance,
                 fieldName = node.fieldName,

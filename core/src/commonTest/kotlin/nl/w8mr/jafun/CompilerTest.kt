@@ -3517,6 +3517,25 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun vcInvalidDeepField() {
+        val code = """
+            value class A(value: Int)
+            value class B(a: A)
+            value class C(b: B)
+            fun getInvalid(c: C): Int {
+                c.b.z
+            }
+        """.trimIndent()
+        val ex = kotlin.test.assertFailsWith<Throwable> {
+            Compiler().compile(code, "Script", "main")
+        }
+        // Error message should mention missing field 'z' in B
+        assert(ex.message?.contains("field 'z' in B") == true) {
+            "Expected error message to mention missing field 'z' in B, got: ${ex.message}"
+        }
+    }
 }
 
 
