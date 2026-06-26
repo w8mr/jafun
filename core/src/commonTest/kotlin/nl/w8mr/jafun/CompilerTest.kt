@@ -3480,8 +3480,44 @@ class CompilerTest {
             }
         }
     }
-}
 
+    @Test
+    fun vcDeepNesting() {
+        test {
+            file {
+                code = """
+                    value class A(value: Int)
+                    value class B(a: A)
+                    value class C(b: B)
+                    fun getValue(c: C): Int {
+                        c.b.a.value
+                    }
+                    val c = C(B(A(42)))
+                    println getValue(c)
+                """.trimIndent()
+                expectedOutput = "42\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcFieldAccessOnCallResult() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    fun getTopLeft(b: Box): Point {
+                        b.topLeft
+                    }
+                    val b = Box(Point(99, 10))
+                    println getTopLeft(b).x
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+}
 
 
 
