@@ -13,6 +13,9 @@ import nl.w8mr.jafun.compiler.flattenType
 import nl.w8mr.jafun.compiler.expandVariable
 import nl.w8mr.jafun.compiler.isMultiFieldVC
 import nl.w8mr.jafun.compiler.createNestedFieldAccess
+import nl.w8mr.jafun.compiler.shouldExpandVC
+import nl.w8mr.jafun.compiler.reconstructVCFromExpanded
+import nl.w8mr.jafun.compiler.expandParameterRecursively
 
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
@@ -487,74 +490,6 @@ private fun buildFunctionParameters(
     }
 }
 
-/**
- * Recursively reconstruct a VC instance from expanded field symbols.
- * For single-field VCs, recursively reconstructs the inner type.
- * For multi-field VCs, creates a ConstructorInvocation with reconstructed args.
- * Returns null if reconstruction isn't possible (e.g., missing symbols).
- */
-private fun reconstructVCFromExpanded(
-    vcType: Type.JFClass,
-    expandedFieldSymbols: Map<String, Type.JFVariableSymbol>,
-    pathPrefix: String = ""
-): ExpressionNode.Phase2_3Expression? {
-    val cons = findConstructor(vcType) ?: return null
-    val constructorArgs = mutableListOf<ExpressionNode.Phase2_3Expression>()
-    for (fieldParam in cons.parameters) {
-        val fieldPath = if (pathPrefix.isEmpty()) fieldParam.name else "${pathPrefix}_${fieldParam.name}"
-        val fieldType = fieldParam.type
-        
-        val arg: ExpressionNode.Phase2_3Expression?
-        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-            arg = reconstructVCFromExpanded(fieldType, expandedFieldSymbols, fieldPath)
-        } else {
-            if (fieldPath in expandedFieldSymbols) {
-                arg = ExpressionNode.Variable(expandedFieldSymbols[fieldPath]!!)
-            } else {
-                arg = null
-            }
-        }
-        if (arg == null) return null
-        constructorArgs.add(arg)
-    }
-    return ExpressionNode.ConstructorInvocation(cons, constructorArgs)
-}
-
-/**
- * Recursively expand a parameter type if it's a multi-field VC.
- * For primitive types and single-field VCs, returns a single Parameter.
- * For multi-field VCs, expands to multiple Parameters for each field.
- */
-private fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Parameter> {
-    if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) {
-        // Not a VC - return as-is
-        return listOf(Parameter(type, baseName))
-    }
-    
-    val cons = findConstructor(type) ?: return listOf(Parameter(type, baseName))
-    
-    // Check if this is a single-field VC containing a multi-field VC
-    if (cons.parameters.size == 1) {
-        val fieldType = cons.parameters[0].type
-        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-            val fieldCons = findConstructor(fieldType)
-            if (fieldCons != null && fieldCons.parameters.size > 1) {
-                // Single-field VC containing multi-field VC - don't expand further
-                return listOf(Parameter(type, baseName))
-            }
-        }
-        // Single-field VC that's not problematic - keep as-is
-        return listOf(Parameter(type, baseName))
-    }
-    
-    // Multi-field VC - expand each field recursively
-    return cons.parameters.flatMap { fieldParam ->
-        val fieldName = fieldParam.name
-        val newBaseName = if (baseName != null) "${baseName}_${fieldName}" else fieldName
-        expandParameterRecursively(fieldParam.type, newBaseName)
-    }
-}
-
 private fun expandValueClassParams(
     parameters: List<Type.JFVariableSymbol>,
     arguments: List<ExpressionNode.Phase2_3Expression>,
@@ -648,29 +583,6 @@ private fun findParamSymbolMap(
           else -> null
       }
   }
-
-/**
- * Determines if a VC should be expanded into its fields as parameters.
- * Multi-field VCs and single-field VCs (including those wrapping multi-field VCs)
- * should be expanded. Only primitive-typed single-field VCs result in no expansion
- * because they are identity-mapped.
- */
-private fun shouldExpandVC(vc: Type.JFClass): Boolean {
-    // Multi-field VCs should always be expanded
-    val cons = findConstructor(vc) ?: return false
-    if (cons.parameters.size > 1) return true
-    
-    // Single-field VCs: check if the field is NOT a primitive type
-    // (e.g., single-field VC wrapping Int is identity-mapped, so no expansion needed)
-    val fieldType = cons.parameters.singleOrNull()?.type ?: return false
-    if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-        // Single-field VC wrapping another VC - expand it
-        return true
-    }
-    
-    // Single-field VC wrapping a primitive - expand it
-    return true
-}
 
 /**
  * Sets expandedFields on all Variables in the function body that reference a specific parameter.

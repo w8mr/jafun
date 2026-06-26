@@ -196,3 +196,81 @@ fun createNestedFieldAccess(
     )
     return createNestedFieldAccess(pathComponents.drop(1), firstAccess)
 }
+
+/**
+ * Determines whether a value class parameter should be expanded into its fields.
+ * Multi-field VCs always expand. Single-field VCs wrapping other VCs also expand.
+ */
+fun shouldExpandVC(vc: Type.JFClass): Boolean {
+    val cons = vc.constructor ?: return false
+    if (cons.parameters.size > 1) return true
+
+    val fieldType = cons.parameters.singleOrNull()?.type ?: return false
+    if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+        return true
+    }
+
+    return true
+}
+
+/**
+ * Reconstructs a VC object from its expanded primitive fields.
+ * For multi-field VCs, creates a ConstructorInvocation with reconstructed args.
+ * Returns null if reconstruction isn't possible (e.g., missing symbols).
+ */
+fun reconstructVCFromExpanded(
+    vcType: Type.JFClass,
+    expandedFieldSymbols: Map<String, Type.JFVariableSymbol>,
+    pathPrefix: String = ""
+): ExpressionNode.Phase2_3Expression? {
+    val cons = vcType.constructor ?: return null
+    val constructorArgs = mutableListOf<ExpressionNode.Phase2_3Expression>()
+    for (fieldParam in cons.parameters) {
+        val fieldPath = if (pathPrefix.isEmpty()) fieldParam.name else "${pathPrefix}_${fieldParam.name}"
+        val fieldType = fieldParam.type
+
+        val arg: ExpressionNode.Phase2_3Expression?
+        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+            arg = reconstructVCFromExpanded(fieldType, expandedFieldSymbols, fieldPath)
+        } else {
+            if (fieldPath in expandedFieldSymbols) {
+                arg = ExpressionNode.Variable(expandedFieldSymbols[fieldPath]!!)
+            } else {
+                arg = null
+            }
+        }
+        if (arg == null) return null
+        constructorArgs.add(arg)
+    }
+    return ExpressionNode.ConstructorInvocation(cons, constructorArgs)
+}
+
+/**
+ * Recursively expand a parameter type if it's a multi-field VC.
+ * For primitive types and single-field VCs, returns a single Parameter.
+ * For multi-field VCs, expands to multiple Parameters for each field.
+ */
+fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Parameter> {
+    if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) {
+        return listOf(Parameter(type, baseName))
+    }
+
+    val cons = type.constructor ?: return listOf(Parameter(type, baseName))
+
+    if (cons.parameters.size == 1) {
+        val fieldType = cons.parameters[0].type
+        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+            val fieldCons = fieldType.constructor
+            if (fieldCons != null && fieldCons.parameters.size > 1) {
+                return listOf(Parameter(type, baseName))
+            }
+        }
+        return listOf(Parameter(type, baseName))
+    }
+
+    return cons.parameters.flatMap { fieldParam ->
+        val fieldName = fieldParam.name
+        val newBaseName = if (baseName != null) "${baseName}_${fieldName}" else fieldName
+        expandParameterRecursively(fieldParam.type, newBaseName)
+    }
+}
