@@ -274,3 +274,15 @@ fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Pa
         expandParameterRecursively(fieldParam.type, newBaseName)
     }
 }
+
+/**
+ * Unwraps a type to its effective JVM representation.
+ * Single-field inline VCs are unwrapped recursively to their underlying type.
+ * Multi-field VCs and non-VC types are returned unchanged.
+ */
+fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
+    if (type is Type.JFClass && type.isInlineValueClass) {
+        return effectiveJvmType(type.constructor!!.parameters.single().type)
+    }
+    return type
+}

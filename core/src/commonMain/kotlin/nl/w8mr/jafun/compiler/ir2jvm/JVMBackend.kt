@@ -4,6 +4,7 @@ import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.replaceIllegalCharacters
+import nl.w8mr.jafun.compiler.effectiveJvmType
 import nl.w8mr.kasmine.ClassBuilder
 import nl.w8mr.kasmine.classBuilder
 
@@ -355,10 +356,4 @@ fun signature(type: OperandType<*>): String =
         is Type.JFClass -> "L${type.path.replace('.', '/')};" // TODO: check if this needs to bee JFObject?
     }
 
-private fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
-    if (type is Type.JFClass && type.isInlineValueClass) {
-        // Recursively unwrap nested single-field VCs
-        return effectiveJvmType(type.constructor!!.parameters.single().type)
-    }
-    return type
-}
+

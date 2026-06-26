@@ -16,6 +16,7 @@ import nl.w8mr.jafun.compiler.createNestedFieldAccess
 import nl.w8mr.jafun.compiler.shouldExpandVC
 import nl.w8mr.jafun.compiler.reconstructVCFromExpanded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
+import nl.w8mr.jafun.compiler.effectiveJvmType
 
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
@@ -91,11 +92,10 @@ private fun expandValAssignmentIfNeeded(
 ): List<ExpressionNode.Phase2_3Expression> {
     val varType = assignment.variableSymbol.type
     
-    // Only expand multi-field VCs
-    if (!isMultiFieldVC(varType)) {
+    // Only expand VC types
+    if (varType !is Type.JFClass || varType.kind != Type.ClassKind.VALUE_CLASS) {
         return listOf(assignment)
     }
-    
     // We can only expand when the RHS is a constructor invocation with known values
     if (assignment.expression !is ExpressionNode.ConstructorInvocation) {
         return listOf(assignment)
@@ -267,12 +267,11 @@ fun compileExpressionNode(
         }
         is ExpressionNode.Function -> {
             val symbol = node.symbol
-            val parameters = buildFunctionParameters(symbol, node)
-            val returnType = if (symbol.rtn is Type.JFClass) {
-                val vc = symbol.rtn as Type.JFClass
-                if (vc.isInlineValueClass) vc.constructor!!.parameters.single().type
-                else symbol.rtn
-            } else symbol.rtn
+            val parameters = buildFunctionParameters(symbol, node).map { p ->
+                val unwrapped = effectiveJvmType(p.type)
+                if (unwrapped != p.type) Parameter(unwrapped, p.varName) else p
+            }
+            val returnType = effectiveJvmType(symbol.rtn)
             compileMethod(
                 builder.parent.parent,
                 node.block,
@@ -330,6 +329,11 @@ fun compileExpressionNode(
                 builder.add(compileAsCodeBlock(builder, node.instance))
                 return
             }
+            // Try resolving expanded field access using the original instance before compiling,
+            // so that metadata on the original variable symbol is available
+            if (node.instance is ExpressionNode.Variable) {
+                if (tryResolveExpandedFieldAccess(builder, node, node.instance as ExpressionNode.Variable)) return
+            }
             val instance = compileAsCodeBlock(builder, node.instance)
             if (instance is ExpressionNode.Variable) {
                 if (tryResolveExpandedFieldAccess(builder, node, instance)) return
@@ -343,9 +347,14 @@ fun compileExpressionNode(
             ))
         }
         is ExpressionNode.Variable -> {
-            // If the variable has expanded fields, it means it's a multi-field VC that was flattened
-            // We should not add it directly - instead let the caller handle it appropriately
-            // (either through FieldAccess for field access, or by expanding arguments for function calls)
+            val expandedFields = node.variableSymbol.expandedFields
+            if (expandedFields != null && expandedFields.size == 1) {
+                val singleField = expandedFields[0]
+                if (singleField.actualSymbol != null) {
+                    builder.add(ExpressionNode.Variable(singleField.actualSymbol!!))
+                    return
+                }
+            }
             builder.add(node)
         }
         is ExpressionNode.Phase2_3Expression -> {

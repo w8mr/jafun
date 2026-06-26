@@ -2,6 +2,7 @@ package nl.w8mr.jafun.compiler.ir2jvm
 
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.compiler.effectiveJvmType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -243,13 +244,5 @@ class EffectiveJvmTypeTests {
         val param = Type.JFVariableSymbol("value", fieldType)
         vc.constructor = Type.JFConstructor(listOf(param), vc)
         return vc
-    }
-
-    // Local copy of effectiveJvmType for testing (mirrors the actual implementation)
-    private fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
-        if (type is Type.JFClass && type.isInlineValueClass) {
-            return effectiveJvmType(type.constructor!!.parameters.single().type)
-        }
-        return type
     }
 }
