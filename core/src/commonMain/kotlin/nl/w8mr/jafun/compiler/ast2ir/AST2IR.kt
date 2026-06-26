@@ -301,14 +301,18 @@ fun compileExpressionNode(
                                 expanded.variableSymbol.constructorArgs = ci.arguments
                             }
                         }
-                        builder.add(ExpressionNode.ValAssignment(expanded.variableSymbol, expr))
+                        val compiledVar = ExpressionNode.ValAssignment(expanded.variableSymbol, expr)
+                        compiledVar.variableSymbol.effectiveType = effectiveJvmType(varType)
+                        builder.add(compiledVar)
                     }
                     else -> builder.add(expanded)
                 }
             }
         }
         is ExpressionNode.VarAssignment -> {
-            builder.add(ExpressionNode.VarAssignment(node.variableSymbol, compileAsCodeBlock(builder, node.expression)))
+            val compiledExpr = compileAsCodeBlock(builder, node.expression)
+            node.variableSymbol.effectiveType = effectiveJvmType(node.variableSymbol.type)
+            builder.add(ExpressionNode.VarAssignment(node.variableSymbol, compiledExpr))
         }
         is ExpressionNode.ExpressionList -> {
             builder.add(ExpressionNode.ExpressionList(node.expressions.map { compileAsCodeBlock(builder, it) }))
@@ -394,6 +398,7 @@ private fun tryResolveExpandedFieldAccess(
                 symbolMap = varSymbol.symbolMap,
                 initialized = true,
             )
+            syntheticVar.effectiveType = effectiveJvmType(field.type)
             val parentSymbols = varSymbol.expandedFieldSymbols
             syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
                 val fullPath = "${field.name}_$subFieldPath"
@@ -415,6 +420,7 @@ private fun tryResolveExpandedFieldAccess(
                 symbolMap = varSymbol.symbolMap,
                 initialized = true,
             )
+            expandedVar.effectiveType = effectiveJvmType(field.type)
             builder.add(ExpressionNode.Variable(expandedVar))
             return true
         }
@@ -489,10 +495,12 @@ private fun buildFunctionParameters(
             } else {
                 // Returns the wrapped type - keep parameter as-is so the caller can pass the object
                 param.skipExpansion = true
+                param.effectiveType = effectiveJvmType(type)
                 val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
                 listOf(Parameter(type, varName))
             }
         } else {
+            param.effectiveType = effectiveJvmType(type)
             val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
             listOf(Parameter(type, varName))
         }

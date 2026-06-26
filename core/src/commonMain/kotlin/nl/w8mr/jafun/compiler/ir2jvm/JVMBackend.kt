@@ -189,7 +189,7 @@ class JVMBackend {
         private fun ClassBuilder.MethodDSL.DSL.storeVariable(instruction: ExpressionNode.Assignment) {
             val variableName =
                 "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (effectiveJvmType(instruction.expression.type())) {
+            when (instruction.variableSymbol.effectiveType ?: instruction.expression.type()) {
                 is OperandType.SInt32 -> istore(variableName)
                 is OperandType.StringType -> astore(variableName)
                 is OperandType.UInt1 -> istore(variableName)
@@ -236,7 +236,7 @@ class JVMBackend {
 
         fun ClassBuilder.MethodDSL.DSL.loadVariable(instruction: ExpressionNode.Variable) {
             val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (effectiveJvmType(instruction.variableSymbol.type)) {
+            when (instruction.variableSymbol.effectiveType ?: instruction.variableSymbol.type) {
                 is OperandType.SInt32 -> iload(variableName)
                 is OperandType.StringType -> aload(variableName)
                 is OperandType.UInt1 -> iload(variableName)
