@@ -200,7 +200,7 @@ fun compileExpressionNode(
     when (node) {
         is ExpressionNode.MethodInvocation -> {
             val (expandedParams, expandedRawArgs) = expandValueClassParams(node.parameters, node.arguments)
-            val arguments = loadArguments(builder, expandedRawArgs, expandedParams.map { it.type })
+            val arguments = loadArguments(builder, expandedRawArgs, expandedParams.map { it.effectiveType ?: it.type })
             val originalRtnLookup = node.rtnLookup
             builder.add(ExpressionNode.MethodInvocation(
                 methodName = node.methodName,
@@ -213,7 +213,12 @@ fun compileExpressionNode(
         }
         is ExpressionNode.ConstructorInvocation -> {
             val arguments = loadArguments(builder, node.arguments, node.cons.parameters.map(Type.JFVariableSymbol::type))
-            builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
+            val classType = node.cons.parent as? Type.JFClass
+            if (classType != null && classType.isInlineValueClass) {
+                builder.add(arguments.single())
+            } else {
+                builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
+            }
         }
         is ExpressionNode.When -> {
             val subjectVariable =

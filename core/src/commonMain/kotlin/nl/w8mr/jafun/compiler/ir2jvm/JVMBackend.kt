@@ -36,17 +36,13 @@ class JVMBackend {
 
                     is ExpressionNode.ConstructorInvocation -> {
                         val classType = instruction.type()
-                        if (classType is Type.JFClass && classType.isInlineValueClass) {
-                            instruction.arguments.forEach { compile(it) }
-                        } else {
-                            val internalName = classType.path.replace('.', '/')
-                            val consSignature =
-                                "(${instruction.cons.parameters.joinToString("") { signature(it.type) }})V"
-                            new(internalName)
-                            dup()
-                            instruction.arguments.forEach { compile(it) }
-                            invokeSpecial(internalName, "<init>", consSignature)
-                        }
+                        val internalName = classType.path.replace('.', '/')
+                        val consSignature =
+                            "(${instruction.cons.parameters.joinToString("") { signature(it.type) }})V"
+                        new(internalName)
+                        dup()
+                        instruction.arguments.forEach { compile(it) }
+                        invokeSpecial(internalName, "<init>", consSignature)
                     }
                     is ExpressionNode.MethodInvocation -> {
                         when (instruction.field) {
@@ -82,7 +78,7 @@ class JVMBackend {
                         with(method) {
                             val methodClassName = instruction.parentPath.replace('.', '/')
                             val methodSignature =
-                                "(${instruction.parameters.joinToString("") { signature(effectiveJvmType(it.type)) }})" +
+                                "(${instruction.parameters.joinToString("") { signature(it.effectiveType ?: it.type) }})" +
                                         signature(instruction.type())
                             when (instruction.field) {
                                 null -> invokeStatic(
