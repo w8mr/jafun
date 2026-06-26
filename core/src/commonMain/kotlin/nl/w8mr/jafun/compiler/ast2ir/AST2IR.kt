@@ -433,21 +433,6 @@ private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? {
     return vc.constructor
 }
 
-/**
- * Unwraps a single level if it's a single-field VC.
- * Does NOT recurse - only unwraps one level.
- */
-private fun unwrapVCOnce(type: OperandType<*>): OperandType<*> {
-    if (type !is Type.JFClass) return type
-    if (type.kind != Type.ClassKind.VALUE_CLASS) return type
-    
-    val cons = findConstructor(type)
-    if (cons == null || cons.parameters.size != 1) return type
-    
-    // Single-field VC - unwrap one level
-    return cons.parameters[0].type
-}
-
 private fun buildFunctionParameters(
     symbol: Type.JFMethod,
     node: ExpressionNode.Function,
@@ -769,16 +754,4 @@ private fun setExpandedFieldsInExpression(
     }
 }
 
-/**
- * Checks if a Variable symbol corresponds to a method parameter.
- * Parameters should not use the identity shortcut for single-field VC field access,
- * because parameters reference actual runtime values that need field extraction.
- */
-private fun isParameterVariable(varSymbol: Type.JFVariableSymbol, builder: IRBuilder.CodeBlockDSL): Boolean {
-    val methodContext = builder.parent.context
-    // A parameter variable is one whose name starts with one of the parameter names
-    // (since parameters might be expanded into box_field names)
-    return methodContext.parameters.any { param ->
-        param.varName == null || varSymbol.name.startsWith(param.varName + "_") || varSymbol.name == param.varName
-    }
-}
+
