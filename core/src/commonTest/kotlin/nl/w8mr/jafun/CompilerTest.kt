@@ -2791,7 +2791,13 @@ class CompilerTest {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
+                        loadConstant("Test")
+                        astore("test_street")
                         loadConstant(1)
+                        istore("test_number")
+                        loadConstant("Test")
+                        astore("test_city")
+                        iload("test_number")
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -2819,7 +2825,11 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(1)
+                        istore("test_number")
                         loadConstant("x")
+                        astore("test_street")
+                        iload("test_number")
+                        aload("test_street")
                         invokeStatic("Script", "printNumber", "(ILjava/lang/String;)V")
                         `return`()
                     }
@@ -2897,9 +2907,17 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(10)
+                        istore("a_x")
                         loadConstant("hello")
+                        astore("a_y")
                         loadConstant("world")
+                        astore("b_p")
                         loadConstant(20)
+                        istore("b_q")
+                        iload("a_x")
+                        aload("a_y")
+                        aload("b_p")
+                        iload("b_q")
                         invokeStatic("Script", "test", "(ILjava/lang/String;Ljava/lang/String;I)V")
                         `return`()
                     }
@@ -3160,7 +3178,11 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(4)
+                        istore("a_number")
                         loadConstant("Privet Drive")
+                        astore("a_street")
+                        iload("a_number")
+                        aload("a_street")
                         invokeStatic("Script", "changeAddress", "(ILjava/lang/String;)LAddress;")
                         astore("b")
                         aload("b")
@@ -3246,7 +3268,11 @@ class CompilerTest {
                         // Both User and Id are fully inlined at call site
                         // User(Id(42), "Alice") expands to just (42, "Alice")
                         loadConstant(42)           // id value (from Id)
+                        istore("u_id_value")
                         loadConstant("Alice")      // name
+                        astore("u_name")
+                        iload("u_id_value")
+                        aload("u_name")
                         invokeStatic("Script", "getUserName", "(ILjava/lang/String;)Ljava/lang/String;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -3284,18 +3310,139 @@ class CompilerTest {
         }
     }
 
+     @Test
+    fun testBoxSimple2() {
+        test {
+            file {
+                code = """
+                    value class Box(x: Int)
+                    val b = Box(99)
+                    println b.x
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+    @Test
+    fun testSimpleBoxAccess() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    val p = Point(99, 10)
+                    val b = Box(p)
+                    println b.topLeft.x
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+    @Test
+    fun testBoxSingleField() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    fun getPoint(box: Box): Point {
+                        box.topLeft
+                    }
+                    val b = Box(Point(99, 10))
+                    println getPoint(b).x
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+    @Test
+    fun testBoxSingleFieldWorking() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    fun getPoint(box: Box): Point {
+                        box.topLeft
+                    }
+                    println getPoint(Box(Point(99, 10))).x
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+
+    @Test
+    fun debugChainedAccess() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    fun getX(box: Box): Int {
+                        box.topLeft.x
+                    }
+                    val p = Point(99, 10)
+                    val b = Box(p)
+                    println getX(b)
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+    @Test
+    fun testMultiFieldVCFieldAccess() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    fun getX(p: Point): Int {
+                        p.x
+                    }
+                    val p = Point(42, 10)
+                    println getX(p)
+                """.trimIndent()
+                expectedOutput = "42\n"
+            }
+        }
+    }
+
     @Test
     fun vcChainedNestedAccess() {
         test {
             file {
                 code = """
-                    value class Point(x: Int)
-                    value class Box(topLeft: Point)
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point, bottomRight: Point)
                     fun getX(box: Box): Int {
                         box.topLeft.x
                     }
-                    val b = Box(Point(99))
+                    val b = Box(Point(99,10), Point(100,11))
                     println getX(b)
+                """.trimIndent()
+                expectedOutput = "99\n"
+            }
+        }
+    }
+
+    @Test
+    fun testMultiArgReconstruction() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    fun selectFirst(b: Box, p: Point): Point {
+                        b.topLeft
+                    }
+                    val b = Box(Point(99, 10))
+                    val p = Point(999, 1)
+                    println selectFirst(b, p).x
                 """.trimIndent()
                 expectedOutput = "99\n"
             }

@@ -79,6 +79,7 @@ interface Type : TypeSymbol {
     /**
      * Represents an expanded field from a value class parameter.
      * Tracks both the direct type and source VC metadata for nested field access.
+     * Can optionally store a reference to the actual JFVariableSymbol for direct access.
      *
      * Example: When User(id: Id, name: String) is expanded:
      * - ExpandedField("id", SInt32, sourceVC=IdClass, sourceVCFields=[("value", SInt32)])
@@ -88,7 +89,8 @@ interface Type : TypeSymbol {
         val name: String,
         val type: OperandType<*>,
         val sourceVC: JFClass? = null,
-        val sourceVCFields: List<Pair<String, OperandType<*>>>? = null
+        val sourceVCFields: List<Pair<String, OperandType<*>>>? = null,
+        val actualSymbol: JFVariableSymbol? = null  // Reference to actual stored symbol
     ) {
         fun hasField(fieldName: String): Boolean =
             sourceVCFields?.any { it.first == fieldName } ?: false
@@ -119,6 +121,8 @@ interface Type : TypeSymbol {
     ) : Type, InvocationTarget, Printable {
         var constructorArgs: List<ExpressionNode.Phase2_3Expression>? = null
         var expandedFields: List<ExpandedField>? = null
+        var expandedFieldSymbols: Map<String, JFVariableSymbol>? = null  // Maps field paths to actual symbols
+        var skipExpansion: Boolean = false  // Set when function definition cannot expand this param
 
         override fun equals(other: Any?): Boolean =
             when (other) {

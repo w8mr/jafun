@@ -1,487 +1,226 @@
 # Value Classes
 
-Value classes (`value class`) provide a way to create lightweight wrapper types that are semantically distinct at the source level but can be represented as their underlying fields at the JVM level to avoid heap allocation overhead.
+Value classes (`value class`) provide lightweight wrapper types that are semantically distinct at the source level but decompose to their underlying fields at the JVM level, avoiding heap allocation.
 
 ## Two Representations
 
 Value class instances have two representations:
 
-- **Scalar (expanded)**: The value is decomposed into N local variables (one per constructor parameter). Used when the value is assigned to a local `val` or passed as a function parameter. No heap object is allocated.
-- **Object (materialized)**: The value lives as a heap object (the JVM `.class` with private fields). Used as method return values, since the JVM cannot return multiple values from a single method.
+- **Scalar (expanded)**: The value is decomposed into N local variables (one per flattened primitive field). Used when the value is assigned to a `val` at the top level or passed as a function parameter. No heap object is allocated.
+- **Object (materialized)**: The value lives as a heap object (the JVM `.class` with private fields). Used as method return values — the JVM cannot return multiple values from a single method.
 
-The scalar/object duality is handled entirely at the compiler (IR) level — there is no runtime dispatch or wrapper type at the JVM level.
+The scalar/object duality is handled entirely at the IR level — there is no runtime dispatch.
 
-## Declaration (`Phase1Parser.kt:173-211`)
+## Phase 1: Declaration (`Phase1Parser.kt`)
 
-`valueClassDeclaration` is registered before `valDeclaration` in the `oneOf` list because `string("val")` matches the first 3 characters of `"value"`.
-
-```kotlin
-val valueClassDeclaration = combi {
-    // Parses:  value class Address(number: Int, street: String)
-    // Creates: JFClass with kind = ClassKind.VALUE_CLASS
-    //          JFConstructor with parameters list
-    //          Getter JFMethod for each parameter
-    // Registers all in the symbol map
-}
-```
-
-The parser:
-1. Creates a `JFClass` with `kind = ClassKind.VALUE_CLASS` and registers it
-2. Creates a `JFConstructor(parameters, jfClass)` and stores it on `jfClass.constructor`
-3. For each constructor parameter, creates a getter `JFMethod` with empty parameter list and registers it on the class
-
-## Symbol Table Types (`Types.kt`)
+`valueClassDeclaration` is registered before `valDeclaration` because `string("val")` matches the first 3 characters of `"value"`.
 
 ```kotlin
-data class JFClass(
-    override val name: String,
-    override val parent: ClassParent? = null,
-    val kind: ClassKind = ClassKind.NORMAL,
-) {
-    var constructor: JFConstructor? = null   // set during valueClassDeclaration
-}
-
-data class JFConstructor(
-    val parameters: List<JFVariableSymbol>,
-    override val parent: MethodParent,
-    override val name: String = "<init>",
-)
-
-data class JFVariableSymbol(
-    val name: String,
-    val type: OperandType<*>,
-    val symbolMap: SymbolMap = IdentifierCache,
-    val mutable: Boolean = false,
-    val initialized: Boolean = false,
-) {
-    var constructorArgs: List<Phase2_3Expression>? = null  // for val assignment expansion
-    var expandedFields: List<Pair<String, OperandType<*>>>? = null  // for param expansion
-}
+value class Address(number: Int, street: String)
 ```
 
-## Parser Interception (`ParserJafun.kt`)
+Creates `JFClass(kind = VALUE_CLASS)` with:
+- A `JFConstructor` stored on `jfClass.constructor`
+- One getter `JFMethod` per constructor parameter
 
-### Getter interception (`methodLhs` at `ParserJafun.kt:401-412`)
+## Phase 2: Parsing
 
-When `methodLhs` encounters a `JFVariableMethod` where the variable type is a value class and the method has no parameters (a getter), it produces a `FieldAccess` node instead of a `MethodInvocation`:
+### Getter interception
+
+When `methodLhs` encounters a value class field access (a getter with no parameters), it produces a `FieldAccess` node instead of `MethodInvocation`. This is what turns `address.number` into a field read rather than a method call.
+
+### Structure pass
+
+`structurePass` skips value class declarations — they have no function body to extract.
+
+## Phase 3: IR Transformation
+
+The core flattening logic lives in `VCFlattening.kt`, with the integration in `AST2IR.kt`.
+
+### Flattening model (`VCFlattening.kt`)
+
+`flattenType` recursively decomposes a VC type into its primitive components:
+
+| Type | Flattens to |
+|------|------------|
+| `Int` | `[("", Int)]` |
+| `Id(value: Int)` | `[("value", Int)]` |
+| `Point(x: Int, y: Int)` | `[("x", Int), ("y", Int)]` |
+| `Box(topLeft: Point)` | `[("topLeft_x", Int), ("topLeft_y", Int)]` |
+| `Box(tl: Point, br: Point)` | `[("tl_x", Int), ("tl_y", Int), ("br_x", Int), ("br_y", Int)]` |
+
+Supporting functions:
+
+- **`isMultiFieldVC(type)`** — Returns true if a type expands to multiple primitives at the top level. Recursively checks single-field VCs: `Box(topLeft: Point)` returns true because `Point` is multi-field, but `Id(value: Int)` returns false because `Int` is a single primitive. This determines whether a `val` assignment gets expanded into separate variables.
+- **`effectiveVariableType(type)`** — Unwraps single-field VC chains to the innermost type. `Box(topLeft: Point)` → `Point`, `Id(value: Int)` → `Int`, `UserId(id: Id(value: Int))` → `Int`.
+- **`expandVariable(variable)`** — Expands a `JFVariableSymbol` into one symbol per flattened primitive, appending the flatten path: `b` of type `Box(topLeft: Point)` → `[b_topLeft_x: Int, b_topLeft_y: Int]`.
+- **`createNestedFieldAccess(pathComponents, arg)`** — Creates a chain of `FieldAccess` nodes from a path like `["topLeft", "x"]`.
+- **`needsFlattening(type)`, `flattenedSize(type)`, `signatureForType(type)`** — Utility functions.
+
+### Variable expansion (`expandValAssignmentIfNeeded`)
+
+When a `val` is assigned a `ConstructorInvocation`, `isMultiFieldVC` determines if the target type needs expansion:
 
 ```kotlin
-is JFVariableMethod -> {
-    val lhsType = symbol.variable.type
-    if (lhsType is Type.JFClass && lhsType.kind == Type.ClassKind.VALUE_CLASS && symbol.method.parameters.isEmpty()) {
-        val fields = symbolMapManager.find(lhsType)
-            .filterIsInstance<Type.JFConstructor>().flatMap { it.parameters }
-        val fieldIndex = fields.indexOfFirst { it.name == symbol.method.name }
-        ExpressionNode.FieldAccess(
-            instance = ExpressionNode.Variable(symbol.variable),
-            fieldName = symbol.method.name,
-            fieldIndex = fieldIndex,
-            fieldType = symbol.method.rtn,
-            arguments = emptyList(),
-        )
-    } else {
-        // normal method dispatch
-    }
-}
+val b = Box(Point(99, 10))  // isMultiFieldVC(Box) = true → expands
+```
+Becomes:
+```kotlin
+val b_topLeft_x = 99
+val b_topLeft_y = 10
 ```
 
-### Structure pass (`ParserJafun.kt:611-626`)
+The original `b` variable is NOT stored as a real JVM local — only the expanded primitives exist. If `b` is later passed to a function expecting a `Box`, the system reconstructs the object from the primitives (see Reconstruction below).
 
-`structurePass` skips over value class declaration tokens entirely (they have no function body to extract):
+Expansion only happens when the RHS is a `ConstructorInvocation`. Function calls like `val a = makeAddress()` do NOT trigger expansion — the returned object stays materialized.
+
+### Function parameter expansion (`buildFunctionParameters`)
+
+`shouldExpandVC` determines if a function parameter type should be expanded (when `buildFunctionParameters` creates the JVM method signature):
+
+```
+shouldExpandVC(Id(value: Int))      → false  (single-field wrapping primitive)
+shouldExpandVC(Point(x: Int, y: Int)) → true  (multi-field)
+shouldExpandVC(Box(topLeft: Point)) → true   (single-field wrapping multi-field VC)
+```
+
+#### `returnsWrappedType` guard
+
+For a single-field VC where the function's return type matches the wrapped field type, expansion is **skipped**:
 
 ```kotlin
-if (token is ExpressionNode.Keyword && token.value == "value") {
-    i++
-    // skip "value class Name(...)"
-    // ...
-}
+fun getPoint(box: Box): Point { box.topLeft }
 ```
 
-## `FieldAccess` Node (`ExpressionNode.kt`)
+Here `Box.wrappedType = Point = returnType`, so the Box parameter stays unexpanded in the JVM signature (`(LBox;)LPoint;`). This is necessary because:
+- The function body returns `box.topLeft`, which resolves via identity shortcut to `box` itself
+- If the parameter were expanded, `box` wouldn't exist as a real variable
+- The caller passes a reconstructed `Box` object, not expanded primitives
+
+When this guard triggers, `param.skipExpansion = true` is set on the parameter symbol.
+
+`expandedFieldSymbols` is a map on `JFVariableSymbol` tracking the actual symbol objects created during variable expansion — keyed by flattened field path (e.g., `"topLeft_x"`) and valued by the real `JFVariableSymbol`. This is used during reconstruction to reference the exact same symbols.
+
+#### Multi-field VC parameter expansion
+
+For multi-field VCs, the parameter expands to individual primitives:
 
 ```kotlin
-class FieldAccess(
-    val instance: Phase2_3Expression,
-    val fieldName: String,
-    val fieldIndex: Int,
-    val fieldType: OperandType<*>,
-    override val arguments: List<Phase2_3Expression>,
-) : Phase2_3Expression
+fun getX(p: Point): Int { p.x }
+// JVM: getX(I, I): I
 ```
 
-- `instance` — the value class variable or expression being accessed
-- `fieldName` — name of the getter (used for JVM `getfield`)
-- `fieldIndex` — position in the constructor parameter list (used for expansion lookups)
-- `fieldType` — scalar type of the field
+The function body's `p.x` resolves through `expandedFields` metadata on the variable symbol, which points `x` → the first expanded int param.
 
-## IR Transformation (`ast2ir/AST2IR.kt`)
+#### `setExpandedFieldsOnParameterVariables`
 
-### Expansion via `ExpansionContext`
+Since structure pass creates separate `JFVariableSymbol` objects from Phase 1, `expandedFields` must be set on BOTH the `symbol.parameters[i]` object AND the symbol found in the body's scope. This is done in `buildFunctionParameters`.
 
-`ExpansionContext` tracks which parameters have been expanded into scalar fields and which constructor arguments have been captured. It is passed through `compileAsCodeBlock` to nested function compilations.
+### Call site expansion (`expandValueClassParams`)
 
-### `ValAssignment` expansion (`line 211-214`)
+When a `MethodInvocation` is compiled, `expandValueClassParams` processes each (param, arg) pair:
 
-When a value class is assigned to a local `val`, the `ConstructorInvocation` arguments are captured on the `JFVariableSymbol`:
+1. **If `param.skipExpansion`**: Pass the arg as-is (or reconstruct from expanded fields — see below)
+2. **If arg is an expanded Variable AND param should expand**: Extract the flattened components from the expanded variable using `createNestedFieldAccess`
+3. **If param should expand but arg is not an expanded Variable** (e.g., inline ConstructorInvocation): Extract `FieldAccess` nodes for each constructor parameter
+
+This creates matching expanded parameter lists at both the call site and function definition.
+
+### Reconstruction (`reconstructVCFromExpanded`)
+
+When a variable was expanded at the val level but the function parameter couldn't be expanded (due to `returnsWrappedType`), the compiler reconstructs the VC object from the expanded primitives:
 
 ```kotlin
-if (varType is Type.JFClass && varType.kind == Type.ClassKind.VALUE_CLASS && expr is ExpressionNode.ConstructorInvocation) {
-    node.variableSymbol.constructorArgs = expr.arguments
-    return  // skip emitting the assignment — kept as a pure scalar
-}
+val b = Box(Point(99, 10))    // b expanded to b_topLeft_x, b_topLeft_y
+println getPoint(b).x          // getPoint takes Box, returns Point
 ```
 
-### `FieldAccess` resolution (`line 229-267`)
+At the call to `getPoint(b)`:
+1. `param.skipExpansion` is true (function returns the wrapped type)
+2. `b` has `expandedFieldSymbols`: `{"topLeft_x" → b_topLeft_x, "topLeft_y" → b_topLeft_y}`
+3. Reconstructs `Box(Point(b_topLeft_x, b_topLeft_y))` by walking the type hierarchy:
+   - `Box.constructor(topLeft: Point)` → recurse with prefix `"topLeft"`
+   - `Point.constructor(x: Int, y: Int)` → look up `"topLeft_x"`, `"topLeft_y"` in expandedFieldSymbols
+   - Builds `ConstructorInvocation(Point, [Variable(b_topLeft_x), Variable(b_topLeft_y)])`
+   - Builds `ConstructorInvocation(Box, [ConstructorInvocation(Point, ...)])`
 
-When the instance is a `Variable`:
-1. First checks `constructorArgs` — if set (from `ValAssignment`), returns the corresponding argument directly
-2. Then checks `expandedFields` — if set (from function parameter expansion), creates a new `Variable` referencing the expanded field's local variable
-3. Falls through to JVM `getfield` (object materialization) if neither expansion is set
+This allows the cached expanded variable to be "re-boxed" on demand when passed to functions that need the object form.
 
-### Function parameter expansion (`line 158-206`)
+### Field access resolution (`compileExpressionNode` — FieldAccess handler)
 
-When a user-defined `Function` has value class parameters:
+For `b.topLeft.x`:
 
-1. For each parameter whose type is a value class, computes `fieldExpansions` from the constructor parameter names and types
-2. Sets `param.expandedFields` on the parameter's `JFVariableSymbol` (both the `symbol.parameters[i]` object AND the symbol found in the body's symbol map — see Disjoint Symbols)
-3. Creates expanded `Parameter` entries with `varName` in the format `{symbolMapId}.{paramName}_{fieldName}`
-4. Pre-registers these var names via kasmine `parameter()` before body compilation, ensuring correct JVM local variable slot ordering
+1. **`constructorArgs` check**: If the variable was `val`-assigned from a `ConstructorInvocation` AND has stored constructor args, extract the arg directly by `fieldIndex`. This bypasses object materialization entirely.
+
+2. **`expandedFields` check**: If the variable has expanded fields (from function parameter expansion), find the matching field by `fieldName` in the expansion list. For multi-field VCs, this creates a `Variable` referencing the corresponding expanded param. For single-field VCs wrapping multi-field VCs, this creates a synthetic intermediate variable with its own `expandedFields` for further chain resolution.
+
+3. **Identity shortcut**: If the instance type is a single-field VC (`isInlineValueClass`), just return the instance itself (no field access needed — the VC IS its field).
+
+4. **JVM `getfield`**: Fall through to a real `FieldAccess` node → `getfield` in bytecode. This happens for function return values (object materialization).
+
+### Return type unwrapping (`compileMethod`)
+
+When a function returns a single-field VC, the return type is unwrapped:
 
 ```kotlin
-for (param in symbol.parameters) {
-    if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS) {
-        val cons = findConstructor(vc)
-        val fieldExpansions = cons.parameters.map { it.name to it.type }
-        param.expandedFields = fieldExpansions
-        // Also set on the symbol in the body's scope (Phase1 object)
-        if (paramRefSymbolMap != null) {
-            (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
-                ?.expandedFields = fieldExpansions
-        }
-        for ((fieldName, fieldType) in fieldExpansions) {
-            val varName = "${actualSymbolMapId}.${param.name}_$fieldName"
-            parameters.add(Parameter(fieldType, varName))
-        }
-    }
-}
+fun makeId(): Id { Id(42) }
+// JVM: ()I, not ()LId;
 ```
 
-### Constructor argument unpacking (`line 108-121`)
-
-When a `ConstructorInvocation` has value class arguments, each argument is expanded into individual `FieldAccess` nodes:
-
+Multi-field VC returns stay as object references:
 ```kotlin
-val unpackedArgs = cons.parameters.mapIndexed { index, param ->
-    if (param.type is Type.JFClass && param.type.kind == Type.ClassKind.VALUE_CLASS) {
-        val vc = param.type as Type.JFClass
-        val innerCons = findConstructor(vc)
-        innerCons?.parameters?.mapIndexed { innerIndex, innerParam ->
-            ExpressionNode.FieldAccess(
-                instance = arg,  // the original argument expression
-                fieldName = innerParam.name,
-                fieldIndex = innerIndex,
-                fieldType = innerParam.type,
-                arguments = emptyList(),
-            )
-        } ?: listOf(arg)
-    } else listOf(arg)
-}.flatten()
+fun makeAddress(): Address { Address(1, "street") }
+// JVM: ()LAddress;
 ```
 
-### `findConstructor` helper
+This is handled in `compileMethod` via `isInlineValueClass` check, and must be consistent between declaration and call site to avoid `VerifyError`.
 
-Simplified to `vc.constructor` — avoids scope-dependent symbol map lookups:
+## `JFVariableSymbol` Runtime State
 
-```kotlin
-private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? = vc.constructor
-```
+`JFVariableSymbol` has several mutable fields set during IR transformation:
 
-## JVM Code Generation (`ir2jvm/JVMBackend.kt`)
-
-### `FieldAccess` compilation (`line 169-178`)
-
-Compiles the instance expression, then emits `getfield`:
-
-```kotlin
-is ExpressionNode.FieldAccess -> {
-    compile(instruction.instance)
-    val ownerType = instruction.instance.type() as Type.JFClass
-    getField(
-        ownerType.path.replace('.', '/'),
-        instruction.fieldName,
-        signature(instruction.fieldType),
-    )
-    if (asStatement && instruction.type() != OperandType.Unit) pop()
-}
-```
-
-### Constructor compilation
-
-`ConstructorInvocation` uses unified `new`/`dup`/`invokeSpecial` sequence. Arguments are compiled and passed to the constructor.
-
-### Parameter naming via `buildClass` (`line 278`)
-
-kasmine maps variable names to JVM local variable slots via an internal counter:
-
-```kotlin
-private val localVarMap = mutableMapOf<String, UByte>()
-
-private fun localVar(name: String): UByte {
-    return localVarMap.getOrPut(name) { localVarMap.size.toUByte() }
-    // The first unknown name gets slot 0, the next slot 1, etc.
-}
-```
-
-When JVMBackend encounters `iload("1.input_number")`, kasmine calls `localVar("1.input_number")`. If the name is new, it gets the **next sequential slot** — which depends on what was first loaded/stored in the body. A body accessing `input.street` before `input.number` would give `street` slot 0 and `number` slot 1, **reversing** the JVM parameter slot order and loading wrong values.
-
-`parameter(name)` calls `localVar(name)` **before any body code runs**, pinning slot 0 to `number` and slot 1 to `street` regardless of access order:
-
-```kotlin
-m.parameters.forEach { p -> p.varName?.let { parameter(it) } }
-```
-
-This is not a value-class-specific issue — it affects **all** function parameters. A normal function `fun subtract(a: Int, b: Int): Int { b - a }` has the same vulnerability: without pre-registration, accessing `b` first would give it slot 0 (a's slot), producing `a - b` instead of `b - a`. The `parameter()` call in the parameter expansion path (via `varName`) fixes this for both VC and non-VC parameters.
-
-Variable names follow the format `{symbolMapId}.{paramName}_{fieldName}` for expanded fields and `{symbolMapId}.{paramName}` for scalar parameters.
+| Field | Set by | Purpose |
+|-------|--------|---------|
+| `constructorArgs` | `ValAssignment` handler | Constructor arg extraction shortcut |
+| `expandedFields` | `buildFunctionParameters` or `expandValAssignmentIfNeeded` | Field-to-primitive mapping |
+| `expandedFieldSymbols` | `expandValAssignmentIfNeeded` | Maps flattened paths to actual symbols (for reconstruction) |
+| `skipExpansion` | `buildFunctionParameters` | Prevents call-site expansion when `returnsWrappedType` |
 
 ## Key Decisions
 
-- **Scalar expansion at IR level**: The `ExpansionContext` is passed through `compileAsCodeBlock`/`compileExpressionNode`, not at the JVM level. This keeps JVMBackend simple (it only sees scalar types).
-- **`JFClass.constructor` as a `var` property**: Added outside the primary constructor to avoid scope-dependent symbol-map lookups for the constructor.
-- **No getter methods on value class `.class` files**: Field access uses `getfield` directly. The value class JVM `.class` has private fields and a constructor.
-- **`string("val")` matching**: The `valueClassDeclaration` parser must appear before `valDeclaration` in the `oneOf` list because `string("val")` matches the first 3 characters of `"value"`.
-
-## Disjoint-Symbols Problem (Resolved)
-
-### Problem
-
-`structurePass.parseParameters()` (`ParserJafun.kt:693`) creates **new** `JFVariableSymbol` objects for function parameters:
-
-```kotlin
-params.add(JFVariableSymbol(name, type))  // new object!
-```
-
-These are distinct from the ones Phase1's `funDeclaration` created and stored in `curlyBlock.symbolMap`. When AST2IR's `Function` handler set `expandedFields` on `symbol.parameters[i]` (the structurePass objects), the Phase1 objects in the body's scope (which `Variable(input)` resolves through) remained unset. `FieldAccess` at `AST2IR.kt:241` then read `null` for `expandedFields` and fell through to JVM `getfield`, causing a `VerifyError`.
-
-### Fix
-
-After setting `expandedFields` on `symbol.parameters[i]`, also look up the parameter via `paramRefSymbolMap.findSingleOrNull(null, param.name)` (which points to `curlyBlock.symbolMap`) and set `expandedFields` on whatever object is found there:
-
-```kotlin
-param.expandedFields = fieldExpansions
-if (paramRefSymbolMap != null) {
-    (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
-        ?.expandedFields = fieldExpansions
-}
-```
-
-## Single-field vs Multi-field Value Classes
-
-### Single-field Value Classes (Inlined)
-
-A single-field value class is inlined to its field type at the JVM level:
-
-```kotlin
-value class Id(id: Int)
-```
-
-- In JVM signatures: `I` (int), not `LId;`
-- Method return type: unwrapped to `Int` via `effectiveJvmType()`
-- Constructor arguments: passed as single primitive, not object reference
-- Example: `increaseHouseNumber(address: Address, increment: Int)` with single-field `increment: Int` becomes `(...)I` in JVM signature
-
-### Multi-field Value Classes (Boxed)
-
-A multi-field value class is boxed as an object reference:
-
-```kotlin
-value class Address(number: Int, street: String)
-```
-
-- In JVM signatures: `LAddress;` (object reference)
-- Method return type: stays as object reference
-- Constructor arguments: expanded into individual field parameters in JVM signature, e.g., `(I, Ljava/lang/String;, ...)`
-- Field access: resolved via `expandedFields` shortcut for parameters, or `getfield` for object materialization
-
-## Effective JVM Type (`effectiveJvmType()`)
-
-To ensure consistency between single-field VC declarations and call sites, the compiler applies `effectiveJvmType()` mapping:
-
-- **Single-field VC**: `effectiveJvmType(Id) → I` (unwrapped to field type)
-- **Multi-field VC**: `effectiveJvmType(Address) → LAddress;` (stays boxed)
-
-This is applied in three places:
-1. **Method declaration signature** (`JVMBackend.buildClass()`, line 38)
-2. **Method invocation signature** (`JVMBackend` MethodInvocation handler, line 85)
-3. **Return type handling** (`AST2IR.buildFunctionParameters()`, line 145)
-
-Without `effectiveJvmType()`, a single-field VC return would mismatch: the declaration would produce `()LId;` but the call site would try to unwrap it to `()I`, causing a `VerifyError`.
-
-## Helper Property: `isInlineValueClass`
-
-To avoid scattered `kind == VALUE_CLASS && cons.parameters.size == 1` checks throughout the codebase, a helper property was added to `Type.JFClass`:
-
-```kotlin
-val isInlineValueClass: Boolean
-    get() = kind == ClassKind.VALUE_CLASS && constructor?.parameters?.size == 1
-```
-
-Usage locations:
-- `JVMBackend.kt:38` — Determine if method return type should be unwrapped
-- `JVMBackend.kt:85` — Match method invocation signature to declaration
-- `JVMBackend.kt:320` — Handle constructor argument expansion
-- `JVMBackend.kt:361` — Compile ConstructorInvocation with proper unwrapping
-- `AST2IR.kt:85` — Inline single-field VC in constructor invocation
-- `AST2IR.kt:145` — Build function return type signature
-
-This consolidation makes the compiler logic more maintainable and reduces the risk of missing cases.
+- **Recursive flattening at IR level**: `VCFlattening.kt` handles all nesting via `flattenType`, separate from `AST2IR.kt` which integrates it.
+- **`isMultiFieldVC` vs `shouldExpandVC`**: `isMultiFieldVC` (in VCFlattening.kt) is the pure type-check used for val expansion; `shouldExpandVC` (in AST2IR.kt) adds return-type awareness by checking `returnsWrappedType`.
+- **Reconstruction, not identity pass-through**: When an expanded variable is passed to a function needing the object form, the compiler reconstructs the VC from primitives rather than trying to keep a reference. This is simpler and avoids aliasing issues.
+- **`expandedFieldSymbols` as a side-channel**: Tracks the actual `JFVariableSymbol` objects created during expansion so that reconstruction creates `Variable` nodes referencing the correct symbols.
 
 ## Tests
 
-| Test | Description |
-|------|-------------|
-| `valueClass()` | Local `val` declaration and field access (scalar expansion only) |
-| `valueClassFunctionParam()` | Value class passed as a function parameter with scalar expansion |
-| `valueClassTwoParamsReverseFieldOrder()` | Multi-field VC with field access in different order than declaration |
-| `vcReturnMultiField()` | Return multi-field VC instance from method |
-| `vcReturnMultiFieldWithVal()` | Assign multi-field VC to local `val`, then return |
-| `vcReturnSingleField()` | Return single-field VC instance from method (unwrapped in JVM signature) |
-| `vcReturnSingleFieldWithVal()` | Assign single-field VC to local `val`, then return (unwrapped) |
-| `vcReturnSingleFieldFieldAccess()` | Access field on single-field VC return value |
-| `vcReturnSingleFieldFieldAccessWithVal()` | Assign single-field VC to `val`, access field, return |
-| `vcChangeAddress()` | Multi-field VC parameter passing, field access in nested function, chained method calls returning new VC instance |
+### VCFlatteningTests (26 tests)
 
-## Implementation Details: Value Class Method Parameters
+| Tests | What |
+|-------|------|
+| 1-8 | `flattenType` — primitive, single-field, multi-field, nested, three-level, chain, mixed, complex |
+| 9-10 | `expandVariable`, `signatureForType` |
+| 11-17 | `isMultiFieldVC` — all edge cases (primitive, normal class, single-field wrapping primitive, multi-field, single-field wrapping multi-field, deep chain true, deep chain false) |
+| 18-23 | `effectiveVariableType` — all unwrapping cases |
+| 24-26 | `createNestedFieldAccess` — empty, single, two-level paths |
 
-When a method takes a value class parameter:
+### CompilerTest (integration)
 
-### For Single-field VCs:
-- Parameter is expanded to its field type in JVM signature, e.g., `fun increase(id: Id)` → JVM `(I)`
-- Field access on parameter resolves via `expandedFields` to the individual field local variable
-- No object materialization needed
+| Test | Scenarios |
+|------|-----------|
+| `testSimpleBoxAccess` | Single-field VC wrapping multi-field VC, chained field access |
+| `testBoxSingleField` | Function returning wrapped type with intermediate expanded val **(reconstruction path)** |
+| `testBoxSingleFieldWorking` | Same function, inline ConstructorInvocation arg (no reconstruction) |
+| `debugChainedAccess` | Field access chain on expanded function parameter |
+| `testMultiFieldVCFieldAccess` | Multi-field VC as function parameter |
+| `testMultiArgReconstruction` | Function with both reconstruction-needed (Box) and normal-expansion (Point) params |
+| `vcChainedNestedAccess` | Box with two multi-field VCs, function returning Int |
+| `vcChangeAddress` | Full multi-field VC lifecycle with multi-class bytecode validation |
+| `vcReturnMultiFieldWithVal` | Function return assigned to val, field access |
 
-### For Multi-field VCs:
-- Constructor parameters are expanded as individual fields in JVM signature, e.g., `fun change(address: Address, inc: Int)` → JVM `(ILjava/lang/String;I)`
-- Field access on parameter resolves via `expandedFields` shortcut to the corresponding expanded field local variable
-- Example: `address.number` resolves to `Variable("address_number")` (the local variable for the expanded field)
-- Allows zero-copy field access within function body
+## Disjoint-Symbols Problem
 
-### Return Type Mapping:
-- Single-field VC returns unwrap to field type via `effectiveJvmType()`
-- Multi-field VC returns stay as object references
-- Consistency enforced at both declaration and call site
+`structurePass.parseParameters()` creates **new** `JFVariableSymbol` objects for function parameters, distinct from the Phase 1 objects in `curlyBlock.symbolMap`. When `AST2IR.Function` sets `expandedFields` on `symbol.parameters[i]`, the Phase 1 objects (which `Variable(field)` resolves through) remain unset.
 
-## Testing Value Classes with Multi-Class Validation
-
-### vcChangeAddress Test Case
-
-The `vcChangeAddress` test demonstrates comprehensive value class validation including both the main Script class and the generated Value Class:
-
-**Source Code:**
-```kotlin
-value class Address(number: Int, street: String)
-fun increaseHouseNumber(address: Address, increment: Int): Address {
-    Address(address.number + increment, address.street)
-}
-fun changeAddress(address: Address): Address {
-    increaseHouseNumber(address, 5)
-}
-val a = Address(4, "Privet Drive")
-val b = changeAddress(a)
-println b.number
-```
-
-**Compiled Output:**
-1. **Script class** — Main entry point with three methods:
-   - `main([String): void` — Entry point
-   - `changeAddress(I, String): Address` — VC parameter expanded
-   - `increaseHouseNumber(I, String, I): Address` — VC parameter + extra int parameter expanded
-
-2. **Address class** — Value class materialized:
-   - Two public fields: `number: int`, `street: String`
-   - Constructor `<init>(int, String): void` that initializes both fields
-
-**Key Bytecode Patterns:**
-
-Script.changeAddress signature: `(ILjava/lang/String;)LAddress;`
-- Takes expanded VC fields as individual parameters
-- Returns materialized Address object
-
-Script.increaseHouseNumber signature: `(ILjava/lang/String;I)LAddress;`
-- Takes expanded VC fields (number: I, street: String)
-- Takes additional parameter (increment: I)
-- Returns materialized Address object
-
-Address.<init> signature: `(ILjava/lang/String;)V`
-- Non-static instance method (not ACC_STATIC)
-- Takes field values as parameters in order
-- Initializes fields via putfield instructions
-
-### Test Validation
-
-The test validates both classes using named jvmIr blocks:
-
-```kotlin
-// Validate Script class
-jvmIr {
-    name = "Script"
-    method { name = "main"; signature = "([Ljava/lang/String;)V"; ... }
-    method { name = "changeAddress"; signature = "(ILjava/lang/String;)LAddress;"; ... }
-    method { name = "increaseHouseNumber"; signature = "(ILjava/lang/String;I)LAddress;"; ... }
-}
-
-// Validate Address class
-jvmIr("Address") {
-    name = "Address"
-    field(access = 1u, "number", "I")
-    field(access = 1u, "street", "Ljava/lang/String;")
-    method {
-        name = "<init>"
-        signature = "(ILjava/lang/String;)V"
-        access = 1u  // Critical: non-static instance method
-        parameter("this")
-        parameter("number")
-        parameter("street")
-        // Initialize fields via putfield
-    }
-}
-```
-
-## Learnings and Insights
-
-### Multi-Field VC Parameter Expansion
-
-When a function receives a multi-field value class parameter, the compiler:
-1. Expands the VC into individual field parameters in the JVM signature
-2. Creates `expandedFields` entries on the parameter symbol
-3. When accessing a field (e.g., `address.number`), resolves to the corresponding expanded parameter
-4. Zero-copy: no intermediate object allocation for field access
-
-This enables passing VCs "by value" at the JVM level without allocating heap objects for parameter passing.
-
-### Generated Class Files
-
-For each value class used in the code, the compiler generates a corresponding `.class` file:
-- Class name matches the VC name (e.g., `Address.class`)
-- Contains public fields (one per constructor parameter)
-- Contains a constructor that initializes all fields
-- No methods (getters are handled via IR-level field expansion)
-
-### Why Multi-Class Testing Matters
-
-Value class code generation involves subtle interactions:
-1. VC materialization (for returns) vs expansion (for parameters)
-2. Field ordering in generated class vs parameter ordering in function signatures
-3. Method access flags (especially for constructors)
-
-Testing both the Script class and generated VC classes together ensures:
-- Field expansion matches actual class field definitions
-- Parameter ordering is consistent across all sites
-- Constructor signatures are valid
-- No mismatches between IR-level expansion and bytecode-level class definition
-
-### Access Flag Pitfall
-
-When manually defining constructors in test bytecode, **always set `access = 1u`** for instance methods. Kasmine defaults to `9u` (ACC_PUBLIC | ACC_STATIC), which is invalid for constructors and causes bytecode verification failures.
-
-
+**Fix**: After setting on `symbol.parameters[i]`, also look up the parameter via `paramRefSymbolMap` and set `expandedFields` on whatever object is found there.
