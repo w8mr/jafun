@@ -318,20 +318,6 @@ fun compileExpressionNode(
             ))
         }
         is ExpressionNode.FieldAccess -> {
-//            val ciShortcut: ExpressionNode.Phase2_3Expression? =
-//                if (node.instance is ExpressionNode.ConstructorInvocation) {
-//                    val ci = node.instance
-//                    val vcType = ci.type()
-//                    if (vcType is Type.JFClass && vcType.isInlineValueClass) {
-//                        ci.arguments[node.fieldIndex]
-//                    } else null
-//                } else null
-//            if (ciShortcut != null) {
-//                builder.add(compileAsCodeBlock(builder, ciShortcut))
-//                return
-//            }
-            // For single-field VC instances, field access is identity
-            // BUT: if the instance is a parameter with expandedFields, we need to resolve through the expansion
             val instanceType = node.instance.type()
             val shouldBypassIdentityShortcut = 
                 (node.instance is ExpressionNode.Variable) && 
@@ -343,71 +329,7 @@ fun compileExpressionNode(
             }
             val instance = compileAsCodeBlock(builder, node.instance)
             if (instance is ExpressionNode.Variable) {
-                val varName = instance.variableSymbol.name
-                val constructorArgs = instance.variableSymbol.constructorArgs
-                if (constructorArgs != null) {
-                    val value = constructorArgs.getOrNull(node.fieldIndex)
-                    if (value != null) {
-                        builder.add(value)
-                        return
-                    }
-                }
-                val expandedFields = instance.variableSymbol.expandedFields
-                if (expandedFields != null) {
-                    // The variable has expanded fields
-                    val field = expandedFields.find { it.name == node.fieldName }
-                        ?: error("Field ${node.fieldName} not found in expansion of $varName")
-                    
-                    // If we have a direct reference to the actual symbol, use it
-                    if (field.actualSymbol != null) {
-                        builder.add(ExpressionNode.Variable(field.actualSymbol))
-                        return
-                    }
-                    
-                    // If this is a nested VC with sub-fields, we need to create a special variable
-                    // that, when accessed further, will resolve to the actual expanded variables
-                    if (field.sourceVCFields != null) {
-                        val syntheticVar = Type.JFVariableSymbol(
-                            name = "${varName}_${field.name}",
-                            type = field.type,
-                            symbolMap = instance.variableSymbol.symbolMap,
-                            initialized = true,
-                        )
-                        
-                        // Look up the actual expanded symbols from the parent variable
-                        // to reuse the same symbols that were used during creation
-                        val parentSymbols = instance.variableSymbol.expandedFieldSymbols
-                        
-                        // Store these as expandedFields on the synthetic variable
-                        // Map them by field name (x, y, etc.) for direct lookup
-                        syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
-                            val fullPath = "${field.name}_$subFieldPath"
-                            val actualSymbol = parentSymbols?.get(fullPath)
-                            
-                            Type.ExpandedField(
-                                name = subFieldPath,
-                                type = subFieldType,
-                                sourceVC = null,
-                                sourceVCFields = null,
-                                actualSymbol = actualSymbol  // Reuse the ORIGINAL symbol object
-                            )
-                        }
-                        
-                        builder.add(ExpressionNode.Variable(syntheticVar))
-                        return
-                    } else {
-                        // Direct primitive field - use the expanded variable name directly
-                        val actualVarName = "${varName}_${field.name}"
-                        val expandedVar = Type.JFVariableSymbol(
-                            name = actualVarName,
-                            type = field.type,
-                            symbolMap = instance.variableSymbol.symbolMap,
-                            initialized = true,
-                        )
-                        builder.add(ExpressionNode.Variable(expandedVar))
-                        return
-                    }
-                }
+                if (tryResolveExpandedFieldAccess(builder, node, instance)) return
             }
             builder.add(ExpressionNode.FieldAccess(
                 instance = instance,
@@ -427,6 +349,65 @@ fun compileExpressionNode(
             builder.add(node)
         }
     }
+}
+
+private fun tryResolveExpandedFieldAccess(
+    builder: IRBuilder.CodeBlockDSL,
+    node: ExpressionNode.FieldAccess,
+    instance: ExpressionNode.Variable,
+): Boolean {
+    val varSymbol = instance.variableSymbol
+    val constructorArgs = varSymbol.constructorArgs
+    if (constructorArgs != null) {
+        val value = constructorArgs.getOrNull(node.fieldIndex)
+        if (value != null) {
+            builder.add(value)
+            return true
+        }
+    }
+    val expandedFields = varSymbol.expandedFields
+    if (expandedFields != null) {
+        val field = expandedFields.find { it.name == node.fieldName }
+            ?: error("Field ${node.fieldName} not found in expansion of ${varSymbol.name}")
+
+        if (field.actualSymbol != null) {
+            builder.add(ExpressionNode.Variable(field.actualSymbol))
+            return true
+        }
+
+        if (field.sourceVCFields != null) {
+            val syntheticVar = Type.JFVariableSymbol(
+                name = "${varSymbol.name}_${field.name}",
+                type = field.type,
+                symbolMap = varSymbol.symbolMap,
+                initialized = true,
+            )
+            val parentSymbols = varSymbol.expandedFieldSymbols
+            syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
+                val fullPath = "${field.name}_$subFieldPath"
+                val actualSymbol = parentSymbols?.get(fullPath)
+                Type.ExpandedField(
+                    name = subFieldPath,
+                    type = subFieldType,
+                    sourceVC = null,
+                    sourceVCFields = null,
+                    actualSymbol = actualSymbol,
+                )
+            }
+            builder.add(ExpressionNode.Variable(syntheticVar))
+            return true
+        } else {
+            val expandedVar = Type.JFVariableSymbol(
+                name = "${varSymbol.name}_${field.name}",
+                type = field.type,
+                symbolMap = varSymbol.symbolMap,
+                initialized = true,
+            )
+            builder.add(ExpressionNode.Variable(expandedVar))
+            return true
+        }
+    }
+    return false
 }
 
 private fun findConstructor(vc: Type.JFClass): Type.JFConstructor? {
