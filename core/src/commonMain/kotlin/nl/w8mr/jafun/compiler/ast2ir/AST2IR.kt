@@ -201,11 +201,12 @@ fun compileExpressionNode(
         is ExpressionNode.MethodInvocation -> {
             val (expandedParams, expandedRawArgs) = expandValueClassParams(node.parameters, node.arguments)
             val arguments = loadArguments(builder, expandedRawArgs, expandedParams.map { it.type })
+            val originalRtnLookup = node.rtnLookup
             builder.add(ExpressionNode.MethodInvocation(
                 methodName = node.methodName,
                 parentPath = node.parentPath,
                 parameters = expandedParams,
-                rtnLookup = node.rtnLookup,
+                rtnLookup = { effectiveJvmType(originalRtnLookup()) },
                 field = node.field,
                 arguments = arguments,
             ))

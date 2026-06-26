@@ -83,7 +83,7 @@ class JVMBackend {
                             val methodClassName = instruction.parentPath.replace('.', '/')
                             val methodSignature =
                                 "(${instruction.parameters.joinToString("") { signature(effectiveJvmType(it.type)) }})" +
-                                        signature(effectiveJvmType(instruction.type()))
+                                        signature(instruction.type())
                             when (instruction.field) {
                                 null -> invokeStatic(
                                     methodClassName,
