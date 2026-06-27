@@ -3,6 +3,7 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.SymbolMap
 
 /**
  * Value Class Flattening and Expansion
@@ -276,6 +277,75 @@ fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Pa
 }
 
 /**
+ * Builds the parameter list for a method, expanding VC parameters and setting
+ * metadata (expandedFields, skipExpansion, effectiveType) on the method symbols.
+ * Called during Phase 3 IR construction.
+ */
+fun buildFunctionParameters(
+    symbol: Type.JFMethod,
+    node: ExpressionNode.Function,
+): List<Parameter> {
+    val paramNames = symbol.parameters.map { it.name }.toSet()
+    val paramRefSymbolMap = node.block.mapNotNull { e -> findParamSymbolMap(e, paramNames) }.firstOrNull()
+    val actualSymbolMapId = paramRefSymbolMap?.symbolMapId
+    return symbol.parameters.flatMap { param ->
+        val type = param.type
+        if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS && shouldExpandVC(type)) {
+            val singleFieldType = type.constructor?.let { cons ->
+                if (cons.parameters.size == 1) cons.parameters[0].type else null
+            }
+            val returnsWrappedType = singleFieldType != null && singleFieldType == symbol.rtn
+            
+            if (!returnsWrappedType) {
+                val cons = type.constructor
+                if (cons != null) {
+                     val fieldExpansions = cons.parameters.map { vcParam ->
+                          val fieldType = vcParam.type
+                          
+                          val sourceVCFields = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
+                              val nestedCons = fieldType.constructor
+                              if (nestedCons != null) {
+                                  nestedCons.parameters.map { it.name to it.type }
+                              } else {
+                                  null
+                              }
+                          } else null
+                          
+                          Type.ExpandedField(
+                              name = vcParam.name,
+                              type = fieldType,
+                              sourceVC = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS && sourceVCFields != null) fieldType else null,
+                              sourceVCFields = sourceVCFields
+                          )
+                      }
+                     
+                      param.expandedFields = fieldExpansions
+                      setExpandedFieldsOnParameterVariables(node, param.name, fieldExpansions)
+                      
+                      if (paramRefSymbolMap != null) {
+                          (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
+                              ?.expandedFields = fieldExpansions
+                      }
+                      fieldExpansions.flatMap { field ->
+                          val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}_${field.name}" else null
+                          expandParameterRecursively(field.type, varName)
+                      }
+                } else emptyList()
+            } else {
+                param.skipExpansion = true
+                param.effectiveType = effectiveJvmType(type)
+                val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
+                listOf(Parameter(type, varName, skipExpansion = true))
+            }
+        } else {
+            param.effectiveType = effectiveJvmType(type)
+            val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
+            listOf(Parameter(type, varName))
+        }
+    }
+}
+
+/**
  * Unwraps a type to its effective JVM representation.
  * Single-field inline VCs are unwrapped recursively to their underlying type.
  * Multi-field VCs and non-VC types are returned unchanged.
@@ -285,4 +355,160 @@ fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
         return effectiveJvmType(type.constructor!!.parameters.single().type)
     }
     return type
+}
+
+/**
+ * Sets expandedFields on all Variables in the function body that reference a specific parameter.
+ * This is necessary because Variable nodes might reference different symbol objects than
+ * what's stored in JFMethod.parameters.
+ */
+fun setExpandedFieldsOnParameterVariables(
+    functionNode: ExpressionNode.Function,
+    parameterName: String,
+    expandedFields: List<Type.ExpandedField>,
+) {
+    functionNode.block.forEach { expr ->
+        setExpandedFieldsInExpression(expr, parameterName, expandedFields)
+    }
+}
+
+/**
+ * Expands value class parameters at call sites, matching expanded function definitions.
+ * Handles skipExpansion params, expanded variables, and regular VC constructor args.
+ */
+fun expandValueClassParams(
+    parameters: List<Type.JFVariableSymbol>,
+    arguments: List<ExpressionNode.Phase2_3Expression>,
+): Pair<List<Type.JFVariableSymbol>, List<ExpressionNode.Phase2_3Expression>> {
+    val (expandedParams, expandedRawArgs) = parameters.zip(arguments).flatMap { (param, arg) ->
+        val paramType = param.type
+
+        if (param.skipExpansion) {
+            if (arg is ExpressionNode.Variable && arg.variableSymbol.expandedFieldSymbols != null && paramType is Type.JFClass) {
+                val varSymbol = arg.variableSymbol
+                val reconstructed = reconstructVCFromExpanded(paramType, varSymbol.expandedFieldSymbols!!)
+                if (reconstructed != null) {
+                    return@flatMap listOf(param to reconstructed)
+                }
+            }
+            return@flatMap listOf(param to arg)
+        }
+
+        val argHasExpanded = arg is ExpressionNode.Variable && arg.variableSymbol.expandedFields != null
+        val paramIsVC = paramType is Type.JFClass && paramType.kind == Type.ClassKind.VALUE_CLASS
+        val paramShouldExpand = paramIsVC && shouldExpandVC(paramType as Type.JFClass)
+
+        if (argHasExpanded && paramShouldExpand) {
+            val flattened = flattenType(paramType)
+            val variable = (arg as ExpressionNode.Variable).variableSymbol
+
+            flattened.mapIndexed { index, field ->
+                val expandedParamName = "${param.name}_${field.path}"
+                val expandedParam = param.copy(name = expandedParamName, type = field.type)
+
+                val expandedArg = variable.expandedFieldSymbols?.get(field.path)
+                    ?.let { ExpressionNode.Variable(it) }
+                    ?: createNestedFieldAccess(field.path.split("_"), arg)
+
+                expandedParam to expandedArg
+            }
+        } else {
+            val cons = (param.type as? Type.JFClass)?.takeIf { it.kind == Type.ClassKind.VALUE_CLASS }?.let { it.constructor }
+            cons?.parameters?.mapIndexed { fieldIndex, fieldParam ->
+                param.copy(name = "${param.name}_${fieldParam.name}", type = fieldParam.type) to
+                    ExpressionNode.FieldAccess(
+                        instance = arg, fieldName = fieldParam.name,
+                        fieldIndex = fieldIndex, fieldType = fieldParam.type,
+                        arguments = emptyList(),
+                    )
+            } ?: listOf(param to arg)
+        }
+    }.unzip()
+    return Pair(expandedParams, expandedRawArgs)
+}
+
+/**
+ * Walks an expression tree to find a SymbolMap containing a reference to a specific parameter name.
+ */
+fun findParamSymbolMap(
+    expr: ExpressionNode.Phase2_3Expression,
+    paramNames: Set<String>,
+): SymbolMap? {
+    return when (expr) {
+        is ExpressionNode.Variable -> {
+            if (expr.variableSymbol.name in paramNames) expr.variableSymbol.symbolMap else null
+        }
+        is ExpressionNode.MethodInvocation -> {
+            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.ValAssignment -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.VarAssignment -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.ExpressionList -> {
+            expr.expressions.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.ConstructorInvocation -> {
+            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+        }
+        is ExpressionNode.FieldAccess -> findParamSymbolMap(expr.instance, paramNames)
+        is ExpressionNode.Convert -> findParamSymbolMap(expr.expression, paramNames)
+        is ExpressionNode.WhenPhase3 -> {
+            expr.matches.firstNotNullOfOrNull { (_, e) -> findParamSymbolMap(e, paramNames) }
+         }
+         is ExpressionNode.Function -> {
+             findParamSymbolMap(ExpressionNode.ExpressionList(expr.block), paramNames)
+         }
+         is ExpressionNode.WhilePhase3 -> {
+             findParamSymbolMap(expr.expressions, paramNames)
+                 ?: findParamSymbolMap(expr.condition, paramNames)
+         }
+          else -> null
+      }
+  }
+
+fun setExpandedFieldsInExpression(
+    node: ExpressionNode.Phase2_3Expression,
+    parameterName: String,
+    expandedFields: List<Type.ExpandedField>,
+) {
+    when (node) {
+        is ExpressionNode.Variable -> {
+            if (node.variableSymbol.name == parameterName) {
+                node.variableSymbol.expandedFields = expandedFields
+            }
+        }
+        is ExpressionNode.FieldAccess -> {
+            setExpandedFieldsInExpression(node.instance, parameterName, expandedFields)
+        }
+        is ExpressionNode.MethodInvocation -> {
+            node.arguments.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
+        }
+        is ExpressionNode.ConstructorInvocation -> {
+            node.arguments.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
+        }
+        is ExpressionNode.ValAssignment -> {
+            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
+        }
+        is ExpressionNode.VarAssignment -> {
+            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
+        }
+        is ExpressionNode.ExpressionList -> {
+            node.expressions.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
+        }
+        is ExpressionNode.WhilePhase3 -> {
+            setExpandedFieldsInExpression(node.condition, parameterName, expandedFields)
+            setExpandedFieldsInExpression(node.expressions, parameterName, expandedFields)
+        }
+        is ExpressionNode.WhenPhase3 -> {
+            node.matches.forEach { (_, expr) ->
+                setExpandedFieldsInExpression(expr, parameterName, expandedFields)
+            }
+        }
+        is ExpressionNode.Convert -> {
+            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
+        }
+        is ExpressionNode.Function -> {
+            node.block.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
+        }
+        else -> {} // Other node types don't need processing
+    }
 }

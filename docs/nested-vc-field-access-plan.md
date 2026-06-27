@@ -347,68 +347,28 @@ public static int test(int id, String name) {
 }
 ```
 
-## Effort Estimate
-
-- **Analysis & Planning**: ✅ Complete (this document)
-- **Type System Changes**: 1-2 hours
-- **Parameter Expansion**: 1-2 hours  
-- **Nested Resolution**: 2-3 hours
-- **JVM Backend Fix**: 30-60 minutes
-- **Testing & Validation**: 1-2 hours
-- **Total**: ~6-10 hours of development
-
-## Success Criteria
-
-- [x] Test `vcNestedIdAccess` passes
-- [x] Test `vcChainedNestedAccess` passes (was `vcChainedAccess`)
-- [x] Test `vcDeepNesting` passes
-- [x] Test `vcFieldAccessOnCallResult` passes (field access on function return)
-- [x] All 200+ existing tests pass
-- [x] No "Type issue" errors for valid nested access
-- [ ] Clear error messages for invalid nested access
-- [ ] Performance regression < 5%
-
 ## Implementation Progress
 
-### Completed (Commits f112d34, f49fb45, 6cabd3d)
-
+### Completed
 1. ✅ Created `ExpandedField` data class in Types.kt
-   - Tracks field name, type, source VC, and source VC fields
-   - Provides helper methods: `hasField()`, `getFieldType()`, `getFieldMetadata()`
-   - Supports recursive metadata for nested nesting
+2. ✅ `tryResolveExpandedFieldAccess` one-level-at-a-time resolution working for valid chains
+3. ✅ All valid nested access tests pass (`vcNestedIdAccess`, `vcChainedNestedAccess`, `vcDeepNesting`, `vcFieldAccessOnCallResult`)
+4. ✅ `ParameterExpansionPhase`, `ValExpansionPhase`, `VCFlattening.kt` extracted from `AST2IR.kt`
+5. ✅ `constructorArgs` removed (dead code)
 
-2. ✅ Updated `buildFunctionParameters` in AST2IR.kt
-   - Creates `ExpandedField` objects with nested VC tracking
-   - Extracts sourceVC and sourceVCFields for single-field VC parameters
-   - Properly unwraps nested VCs during parameter expansion
+### Not Yet Extracted (still inline in AST2IR.kt)
+1. `setExpandedFieldsInExpression` tree walker (~line 630)
+2. FieldAccess identity shortcut (`isInlineValueClass` check, ~line 355)
+3. `tryResolveExpandedFieldAccess` private function (~line 407)
+4. Variable single-field shortcut (`expandedFields.size == 1`, ~line 390)
+5. `buildFunctionParameters` with inline expansion (~line 469)
+6. Stale imports and direct `effectiveJvmType` references
 
-3. ✅ Implemented `tryResolveExpandedFieldAccess` one-level-at-a-time resolution
-   - FieldAccess resolves one VC level at a time through `expandedFields` metadata
-   - Synthetic `Variable` carries `expandedFields` for the next level in the chain
-   - Chain resolves fully across `user.id.value`, `box.topLeft.x`, `c.b.a.value`
-
-4. ✅ Phases 4a-4c: Extracted VC expansion from AST2IR into dedicated pipeline phases
-   - `ParameterExpansionPhase` (4a): parameter expansion
-   - `ValExpansionPhase` (4b): val assignment expansion
-   - VarAssignment expansion (4c): var declaration and re-assignment with VCs
-
-5. ✅ Added test cases for nested VC field access:
-   - `vcNestedIdAccess`: Tests `user.id.value` access — **passes**
-   - `vcChainedNestedAccess`: Tests `box.topLeft.x` access — **passes**
-   - `vcDeepNesting`: Tests `c.b.a.value` three-level nesting — **passes**
-   - `vcFieldAccessOnCallResult`: Tests `getTopLeft(b).x` — **passes**
-
-### Key Implementation Detail: One-Level-at-a-Time Resolution
-
-The resolution follows the "Revised Approach" from the plan. Each `FieldAccess` in the chain is processed independently by `compileExpressionNode`:
-
-1. `FieldAccess(Variable(user), "id")` → `tryResolveExpandedFieldAccess` creates `Variable("user_id", Id)` with `expandedFields = [ExpandedField("value", Int, actualSymbol=user_id_value)]`
-2. `FieldAccess(Variable("user_id"), "value")` → `tryResolveExpandedFieldAccess` finds `actualSymbol = user_id_value`, returns `Variable(user_id_value)`
-
-The synthetic `Variable` at step 1 carries `expandedFields` metadata, and step 2 resolves through it via the same `tryResolveExpandedFieldAccess` function. This works for arbitrary nesting depth.
+### Known Bug
+- **Parser silently drops `.identifier` tokens** — fieldRhs fails → pratt loop breaks → tokens discarded. `c.b.z` is parsed as `c.b`. Tracking test `vcDeepInvalidAccess` is `@kotlin.test.Ignore`.
 
 ### Remaining Items
-
-1. **Clear error messages for invalid nested access** — Currently the JVM backend throws `ClassCastException` or `Type issue` errors. Improve diagnostics.
-2. **Performance regression check** — Verify that the one-level-at-a-time resolution doesn't introduce measurable overhead.
-
+1. Fix parser bug: make `fieldRhs` always consume `.identifier` and produce a `FieldAccess` node.
+2. Extract remaining 6 inline sections from AST2IR.kt into dedicated phases.
+3. Clear error messages for invalid nested access — error handling path exists in AST2IR (checks at lines 364, 380, 416) but is blocked by parser bug.
+4. Performance regression check.

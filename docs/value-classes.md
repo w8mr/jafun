@@ -35,7 +35,7 @@ When `methodLhs` encounters a value class field access (a getter with no paramet
 
 ## Phase 3: IR Transformation
 
-The core flattening logic lives in `VCFlattening.kt`, with the integration in `AST2IR.kt`.
+The core flattening logic lives in `VCFlattening.kt`, with the integration in `AST2IR.kt`. Three dedicated phase classes (`ParameterExpansionPhase`, `ValExpansionPhase`, `VCFlattening`) exist alongside the inline VC logic in `AST2IR.kt`. (See `docs/vc_field_access_current_plan.md` for the list of inline sections not yet extracted.)
 
 ### Flattening model (`VCFlattening.kt`)
 
@@ -57,7 +57,7 @@ Supporting functions:
 - **`createNestedFieldAccess(pathComponents, arg)`** — Creates a chain of `FieldAccess` nodes from a path like `["topLeft", "x"]`.
 - **`signatureForType(type)`** — Generates a JVM descriptor character for a type.
 
-### Variable expansion (`expandValAssignmentIfNeeded`)
+### Variable expansion (`ValExpansionPhase`)
 
 When a `val` is assigned a `ConstructorInvocation`, `isMultiFieldVC` determines if the target type needs expansion:
 
@@ -109,9 +109,9 @@ fun getX(p: Point): Int { p.x }
 
 The function body's `p.x` resolves through `expandedFields` metadata on the variable symbol, which points `x` → the first expanded int param.
 
-#### `setExpandedFieldsOnParameterVariables`
+#### Expanded fields on parameter variables
 
-Since structure pass creates separate `JFVariableSymbol` objects from Phase 1, `expandedFields` must be set on BOTH the `symbol.parameters[i]` object AND the symbol found in the body's scope. This is done in `buildFunctionParameters`.
+Since structure pass creates separate `JFVariableSymbol` objects from Phase 1, `expandedFields` must be set on BOTH the `symbol.parameters[i]` object AND the symbol found in the body's scope. This is done inline in `buildFunctionParameters` (around line 504-517 in `AST2IR.kt`).
 
 ### Call site expansion (`expandValueClassParams`)
 
@@ -144,7 +144,7 @@ Single-field VC wrappers (`Box` wrapping `Point`) are eliminated from reconstruc
 
 Field access uses two paths:
 
-- **`tryResolveExpandedFieldAccess`** (extracted helper in `AST2IR.kt`): Handles Variable instances with `constructorArgs` or `expandedFields`, resolving field accesses through the expanded representation without materializing the object.
+- **`tryResolveExpandedFieldAccess`** (helper function in `AST2IR.kt`): Handles Variable instances with `expandedFields`, resolving field accesses through the expanded representation without materializing the object.
 - **Identity shortcut**: If the instance type is a single-field VC (`isInlineValueClass`) and does NOT have `expandedFields`, just return the instance itself (the VC IS its field).
 - **JVM `getfield`**: Fall through to a real `FieldAccess` node → `getfield` in bytecode. This happens for function return values (object materialization).
 
@@ -171,8 +171,7 @@ Unwrapping happens in the Function handler (`compileExpressionNode` in `AST2IR.k
 
 | Field | Set by | Purpose |
 |-------|--------|---------|
-| `constructorArgs` | `ValAssignment` handler | Constructor arg extraction shortcut |
-| `expandedFields` | `buildFunctionParameters` or `expandValAssignmentIfNeeded` | Field-to-primitive mapping |
+| `expandedFields` | `buildFunctionParameters` or `ValExpansionPhase` | Field-to-primitive mapping |
 | `expandedFieldSymbols` | `expandValAssignmentIfNeeded` | Maps flattened paths to actual symbols (for reconstruction) |
 | `skipExpansion` | `buildFunctionParameters` | Prevents call-site expansion when `returnsWrappedType` |
 | `effectiveType` | ValAssignment/VarAssignment handlers, `buildFunctionParameters`, `tryResolveExpandedFieldAccess` | Unwrapped JVM type for load/store opcode selection; `null` means same as `type` |

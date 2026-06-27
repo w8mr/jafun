@@ -127,7 +127,11 @@ annotation class FunctionPrecedence(val precedence: Int)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class FunctionName(val name: String)
 
-data class Parameter(val type: OperandType<*>, val varName: String? = null)
+data class Parameter(
+    val type: OperandType<*>,
+    val varName: String? = null,
+    val skipExpansion: Boolean = false,
+)
 
 fun compileMethod(
     builder: IRBuilder.ClassDSL,

@@ -27,6 +27,9 @@ class ParameterExpansionPhase {
     }
 
     private fun expandParameter(param: Parameter, returnType: OperandType<*>): List<Parameter> {
+        if (param.skipExpansion) {
+            return listOf(param)
+        }
         val type = param.type
         if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) {
             return listOf(param)

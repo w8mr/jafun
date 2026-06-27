@@ -100,7 +100,6 @@ interface Type : TypeSymbol {
         val mutable: Boolean = false,
         val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
-        var constructorArgs: List<ExpressionNode.Phase2_3Expression>? = null
         var expandedFields: List<ExpandedField>? = null
         var expandedFieldSymbols: Map<String, JFVariableSymbol>? = null  // Maps field paths to actual symbols
         var skipExpansion: Boolean = false  // Set when function definition cannot expand this param
