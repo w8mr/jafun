@@ -5,7 +5,6 @@ import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.TypeSymbol
 import nl.w8mr.jafun.compiler.ir2jvm.buildClass
 import nl.w8mr.jafun.compiler.ir2jvm.compileAll
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
@@ -60,14 +59,12 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
                 val parsed = parseResult.first
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
-                val valueClasses = extractValueClasses(symbolMap)
-                val classContext = ast2ir(className, updatedParsed, methodName, valueClasses)
+                val classContext = ast2ir(className, updatedParsed, methodName)
                 val updatedContext = Phase3.run(classContext)
                 val vcContext = runVCPhases(updatedContext)
 
                 val builder = IRBuilder.BuilderContext(
-                    classes = mutableMapOf(className to vcContext),
-                    valueClasses = valueClasses.toMutableMap()
+                    classes = mutableMapOf(className to vcContext)
                 )
                 val allClasses = compileAll(builder)
                 JVM.run(allClasses)
@@ -75,28 +72,14 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         }
     }
 
-    private fun extractValueClasses(symbolMap: SymbolMapManager): Map<String, IRBuilder.ValueClassDef> {
-        val result = mutableMapOf<String, IRBuilder.ValueClassDef>()
-        val topSymbols = symbolMap.find(null as TypeSymbol?)
-        for (sym in topSymbols) {
-            if (sym is Type.JFClass && sym.kind == Type.ClassKind.VALUE_CLASS) {
-                val fields = sym.constructor?.parameters?.map { it.name to it.type } ?: emptyList()
-                result[sym.name] = IRBuilder.ValueClassDef(sym.name, fields)
-            }
-        }
-        return result
-    }
-
     private fun ast2ir(
         className: String,
         parsed: List<ExpressionNode.Phase2Expression>,
         methodName: String,
-        valueClasses: Map<String, IRBuilder.ValueClassDef>
     ): IRBuilder.ClassContext {
         val returnType: OperandType<*> = OperandType.Unit
         val builder =
             IRBuilder.define {
-                valueClasses.forEach { (name, vc) -> addValueClass(name, vc) }
                 `class`(className) {
                     compileMethod(this, parsed, methodName, returnType, listOf(Parameter(OperandType.Array(OperandType.StringType))))
                 }

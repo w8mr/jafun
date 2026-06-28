@@ -202,11 +202,7 @@ class JVMBackend {
             from: OperandType<*>,
             to: OperandType<*>
         ) {
-            var effectiveFrom = from
-            while (effectiveFrom is Type.JFClass && effectiveFrom.isInlineValueClass) {
-                effectiveFrom = effectiveFrom.constructor!!.parameters.single().type
-            }
-            when (effectiveFrom) {
+            when (from) {
                 is OperandType.SInt32 -> when (to) {
                     is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
                     is Type.JFClass -> invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -223,12 +219,12 @@ class JVMBackend {
                 is Type.JFClass -> when (to) {
                     is Type.JFClass -> when {
                         to.path == "java.lang.Object" -> {}
-                        effectiveFrom.path == to.path -> {}
-                        else -> TODO("Conversion not defined for ${effectiveFrom.path} -> ${to.path}")
+                        from.path == to.path -> {}
+                        else -> TODO("Conversion not defined for ${from.path} -> ${to.path}")
                     }
-                    else -> TODO("Conversion not defined for ${effectiveFrom.path} -> ${to}")
+                    else -> TODO("Conversion not defined for ${from.path} -> ${to}")
                 }
-                else -> TODO("Conversion not defined for ${effectiveFrom} -> ${to}")
+                else -> TODO("Conversion not defined for ${from} -> ${to}")
             }
         }
 
@@ -266,37 +262,8 @@ fun compileAll(
     builder.classes.forEach { (name, classContext) ->
         result[name] = buildClass(name, classContext).write()
     }
-    builder.valueClasses.forEach { (name, vc) ->
-        result[name] = buildValueClass(vc).write()
-    }
     return result
 }
-
-fun buildValueClass(vc: IRBuilder.ValueClassDef): ClassBuilder =
-    classBuilder {
-        name = vc.name
-        vc.fields.forEach { (fieldName, fieldType) ->
-            field(access = 1u, name = fieldName, type = signature(fieldType))
-        }
-        method {
-            name = "<init>"
-            access = 1u
-            signature = "(${vc.fields.joinToString("") { signature(it.second) }})V"
-            parameter("thisRef")
-            vc.fields.forEach { (fieldName, _) -> parameter("p_$fieldName") }
-            aload("thisRef")
-            invokeSpecial("java/lang/Object", "<init>", "()V")
-            vc.fields.forEach { (fieldName, fieldType) ->
-                aload("thisRef")
-                when (fieldType) {
-                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> iload("p_$fieldName")
-                    else -> aload("p_$fieldName")
-                }
-                putField(vc.name, fieldName, signature(fieldType))
-            }
-            `return`()
-        }
-    }
 
 fun compileJVM(
     className: String,
@@ -332,11 +299,7 @@ fun buildClass(
                     is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType,
                     is OperandType.StringType, is Type.JFClass -> {
                         val lastType = m.instructions.last().type()
-                        var effectiveLastType = lastType
-                        while (effectiveLastType is Type.JFClass && effectiveLastType.isInlineValueClass) {
-                            effectiveLastType = effectiveLastType.constructor!!.parameters.single().type
-                        }
-                        if (effectiveLastType != m.returnType) error("Type issue: $effectiveLastType vs ${m.returnType}")
+                        if (lastType != m.returnType) error("Type issue: $lastType vs ${m.returnType}")
                         when (m.returnType) {
                             is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> ireturn()
                             is OperandType.StringType, is Type.JFClass -> areturn()

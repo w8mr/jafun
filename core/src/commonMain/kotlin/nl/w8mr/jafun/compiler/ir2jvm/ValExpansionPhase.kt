@@ -2,7 +2,7 @@ package nl.w8mr.jafun.compiler.ir2jvm
 
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.effectiveJvmType
-import nl.w8mr.jafun.compiler.ast2ir.expandAssignmentIfNeeded
+import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.ExpressionNode
 
 object ValExpansionPhase {

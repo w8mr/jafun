@@ -295,13 +295,13 @@ fun buildFunctionParameters(
                 if (cons.parameters.size == 1) cons.parameters[0].type else null
             }
             val returnsWrappedType = singleFieldType != null && singleFieldType == symbol.rtn
-            
+
             if (!returnsWrappedType) {
                 val cons = type.constructor
                 if (cons != null) {
                      val fieldExpansions = cons.parameters.map { vcParam ->
                           val fieldType = vcParam.type
-                          
+
                           val sourceVCFields = if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
                               val nestedCons = fieldType.constructor
                               if (nestedCons != null) {
@@ -310,7 +310,7 @@ fun buildFunctionParameters(
                                   null
                               }
                           } else null
-                          
+
                           Type.ExpandedField(
                               name = vcParam.name,
                               type = fieldType,
@@ -318,10 +318,10 @@ fun buildFunctionParameters(
                               sourceVCFields = sourceVCFields
                           )
                       }
-                     
+
                       param.expandedFields = fieldExpansions
                       setExpandedFieldsOnParameterVariables(node, param.name, fieldExpansions)
-                      
+
                       if (paramRefSymbolMap != null) {
                           (paramRefSymbolMap.findSingleOrNull(null, param.name) as? Type.JFVariableSymbol)
                               ?.expandedFields = fieldExpansions
@@ -358,157 +358,143 @@ fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
 }
 
 /**
- * Sets expandedFields on all Variables in the function body that reference a specific parameter.
- * This is necessary because Variable nodes might reference different symbol objects than
- * what's stored in JFMethod.parameters.
+ * Expand an Assignment of a multi-field VC into multiple Assignment nodes
+ * of primitive types (val for val, var for var).
+ *
+ * Example: val b = Box(Point(1,2), Point(3,4)) with type Box(topLeft: Point, bottomRight: Point)
+ * becomes:
+ *   val b_topLeft_x = <expr>
+ *   val b_topLeft_y = <expr>
+ *   val b_bottomRight_x = <expr>
+ *   val b_bottomRight_y = <expr>
+ *
+ * The original symbol is updated with expandedFields storing the hierarchical structure
+ * so that b.topLeft resolves correctly and knows that topLeft has x and y.
  */
-fun setExpandedFieldsOnParameterVariables(
-    functionNode: ExpressionNode.Function,
-    parameterName: String,
-    expandedFields: List<Type.ExpandedField>,
-) {
-    functionNode.block.forEach { expr ->
-        setExpandedFieldsInExpression(expr, parameterName, expandedFields)
+fun expandAssignmentIfNeeded(
+    assignment: ExpressionNode.Assignment,
+): List<ExpressionNode.Phase2_3Expression> {
+    val varType = assignment.variableSymbol.type
+
+    // Only expand VC types
+    if (varType !is Type.JFClass || varType.kind != Type.ClassKind.VALUE_CLASS) {
+        return listOf(assignment as ExpressionNode.Phase2_3Expression)
     }
-}
+    // We can only expand when the RHS is a constructor invocation with known values
+    if (assignment.expression !is ExpressionNode.ConstructorInvocation) {
+        return listOf(assignment as ExpressionNode.Phase2_3Expression)
+    }
+    val ci = assignment.expression as ExpressionNode.ConstructorInvocation
 
-/**
- * Expands value class parameters at call sites, matching expanded function definitions.
- * Handles skipExpansion params, expanded variables, and regular VC constructor args.
- */
-fun expandValueClassParams(
-    parameters: List<Type.JFVariableSymbol>,
-    arguments: List<ExpressionNode.Phase2_3Expression>,
-): Pair<List<Type.JFVariableSymbol>, List<ExpressionNode.Phase2_3Expression>> {
-    val (expandedParams, expandedRawArgs) = parameters.zip(arguments).flatMap { (param, arg) ->
-        val paramType = param.type
+    // Get the flattened fields for the entire structure
+    val flattened = flattenType(varType)
+    val expandedVars = expandVariable(assignment.variableSymbol)
 
-        if (param.skipExpansion) {
-            if (arg is ExpressionNode.Variable && arg.variableSymbol.expandedFieldSymbols != null && paramType is Type.JFClass) {
-                val varSymbol = arg.variableSymbol
-                val reconstructed = reconstructVCFromExpanded(paramType, varSymbol.expandedFieldSymbols!!)
-                if (reconstructed != null) {
-                    return@flatMap listOf(param to reconstructed)
-                }
-            }
-            return@flatMap listOf(param to arg)
+    // Store the hierarchical structure on the original symbol
+    val constructorParams = (varType as Type.JFClass).constructor!!.parameters
+
+    // Build a map from flattened field paths to their expanded symbols
+    val fieldPathToSymbol = mutableMapOf<String, Type.JFVariableSymbol>()
+    expandedVars.forEachIndexed { index, expandedVar ->
+        fieldPathToSymbol[flattened[index].path] = expandedVar
+    }
+
+    assignment.variableSymbol.expandedFields = constructorParams.map { param ->
+        // Find all flattened fields belonging to this parameter
+        val paramFlattened = flattened.filter { field ->
+            field.path.startsWith(param.name + "_") || field.path == param.name
         }
 
-        val argHasExpanded = arg is ExpressionNode.Variable && arg.variableSymbol.expandedFields != null
-        val paramIsVC = paramType is Type.JFClass && paramType.kind == Type.ClassKind.VALUE_CLASS
-        val paramShouldExpand = paramIsVC && shouldExpandVC(paramType as Type.JFClass)
-
-        if (argHasExpanded && paramShouldExpand) {
-            val flattened = flattenType(paramType)
-            val variable = (arg as ExpressionNode.Variable).variableSymbol
-
-            flattened.mapIndexed { index, field ->
-                val expandedParamName = "${param.name}_${field.path}"
-                val expandedParam = param.copy(name = expandedParamName, type = field.type)
-
-                val expandedArg = variable.expandedFieldSymbols?.get(field.path)
-                    ?.let { ExpressionNode.Variable(it) }
-                    ?: createNestedFieldAccess(field.path.split("_"), arg)
-
-                expandedParam to expandedArg
+        // For nested VCs, extract the sub-structure
+        val sourceVCFields = if (isMultiFieldVC(param.type) && paramFlattened.size > 1) {
+            paramFlattened.map { field ->
+                // Strip the parameter name prefix to get local path
+                val localPath = if (field.path.startsWith(param.name + "_")) {
+                    field.path.substring((param.name + "_").length)
+                } else {
+                    field.path
+                }
+                localPath to field.type
             }
         } else {
-            val cons = (param.type as? Type.JFClass)?.takeIf { it.kind == Type.ClassKind.VALUE_CLASS }?.let { it.constructor }
-            cons?.parameters?.mapIndexed { fieldIndex, fieldParam ->
-                param.copy(name = "${param.name}_${fieldParam.name}", type = fieldParam.type) to
-                    ExpressionNode.FieldAccess(
-                        instance = arg, fieldName = fieldParam.name,
-                        fieldIndex = fieldIndex, fieldType = fieldParam.type,
-                        arguments = emptyList(),
-                    )
-            } ?: listOf(param to arg)
+            null
         }
-    }.unzip()
-    return Pair(expandedParams, expandedRawArgs)
-}
 
-/**
- * Walks an expression tree to find a SymbolMap containing a reference to a specific parameter name.
- */
-fun findParamSymbolMap(
-    expr: ExpressionNode.Phase2_3Expression,
-    paramNames: Set<String>,
-): SymbolMap? {
-    return when (expr) {
-        is ExpressionNode.Variable -> {
-            if (expr.variableSymbol.name in paramNames) expr.variableSymbol.symbolMap else null
+        // Find the actual symbol if this is a direct field (not nested)
+        val actualSymbol = if (paramFlattened.size == 1 && sourceVCFields == null) {
+            fieldPathToSymbol[paramFlattened[0].path]
+        } else {
+            null
         }
-        is ExpressionNode.MethodInvocation -> {
-            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
-        }
-        is ExpressionNode.ValAssignment -> findParamSymbolMap(expr.expression, paramNames)
-        is ExpressionNode.VarAssignment -> findParamSymbolMap(expr.expression, paramNames)
-        is ExpressionNode.ExpressionList -> {
-            expr.expressions.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
-        }
-        is ExpressionNode.ConstructorInvocation -> {
-            expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
-        }
-        is ExpressionNode.FieldAccess -> findParamSymbolMap(expr.instance, paramNames)
-        is ExpressionNode.Convert -> findParamSymbolMap(expr.expression, paramNames)
-        is ExpressionNode.WhenPhase3 -> {
-            expr.matches.firstNotNullOfOrNull { (_, e) -> findParamSymbolMap(e, paramNames) }
-         }
-         is ExpressionNode.Function -> {
-             findParamSymbolMap(ExpressionNode.ExpressionList(expr.block), paramNames)
-         }
-         is ExpressionNode.WhilePhase3 -> {
-             findParamSymbolMap(expr.expressions, paramNames)
-                 ?: findParamSymbolMap(expr.condition, paramNames)
-         }
-          else -> null
-      }
-  }
 
-fun setExpandedFieldsInExpression(
-    node: ExpressionNode.Phase2_3Expression,
-    parameterName: String,
-    expandedFields: List<Type.ExpandedField>,
-) {
-    when (node) {
-        is ExpressionNode.Variable -> {
-            if (node.variableSymbol.name == parameterName) {
-                node.variableSymbol.expandedFields = expandedFields
+        Type.ExpandedField(
+            name = param.name,
+            type = param.type,
+            sourceVC = if (isMultiFieldVC(param.type)) param.type as? Type.JFClass else null,
+            sourceVCFields = sourceVCFields,
+            actualSymbol = actualSymbol  // For top-level primitive fields
+        )
+    }
+
+    // Also store the expanded symbols mapping in the original variable for nested access
+    assignment.variableSymbol.expandedFieldSymbols = fieldPathToSymbol
+
+    // For each flattened field, create a nested field access expression
+    val expandedArgs = flattened.map { field ->
+        val pathComponents = field.path.split("_")
+
+        // Find which constructor argument this path belongs to
+        val matchingArgIndex = constructorParams.indexOfFirst { param ->
+            field.path.startsWith(param.name + "_") || field.path == param.name
+        }
+
+        if (matchingArgIndex >= 0 && matchingArgIndex < ci.arguments.size) {
+            val arg = ci.arguments[matchingArgIndex]
+
+            // Remove the first component if it matches the arg parameter name
+            val param = constructorParams[matchingArgIndex]
+            val remainingPath = if (field.path.startsWith(param.name + "_")) {
+                field.path.substring((param.name + "_").length).split("_")
+            } else if (field.path == param.name) {
+                emptyList()
+            } else {
+                field.path.split("_")
             }
-        }
-        is ExpressionNode.FieldAccess -> {
-            setExpandedFieldsInExpression(node.instance, parameterName, expandedFields)
-        }
-        is ExpressionNode.MethodInvocation -> {
-            node.arguments.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
-        }
-        is ExpressionNode.ConstructorInvocation -> {
-            node.arguments.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
-        }
-        is ExpressionNode.ValAssignment -> {
-            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
-        }
-        is ExpressionNode.VarAssignment -> {
-            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
-        }
-        is ExpressionNode.ExpressionList -> {
-            node.expressions.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
-        }
-        is ExpressionNode.WhilePhase3 -> {
-            setExpandedFieldsInExpression(node.condition, parameterName, expandedFields)
-            setExpandedFieldsInExpression(node.expressions, parameterName, expandedFields)
-        }
-        is ExpressionNode.WhenPhase3 -> {
-            node.matches.forEach { (_, expr) ->
-                setExpandedFieldsInExpression(expr, parameterName, expandedFields)
+
+            if (remainingPath.isEmpty()) {
+                arg
+            } else {
+                // Resolve through expanded field symbols when the arg is a variable
+                val resolvedFromVariable = if (arg is ExpressionNode.Variable) {
+                    val fieldPath = remainingPath.joinToString("_")
+                    arg.variableSymbol.expandedFieldSymbols?.get(fieldPath)
+                        ?.let { ExpressionNode.Variable(it) }
+                } else {
+                    null
+                }
+                // When arg is a ConstructorInvocation, extract the matching constructor argument
+                val resolvedFromConstructor = if (arg is ExpressionNode.ConstructorInvocation && resolvedFromVariable == null) {
+                    val fieldName = remainingPath[0]
+                    val fieldIndex = arg.cons.parameters.indexOfFirst { it.name == fieldName }
+                    if (fieldIndex >= 0 && fieldIndex < arg.arguments.size) {
+                        val fieldArg = arg.arguments[fieldIndex]
+                        if (remainingPath.size == 1) fieldArg
+                        else createNestedFieldAccess(remainingPath.drop(1), fieldArg)
+                    } else null
+                } else null
+                resolvedFromVariable ?: resolvedFromConstructor ?: createNestedFieldAccess(remainingPath, arg)
             }
+        } else {
+            error("Could not match field path ${field.path} to constructor arguments")
         }
-        is ExpressionNode.Convert -> {
-            setExpandedFieldsInExpression(node.expression, parameterName, expandedFields)
+    }
+
+    // Create separate Assignment for each expanded variable (val for val, var for var)
+    return expandedVars.mapIndexed { index, expandedVar ->
+        if (assignment.variableSymbol.mutable) {
+            ExpressionNode.VarAssignment(expandedVar, expandedArgs[index])
+        } else {
+            ExpressionNode.ValAssignment(expandedVar, expandedArgs[index])
         }
-        is ExpressionNode.Function -> {
-            node.block.forEach { setExpandedFieldsInExpression(it, parameterName, expandedFields) }
-        }
-        else -> {} // Other node types don't need processing
     }
 }
