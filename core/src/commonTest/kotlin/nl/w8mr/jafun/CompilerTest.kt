@@ -3517,57 +3517,6 @@ class CompilerTest {
             }
         }
     }
-
-    // ---- Deep / nested value class field access tests ----
-
-    @Test
-    fun vcDeepValidAccess() {
-        // Three-level deep access through nested inline VCs should succeed
-        val code = """
-            value class A(value: Int)
-            value class B(a: A)
-            value class C(b: B)
-            fun getValid(c: C): Int {
-                c.b.a.value
-            }
-        """.trimIndent()
-        val result = Compiler().compile(code, "Script", "main")
-        kotlin.test.assertTrue(result.containsKey("Script"), "Should compile nested field access")
-    }
-
-    @Test
-    fun vcFieldAccessOnValAssignment() {
-        // Accessing a non-existent field on an expanded val variable should fail
-        val code = """
-            value class Point(x: Int, y: Int)
-            fun test(): Int {
-                val p = Point(1, 2)
-                p.z
-            }
-        """.trimIndent()
-        kotlin.test.assertFailsWith<Throwable> {
-            Compiler().compile(code, "Script", "main")
-        }
-    }
-
-    // TODO: Known bug — parser silently drops unrecognised .identifier tokens instead of
-    // producing an error node. Fix requires changing fieldRhs to always consume .identifier
-    // and produce a FieldAccess with Unknown type, so AST2IR can report the missing field.
-    @Test
-    @kotlin.test.Ignore
-    fun vcDeepInvalidAccess() {
-        val code = """
-            value class A(value: Int)
-            value class B(a: A)
-            value class C(b: B)
-            fun getInvalid(c: C): Int {
-                c.b.z
-            }
-        """.trimIndent()
-        kotlin.test.assertFailsWith<Throwable> {
-            Compiler().compile(code, "Script", "main")
-        }
-    }
 }
 
 

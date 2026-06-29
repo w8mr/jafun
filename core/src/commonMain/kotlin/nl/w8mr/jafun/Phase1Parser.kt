@@ -27,6 +27,7 @@ import nl.w8mr.parsek.text.CharSequenceContext
 import nl.w8mr.parsek.text.and
 import nl.w8mr.parsek.text.any
 import nl.w8mr.parsek.text.char
+import nl.w8mr.parsek.text.digit
 import nl.w8mr.parsek.text.letter
 import nl.w8mr.parsek.text.oneOrMore
 import nl.w8mr.parsek.text.repeat
@@ -108,7 +109,13 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
     // TODO: Multiline string
 
     val valDeclaration = combi {
-        val `val` = string("val").map { ExpressionNode.Keyword(it) }.bind()
+        val rawVal = string("val").bind()
+        // Check that 'val' is not part of a longer identifier (like 'value')
+        val nextChar = (letter or digit or char { it == '_' }).bindAsResult()
+        if (nextChar is Parser.Success) {
+            fail("'val' is followed by identifier character")
+        }
+        val `val` = ExpressionNode.Keyword(rawVal)
         val whitespace1 = owsnl.bind()
         val identifier = identifier.bind()
         val whitespace2 = owsnl.bind()
@@ -120,7 +127,13 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
     }
 
     val varDeclaration = combi {
-        val `var` = string("var").map { ExpressionNode.Keyword(it) }.bind()
+        val rawVar = string("var").bind()
+        // Check that 'var' is not part of a longer identifier
+        val nextChar = (letter or digit or char { it == '_' }).bindAsResult()
+        if (nextChar is Parser.Success) {
+            fail("'var' is followed by identifier character")
+        }
+        val `var` = ExpressionNode.Keyword(rawVar)
         val whitespace1 = owsnl.bind()
         val identifier = identifier.bind()
         val whitespace2 = owsnl.bind()
@@ -132,7 +145,13 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
     }
 
     val funDeclaration = combi {
-        val `fun` = string("fun").map { ExpressionNode.Keyword(it) }.bind()
+        val rawFun = string("fun").bind()
+        // Check that 'fun' is not part of a longer identifier
+        val nextChar = (letter or digit or char { it == '_' }).bindAsResult()
+        if (nextChar is Parser.Success) {
+            fail("'fun' is followed by identifier character")
+        }
+        val `fun` = ExpressionNode.Keyword(rawFun)
         val whitespace1 = owsnl.bind()
         val name = identifier.bind()
         val whitespace2 = owsnl.bind()
@@ -171,7 +190,13 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
     }
 
     val valueClassDeclaration = combi {
-        val `value` = string("value").map { ExpressionNode.Keyword(it) }.bind()
+        val rawValue = string("value").bind()
+        // Check that 'value' is not part of a longer identifier
+        val nextChar = (letter or digit or char { it == '_' }).bindAsResult()
+        if (nextChar is Parser.Success) {
+            fail("'value' is followed by identifier character")
+        }
+        val `value` = ExpressionNode.Keyword(rawValue)
         val white1 = owsnl.bind()
         val `class` = string("class").map { ExpressionNode.Keyword(it) }.bind()
         val white2 = owsnl.bind()

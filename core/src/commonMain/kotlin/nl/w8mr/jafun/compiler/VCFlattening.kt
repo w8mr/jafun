@@ -260,13 +260,8 @@ fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Pa
 
     if (cons.parameters.size == 1) {
         val fieldType = cons.parameters[0].type
-        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-            val fieldCons = fieldType.constructor
-            if (fieldCons != null && fieldCons.parameters.size > 1) {
-                return listOf(Parameter(type, baseName))
-            }
-        }
-        return listOf(Parameter(type, baseName))
+        val newBaseName = if (baseName != null) "${baseName}_${cons.parameters[0].name}" else cons.parameters[0].name
+        return expandParameterRecursively(fieldType, newBaseName)
     }
 
     return cons.parameters.flatMap { fieldParam ->
@@ -355,6 +350,19 @@ fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
         return effectiveJvmType(type.constructor!!.parameters.single().type)
     }
     return type
+}
+
+/**
+ * Gets the innermost primitive type from a single-field VC.
+ * Returns null if the type is not a single-field VC.
+ * Recursively unwraps nested single-field VCs.
+ */
+fun unboxSingleFieldVCType(type: OperandType<*>): OperandType<*>? {
+    if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) return null
+    val cons = type.constructor ?: return null
+    if (cons.parameters.size != 1) return null
+    val innerType = cons.parameters[0].type
+    return unboxSingleFieldVCType(innerType) ?: innerType
 }
 
 /**

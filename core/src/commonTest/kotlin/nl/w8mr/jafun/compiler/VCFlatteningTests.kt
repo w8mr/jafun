@@ -696,7 +696,7 @@ class VCFlatteningTests {
     }
 
     // ============================================================================
-    // Test 40: expandParameterRecursively — single-field VC kept as-is
+    // Test 40: expandParameterRecursively — single-field VC flattens to inner field
     // ============================================================================
 
     @Test
@@ -704,8 +704,8 @@ class VCFlatteningTests {
         val id = createVC("Id", "value" to createIntType())
         val result = expandParameterRecursively(id, "id")
         assertEquals(1, result.size, "Id should stay as 1 Parameter")
-        assertEquals("id", result[0].varName)
-        assertEquals(id, result[0].type)
+        assertEquals("id_value", result[0].varName)
+        assertEquals(createIntType(), result[0].type)
     }
 
     // ============================================================================
@@ -720,10 +720,13 @@ class VCFlatteningTests {
         )
         val box = createVC("Box", "topLeft" to point)
         val result = expandParameterRecursively(box, "b")
-        // Guard: single-field wrapping multi-field VC stays as-is
-        assertEquals(1, result.size, "Box(topLeft: Point) should stay as 1 Parameter")
-        assertEquals("b", result[0].varName)
-        assertEquals(box, result[0].type)
+        // Box(topLeft: Point) has single-field wrapping multi-field VC
+        // → expands through to Point's fields
+        assertEquals(2, result.size, "Box should expand to 2 Parameters (Point.x, Point.y)")
+        assertEquals("b_topLeft_x", result[0].varName)
+        assertEquals(createIntType(), result[0].type)
+        assertEquals("b_topLeft_y", result[1].varName)
+        assertEquals(createIntType(), result[1].type)
     }
 
     // ============================================================================
@@ -763,10 +766,10 @@ class VCFlatteningTests {
             "name" to OperandType.StringType
         )
         val result = expandParameterRecursively(user, "u")
-        // User has id: Id, name: String → id stays as Id (single-field), name stays as String
+        // User has id: Id (single-field VC, flattened) and name: String
         assertEquals(2, result.size, "User should expand to 2 Parameters")
-        assertEquals("u_id", result[0].varName)
-        assertEquals(id, result[0].type)
+        assertEquals("u_id_value", result[0].varName)
+        assertEquals(createIntType(), result[0].type)
         assertEquals("u_name", result[1].varName)
         assertEquals(OperandType.StringType, result[1].type)
     }

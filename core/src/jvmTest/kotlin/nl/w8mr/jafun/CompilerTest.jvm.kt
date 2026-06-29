@@ -72,7 +72,15 @@ actual fun runAndAssertOutput(
 ): String {
     val result = runAndCatchOutput(actualBytes, className, methodName, params)
     println("OUTPUT: $result")
-    assertEquals(expectedOutput, result)
+    try {
+        assertEquals(expectedOutput, result)
+    } catch (e: Throwable) {
+        writeFile(className, actualBytes[className] ?: error("No bytes"))
+        val javap = "javap -c -p $className".runCommand(File("./build/classes/jafun/test"))
+        println("=== JAVAP OUTPUT ===")
+        println(javap)
+        throw e
+    }
     return result
 }
 
