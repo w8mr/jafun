@@ -31,6 +31,11 @@ object VCBinder {
             params != orig.parameters
         }
 
+        val expandMI: ((ExpressionNode.MethodInvocation) -> ExpressionNode.MethodInvocation)? =
+            if (expandedMethodParams.isNotEmpty()) {
+                { mi -> expandedMethodParams[mi.methodName]?.let { expandMethodInvocation(mi, it) } ?: mi }
+            } else null
+
         for (i in context.methods.indices) {
             val method = context.methods[i]
 
@@ -44,14 +49,12 @@ object VCBinder {
             val combinedInstructions = method.instructions.map { instruction ->
                 instruction
                     .transformTree { node ->
-                        val afterPhase1 = onPhase1(node, paramFieldMap.takeIf { it.isNotEmpty() })
+                        val afterPhase1 = onPhase1(node, paramFieldMap.takeIf { it.isNotEmpty() }, expandMI)
                         if (afterPhase1 !== node) return@transformTree afterPhase1
-                        onUpdateReturnType(node, methodReturnTypes)
+                        node
+                            .let { onExpandCallSite(it, expandedMethodParams) }
+                            .let { onUpdateReturnType(it, methodReturnTypes) }
                     }
-            }.let { preInstructions ->
-                if (expandedMethodParams.isNotEmpty()) {
-                    preInstructions.map { it.transformTree { onExpandCallSite(it, expandedMethodParams) } }
-                } else preInstructions
             }.toMutableList()
 
             val unboxedType = unboxSingleFieldVCType(method.returnType)
@@ -76,11 +79,12 @@ object VCBinder {
 
     private fun onPhase1(
         node: ExpressionNode.Phase2_3Expression,
-        paramFieldMap: Map<String, Map<String, Pair<String, OperandType<*>>>>?
+        paramFieldMap: Map<String, Map<String, Pair<String, OperandType<*>>>>?,
+        expandMI: ((ExpressionNode.MethodInvocation) -> ExpressionNode.MethodInvocation)? = null,
     ): ExpressionNode.Phase2_3Expression {
         when (node) {
             is ExpressionNode.ValAssignment -> {
-                val expanded = expandAssignmentIfNeeded(node)
+                val expanded = expandAssignmentIfNeeded(node, expandMI)
                 if (expanded.size > 1 || expanded.singleOrNull() !== node) {
                     return ExpressionNode.ExpressionList(expanded.map { e ->
                         if (e is ExpressionNode.ValAssignment) {
@@ -92,7 +96,7 @@ object VCBinder {
                 }
             }
             is ExpressionNode.VarAssignment -> {
-                val expanded = expandAssignmentIfNeeded(node)
+                val expanded = expandAssignmentIfNeeded(node, expandMI)
                 if (expanded.size > 1 || expanded.singleOrNull() !== node) {
                     return ExpressionNode.ExpressionList(expanded.map { e ->
                         if (e is ExpressionNode.VarAssignment) {
@@ -338,15 +342,15 @@ object VCBinder {
             val newExpr = node.expression.transformTree { onUpdateReturnType(it, methodReturnTypes) }
             if (newExpr !== node.expression) {
                 node.variableSymbol.effectiveType = newExpr.type()
-                ExpressionNode.ValAssignment(node.variableSymbol, newExpr)
-            } else node
+            }
+            node
         }
         is ExpressionNode.VarAssignment -> {
             val newExpr = node.expression.transformTree { onUpdateReturnType(it, methodReturnTypes) }
             if (newExpr !== node.expression) {
                 node.variableSymbol.effectiveType = newExpr.type()
-                ExpressionNode.VarAssignment(node.variableSymbol, newExpr)
-            } else node
+            }
+            node
         }
         is ExpressionNode.Convert -> {
             val newExpr = node.expression.transformTree { onUpdateReturnType(it, methodReturnTypes) }
