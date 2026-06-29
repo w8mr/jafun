@@ -18,44 +18,30 @@ import nl.w8mr.jafun.compiler.unboxSingleFieldVCType
 object VCBinder {
 
     fun handle(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
-        // Phase 1: Transform instructions (assignment expansion, field resolution)
+        // Phase 1: Expand val/var + unbox return types + fix MethodInvocation return types
+        val methodReturnTypes = mutableMapOf<String, OperandType<*>>()
         for (methodIndex in context.methods.indices) {
             val method = context.methods[methodIndex]
-            val newInstructions = method.instructions.map {
+            val expandedInstructions = method.instructions.map {
                 it.transformTree(::onTransformInstruction)
             }
-            if (newInstructions != method.instructions) {
-                context.methods[methodIndex] = method.copy(instructions = newInstructions.toMutableList())
-            }
-        }
-
-        // Phase 2: Build and unbox method return types
-        val methodReturnTypes = mutableMapOf<String, OperandType<*>>()
-        for (method in context.methods) {
-            methodReturnTypes[method.name] = method.returnType
-        }
-
-        // Phase 3: Unbox single-field VC return types in method definitions
-        for (methodIndex in context.methods.indices) {
-            val method = context.methods[methodIndex]
             val innerType = unboxSingleFieldVCType(method.returnType)
             if (innerType != null) {
-                context.methods[methodIndex] = method.copy(returnType = innerType)
                 methodReturnTypes[method.name] = innerType
-
-                val instructions = context.methods[methodIndex].instructions.toMutableList()
-                if (instructions.isNotEmpty()) {
-                    val lastIdx = instructions.lastIndex
-                    val unboxed = tryUnboxCI(instructions[lastIdx], method.returnType as Type.JFClass)
-                    if (unboxed != null) {
-                        instructions[lastIdx] = unboxed
-                        context.methods[methodIndex] = context.methods[methodIndex].copy(instructions = instructions)
+                val instructions = (expandedInstructions.toMutableList()).also {
+                    if (it.isNotEmpty()) {
+                        val unboxed = tryUnboxCI(it.last(), method.returnType as Type.JFClass)
+                        if (unboxed != null) it[it.lastIndex] = unboxed
                     }
+                }
+                context.methods[methodIndex] = method.copy(returnType = innerType, instructions = instructions)
+            } else {
+                methodReturnTypes[method.name] = method.returnType
+                if (expandedInstructions != method.instructions) {
+                    context.methods[methodIndex] = method.copy(instructions = expandedInstructions.toMutableList())
                 }
             }
         }
-
-        // Phase 4: Update MethodInvocation return types
         for (methodIndex in context.methods.indices) {
             val method = context.methods[methodIndex]
             val updatedInstructions = method.instructions.map {
@@ -64,7 +50,7 @@ object VCBinder {
             context.methods[methodIndex] = method.copy(instructions = updatedInstructions.toMutableList())
         }
 
-        // Phase 5a: Expand VC function parameters and transform bodies
+        // Phase 2: Expand VC function parameters and transform bodies
         val expandedMethodParams = mutableMapOf<String, List<Parameter>>()
         for (i in context.methods.indices) {
             val method = context.methods[i]
@@ -87,7 +73,7 @@ object VCBinder {
             expandedMethodParams[method.name] = expandedParams
         }
 
-        // Phase 5b: Expand call sites to match expanded method parameters
+        // Phase 3: Expand call sites to match expanded method parameters
         if (expandedMethodParams.isNotEmpty()) {
             for (i in context.methods.indices) {
                 val method = context.methods[i]
