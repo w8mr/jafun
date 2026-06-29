@@ -60,29 +60,29 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
                 val parsed = parseResult.first
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
-                val valueClasses = extractValueClasses(symbolMap)
+                val vcFieldMap = extractValueClassFields(symbolMap)
                 val classContext = ast2ir(className, updatedParsed, methodName)
                 val updatedContext = Phase3.run(classContext)
                 val vcContext = runVCPhases(updatedContext)
 
-                val builder = IRBuilder.BuilderContext(
-                    classes = mutableMapOf(className to vcContext),
-                    valueClasses = valueClasses.toMutableMap()
-                )
-                val allClasses = compileAll(builder)
-                JVM.run(allClasses)
+                val allClasses = mutableMapOf(className to vcContext)
+                for ((name, fields) in vcFieldMap) {
+                    allClasses[name] = IRBuilder.ClassContext(name, fields = fields, parent = IRBuilder.BuilderContext())
+                }
+                val builder = IRBuilder.BuilderContext(classes = allClasses)
+                val allBytecode = compileAll(builder)
+                JVM.run(allBytecode)
             }
         }
     }
 
-    private fun extractValueClasses(symbolMap: SymbolMapManager): Map<String, IRBuilder.ValueClassDef> {
-        val result = mutableMapOf<String, IRBuilder.ValueClassDef>()
+    private fun extractValueClassFields(symbolMap: SymbolMapManager): Map<String, List<Pair<String, OperandType<*>>>> {
+        val result = mutableMapOf<String, List<Pair<String, OperandType<*>>>>()
         val topSymbols = symbolMap.find(null as TypeSymbol?)
         for (sym in topSymbols) {
             if (sym is Type.JFClass && sym.kind == Type.ClassKind.VALUE_CLASS) {
                 val fields = sym.constructor?.parameters?.map { it.name to it.type } ?: emptyList()
-                println("extractValueClasses: found ${sym.name} with fields=$fields")
-                result[sym.name] = IRBuilder.ValueClassDef(sym.name, fields)
+                result[sym.name] = fields
             }
         }
         return result

@@ -12,19 +12,18 @@ object IRBuilder {
         return builderContext
     }
 
-    data class ValueClassDef(
-        val name: String,
-        val fields: List<Pair<String, OperandType<*>>>,
-    )
-
     data class BuilderContext(
         val classes: MutableMap<String, ClassContext> = mutableMapOf(),
-        val valueClasses: MutableMap<String, ValueClassDef> = mutableMapOf(),
     )
 
-    data class ClassContext(val name: String, val methods: MutableList<MethodContext> = mutableListOf(), val parent: BuilderContext): Printable{
+    data class ClassContext(
+        val name: String,
+        val fields: List<Pair<String, OperandType<*>>> = emptyList(),
+        val methods: MutableList<MethodContext> = mutableListOf(),
+        val parent: BuilderContext,
+    ): Printable {
         override fun toString(): String =
-            "ClassContext(name=$name, methods=$methods)"
+            "ClassContext(name=$name, fields=$fields, methods=$methods)"
     }
 
     data class MethodContext(
@@ -39,16 +38,13 @@ object IRBuilder {
     }
 
     class BuilderDSL(val context: BuilderContext) {
-        fun addValueClass(name: String, vc: ValueClassDef) {
-            context.valueClasses[name] = vc
-        }
-
         @Suppress("ktlint:standard:function-naming")
         fun `class`(
             name: String,
+            fields: List<Pair<String, OperandType<*>>> = emptyList(),
             init: ClassDSL.() -> Unit,
         ) {
-            val classContext = ClassContext(name, parent = context)
+            val classContext = ClassContext(name, fields = fields, parent = context)
             context.classes.put(name, classContext)
             init.invoke(ClassDSL(classContext, this))
         }

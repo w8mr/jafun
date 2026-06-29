@@ -262,37 +262,8 @@ fun compileAll(
     builder.classes.forEach { (name, classContext) ->
         result[name] = buildClass(name, classContext).write()
     }
-    builder.valueClasses.forEach { (name, vc) ->
-        result[name] = buildValueClass(vc).write()
-    }
     return result
 }
-
-fun buildValueClass(vc: IRBuilder.ValueClassDef): ClassBuilder =
-    classBuilder {
-        name = vc.name
-        vc.fields.forEach { (fieldName, fieldType) ->
-            field(access = 1u, name = fieldName, type = signature(fieldType))
-        }
-        method {
-            name = "<init>"
-            access = 1u
-            signature = "(${vc.fields.joinToString("") { signature(it.second) }})V"
-            parameter("thisRef")
-            vc.fields.forEach { (fieldName, _) -> parameter("p_$fieldName") }
-            aload("thisRef")
-            invokeSpecial("java/lang/Object", "<init>", "()V")
-            vc.fields.forEach { (fieldName, fieldType) ->
-                aload("thisRef")
-                when (fieldType) {
-                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> iload("p_$fieldName")
-                    else -> aload("p_$fieldName")
-                }
-                putField(vc.name, fieldName, signature(fieldType))
-            }
-            `return`()
-        }
-    }
 
 fun compileJVM(
     className: String,
@@ -308,6 +279,30 @@ fun buildClass(
 ): ClassBuilder =
     classBuilder {
         name = className
+        classContext.fields.forEach { (fieldName, fieldType) ->
+            field(access = 1u, name = fieldName, type = signature(fieldType))
+        }
+        val hasInit = classContext.methods.any { it.name == "<init>" }
+        if (classContext.fields.isNotEmpty() && !hasInit) {
+            method {
+                name = "<init>"
+                access = 1u
+                signature = "(${classContext.fields.joinToString("") { signature(it.second) }})V"
+                parameter("thisRef")
+                classContext.fields.forEach { (fieldName, _) -> parameter("p_$fieldName") }
+                aload("thisRef")
+                invokeSpecial("java/lang/Object", "<init>", "()V")
+                classContext.fields.forEach { (fieldName, fieldType) ->
+                    aload("thisRef")
+                    when (fieldType) {
+                        is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> iload("p_$fieldName")
+                        else -> aload("p_$fieldName")
+                    }
+                    putField(className, fieldName, signature(fieldType))
+                }
+                `return`()
+            }
+        }
         classContext.methods.forEach { m ->
             method {
                 name = m.name
