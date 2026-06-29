@@ -18,110 +18,192 @@ import nl.w8mr.jafun.compiler.unboxSingleFieldVCType
 object VCBinder {
 
     fun handle(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
-        // Phase 1: Expand val/var + unbox return types + fix MethodInvocation return types
-        val methodReturnTypes = mutableMapOf<String, OperandType<*>>()
-        for (methodIndex in context.methods.indices) {
-            val method = context.methods[methodIndex]
-            val expandedInstructions = method.instructions.map {
-                it.transformTree(::onTransformInstruction)
-            }
-            val innerType = unboxSingleFieldVCType(method.returnType)
-            if (innerType != null) {
-                methodReturnTypes[method.name] = innerType
-                val instructions = (expandedInstructions.toMutableList()).also {
-                    if (it.isNotEmpty()) {
-                        val unboxed = tryUnboxCI(it.last(), method.returnType as Type.JFClass)
-                        if (unboxed != null) it[it.lastIndex] = unboxed
-                    }
-                }
-                context.methods[methodIndex] = method.copy(returnType = innerType, instructions = instructions)
-            } else {
-                methodReturnTypes[method.name] = method.returnType
-                if (expandedInstructions != method.instructions) {
-                    context.methods[methodIndex] = method.copy(instructions = expandedInstructions.toMutableList())
-                }
-            }
-        }
-        for (methodIndex in context.methods.indices) {
-            val method = context.methods[methodIndex]
-            val updatedInstructions = method.instructions.map {
-                it.transformTree { onUpdateReturnType(it, methodReturnTypes) }
-            }
-            context.methods[methodIndex] = method.copy(instructions = updatedInstructions.toMutableList())
+        val methodReturnTypes = context.methods.associate { method ->
+            method.name to (unboxSingleFieldVCType(method.returnType) ?: method.returnType)
         }
 
-        // Phase 2: Expand VC function parameters and transform bodies
-        val expandedMethodParams = mutableMapOf<String, List<Parameter>>()
-        for (i in context.methods.indices) {
-            val method = context.methods[i]
+        val expandedMethodParams = context.methods.associate { method ->
             val expandedParams = method.parameters.flatMap { expandParameter(it, method.returnType) }
                 .map { p -> if (effectiveJvmType(p.type) != p.type) Parameter(effectiveJvmType(p.type), p.varName) else p }
-            val expandedReturnType = effectiveJvmType(method.returnType)
-            if (expandedParams == method.parameters && expandedReturnType == method.returnType) continue
-
-            val paramFieldMap = buildParamFieldMap(method.parameters)
-            val newInstructions = if (paramFieldMap.isNotEmpty()) {
-                method.instructions.map { resolveParamFieldAccess(it, paramFieldMap) }.toMutableList()
-            } else {
-                method.instructions
-            }
-            context.methods[i] = method.copy(
-                parameters = expandedParams,
-                returnType = expandedReturnType,
-                instructions = newInstructions
-            )
-            expandedMethodParams[method.name] = expandedParams
+            method.name to expandedParams
+        }.filter { (name, params) ->
+            val orig = context.methods.first { it.name == name }
+            params != orig.parameters
         }
 
-        // Phase 3: Expand call sites to match expanded method parameters
-        if (expandedMethodParams.isNotEmpty()) {
-            for (i in context.methods.indices) {
-                val method = context.methods[i]
-                val updatedInstructions = method.instructions.map {
-                    it.transformTree { onExpandCallSite(it, expandedMethodParams) }
-                }
-                context.methods[i] = method.copy(instructions = updatedInstructions.toMutableList())
+        for (i in context.methods.indices) {
+            val method = context.methods[i]
+
+            val expandedParams = method.parameters.flatMap { expandParameter(it, method.returnType) }
+                .map { p -> if (effectiveJvmType(p.type) != p.type) Parameter(effectiveJvmType(p.type), p.varName) else p }
+            val expandedReturnType = methodReturnTypes[method.name] ?: method.returnType
+            val hasParamChanges = expandedParams != method.parameters || expandedReturnType != method.returnType
+
+            val paramFieldMap = buildParamFieldMap(method.parameters)
+
+            val combinedInstructions = method.instructions.map { instruction ->
+                instruction
+                    .transformTree { node ->
+                        val afterPhase1 = onPhase1(node, paramFieldMap.takeIf { it.isNotEmpty() })
+                        if (afterPhase1 !== node) return@transformTree afterPhase1
+                        onUpdateReturnType(node, methodReturnTypes)
+                    }
+            }.let { preInstructions ->
+                if (expandedMethodParams.isNotEmpty()) {
+                    preInstructions.map { it.transformTree { onExpandCallSite(it, expandedMethodParams) } }
+                } else preInstructions
+            }.toMutableList()
+
+            val unboxedType = unboxSingleFieldVCType(method.returnType)
+            if (unboxedType != null && combinedInstructions.isNotEmpty()) {
+                val unboxed = tryUnboxCI(combinedInstructions.last(), method.returnType as Type.JFClass)
+                if (unboxed != null) combinedInstructions[combinedInstructions.lastIndex] = unboxed
+            }
+
+            if (hasParamChanges) {
+                context.methods[i] = method.copy(
+                    parameters = expandedParams,
+                    returnType = expandedReturnType,
+                    instructions = combinedInstructions
+                )
+            } else if (combinedInstructions != method.instructions) {
+                context.methods[i] = method.copy(instructions = combinedInstructions)
             }
         }
 
         return context
     }
 
-    // --- Phase 4: Identity transform + field resolution ---
+    private fun onPhase1(
+        node: ExpressionNode.Phase2_3Expression,
+        paramFieldMap: Map<String, Map<String, Pair<String, OperandType<*>>>>?
+    ): ExpressionNode.Phase2_3Expression {
+        when (node) {
+            is ExpressionNode.ValAssignment -> {
+                val expanded = expandAssignmentIfNeeded(node)
+                if (expanded.size > 1 || expanded.singleOrNull() !== node) {
+                    return ExpressionNode.ExpressionList(expanded.map { e ->
+                        if (e is ExpressionNode.ValAssignment) {
+                            val ci = e.expression as? ExpressionNode.ConstructorInvocation
+                            if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
+                        }
+                        e
+                    })
+                }
+            }
+            is ExpressionNode.VarAssignment -> {
+                val expanded = expandAssignmentIfNeeded(node)
+                if (expanded.size > 1 || expanded.singleOrNull() !== node) {
+                    return ExpressionNode.ExpressionList(expanded.map { e ->
+                        if (e is ExpressionNode.VarAssignment) {
+                            val ci = e.expression as? ExpressionNode.ConstructorInvocation
+                            if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
+                        }
+                        e
+                    })
+                }
+            }
+            is ExpressionNode.FieldAccess -> {
+                val resolved = resolveFieldAccess(node)
+                if (resolved !== node) return resolved
+            }
+            is ExpressionNode.Variable -> {
+                val resolved = resolveVariable(node)
+                if (resolved !== node) return resolved
+            }
+            else -> {}
+        }
 
-    private fun onTransformInstruction(node: ExpressionNode.Phase2_3Expression): ExpressionNode.Phase2_3Expression = when (node) {
-        is ExpressionNode.ValAssignment -> {
-            val expanded = expandAssignmentIfNeeded(node)
-            if (expanded.size > 1 || expanded.singleOrNull() !== node) {
-                ExpressionNode.ExpressionList(expanded.map { e ->
-                    if (e is ExpressionNode.ValAssignment) {
-                        val ci = e.expression as? ExpressionNode.ConstructorInvocation
-                        if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
+        if (paramFieldMap != null) {
+            when (node) {
+                is ExpressionNode.FieldAccess -> {
+                    val pathMatch = extractFieldPath(node)
+                    if (pathMatch != null) {
+                        val (baseName, fieldPath) = pathMatch
+                        val fields = paramFieldMap[baseName]
+                        if (fields != null && fieldPath in fields) {
+                            val (expandedName, fieldType) = fields[fieldPath]!!
+                            val symbolMap = getInnermostVariable(node)?.variableSymbol?.symbolMap
+                            return ExpressionNode.Variable(
+                                Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap ?: IdentifierCache, initialized = true)
+                            )
+                        }
+                        if (fields != null && fieldPath !in fields) {
+                            val innermostVar = getInnermostVariable(node)
+                            if (innermostVar != null) {
+                                val varType = innermostVar.variableSymbol.type
+                                if (varType is Type.JFClass) {
+                                    val cons = varType.constructor
+                                    if (cons != null && cons.parameters.size == 1 && cons.parameters[0].name == fieldPath) {
+                                        val sm = innermostVar.variableSymbol.symbolMap
+                                        return ExpressionNode.Variable(
+                                            Type.JFVariableSymbol(
+                                                name = innermostVar.variableSymbol.name,
+                                                type = cons.parameters[0].type,
+                                                symbolMap = sm ?: IdentifierCache,
+                                                initialized = true
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                    e
-                })
-            } else {
-                node  // identity → let transformTree recurse
+                }
+                is ExpressionNode.Variable -> {
+                    val cleanName = node.variableSymbol.name
+                    val fields = paramFieldMap[cleanName]
+                    if (fields != null) {
+                        val vcType = node.variableSymbol.type
+                        if (vcType is Type.JFClass) {
+                            val cons = vcType.constructor
+                            if (cons != null) {
+                                val symbolMap = node.variableSymbol.symbolMap
+                                val ciArgs = cons.parameters.map { fieldParam ->
+                                    val flatFieldsFromParam = flattenType(fieldParam.type, fieldParam.name)
+                                    val fieldPaths = flatFieldsFromParam.map { it.path }
+                                    when {
+                                        fieldPaths.isEmpty() -> null
+                                        fieldPaths.size == 1 -> {
+                                            val path = fieldPaths[0]
+                                            fields[path]?.let { (expandedName, fieldType) ->
+                                                ExpressionNode.Variable(
+                                                    Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap, initialized = true)
+                                                )
+                                            }
+                                        }
+                                        else -> {
+                                            val innerCons = (fieldParam.type as? Type.JFClass)?.constructor
+                                            if (innerCons != null) {
+                                                val innerArgs = fieldPaths.mapNotNull { path ->
+                                                    fields[path]?.let { (expandedName, fieldType) ->
+                                                        ExpressionNode.Variable(
+                                                            Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap, initialized = true)
+                                                        )
+                                                    }
+                                                }
+                                                if (innerArgs.size == fieldPaths.size) {
+                                                    ExpressionNode.ConstructorInvocation(innerCons, innerArgs)
+                                                } else null
+                                            } else null
+                                        }
+                                    }
+                                }
+                                if (ciArgs.none { it == null }) {
+                                    return ExpressionNode.ConstructorInvocation(cons, ciArgs.filterNotNull())
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {}
             }
         }
-        is ExpressionNode.VarAssignment -> {
-            val expanded = expandAssignmentIfNeeded(node)
-            if (expanded.size > 1 || expanded.singleOrNull() !== node) {
-                ExpressionNode.ExpressionList(expanded.map { e ->
-                    if (e is ExpressionNode.VarAssignment) {
-                        val ci = e.expression as? ExpressionNode.ConstructorInvocation
-                        if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
-                    }
-                    e
-                })
-            } else {
-                node  // identity → let transformTree recurse
-            }
-        }
-        is ExpressionNode.FieldAccess -> resolveFieldAccess(node)
-        is ExpressionNode.Variable -> resolveVariable(node)
-        else -> node  // identity → let transformTree recurse
+
+        return node
     }
+
+    // --- Phase 1: Field resolution helpers ---
 
     private fun resolveFieldAccess(node: ExpressionNode.FieldAccess): ExpressionNode.Phase2_3Expression {
         val instanceVariable = node.instance as? ExpressionNode.Variable
@@ -176,7 +258,7 @@ object VCBinder {
         val resolvedInstance = when (node.instance) {
             is ExpressionNode.FieldAccess -> resolveFieldAccess(node.instance as ExpressionNode.FieldAccess)
             is ExpressionNode.Variable -> node.instance
-            else -> node.instance.transformTree(::onTransformInstruction)
+            else -> node.instance
         }
 
         if (resolvedInstance !== node.instance) {
@@ -230,7 +312,7 @@ object VCBinder {
         return node
     }
 
-    // --- Phase 4: Update MethodInvocation return types ---
+    // --- Phase 2: Update MethodInvocation return types ---
 
     private fun onUpdateReturnType(
         node: ExpressionNode.Phase2_3Expression,
@@ -249,7 +331,7 @@ object VCBinder {
                     arguments = node.arguments,
                 )
             } else {
-                node  // identity → let transformTree recurse
+                node
             }
         }
         is ExpressionNode.ValAssignment -> {
@@ -281,10 +363,10 @@ object VCBinder {
                 ExpressionNode.FieldAccess(newInstance, node.fieldName, node.fieldIndex, node.fieldType, node.arguments)
             } else node
         }
-        else -> node  // identity → let transformTree recurse
+        else -> node
     }
 
-    // --- Phase 3 helpers ---
+    // --- Phase 1: Return value unboxing ---
 
     private fun tryUnboxCI(expr: ExpressionNode.Phase2_3Expression, vcType: Type.JFClass): ExpressionNode.Phase2_3Expression? {
         if (expr is ExpressionNode.ConstructorInvocation && expr.type() == vcType) {
@@ -336,7 +418,7 @@ object VCBinder {
         return innerType
     }
 
-    // --- Phase 5a: Parameter expansion + body transform ---
+    // --- Phase 2: Parameter field map building ---
 
     private fun buildParamFieldMap(
         parameters: List<Parameter>
@@ -368,135 +450,6 @@ object VCBinder {
         return current.variableSymbol.name to parts.joinToString("_")
     }
 
-    private fun resolveParamFieldAccess(
-        expr: ExpressionNode.Phase2_3Expression,
-        paramMap: Map<String, Map<String, Pair<String, OperandType<*>>>>
-    ): ExpressionNode.Phase2_3Expression {
-        val pathMatch = extractFieldPath(expr)
-        if (pathMatch != null) {
-            val (baseName, fieldPath) = pathMatch
-            val fields = paramMap[baseName]
-            if (fields != null && fieldPath in fields) {
-                val (expandedName, fieldType) = fields[fieldPath]!!
-                val symbolMap = getInnermostVariable(expr)?.variableSymbol?.symbolMap
-                return ExpressionNode.Variable(
-                    Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap ?: IdentifierCache, initialized = true)
-                )
-            }
-            if (fields != null && fieldPath !in fields) {
-                val innermostVar = getInnermostVariable(expr)
-                if (innermostVar != null) {
-                    val varType = innermostVar.variableSymbol.type
-                    if (varType is Type.JFClass) {
-                        val cons = varType.constructor
-                        if (cons != null && cons.parameters.size == 1 && cons.parameters[0].name == fieldPath) {
-                            val symbolMap = innermostVar.variableSymbol.symbolMap
-                            return ExpressionNode.Variable(
-                                Type.JFVariableSymbol(
-                                    name = innermostVar.variableSymbol.name,
-                                    type = cons.parameters[0].type,
-                                    symbolMap = symbolMap ?: IdentifierCache,
-                                    initialized = true
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        return expr.transformTree { onResolveParamFieldAccess(it, paramMap) }
-    }
-
-    private fun onResolveParamFieldAccess(
-        node: ExpressionNode.Phase2_3Expression,
-        paramMap: Map<String, Map<String, Pair<String, OperandType<*>>>>
-    ): ExpressionNode.Phase2_3Expression = when (node) {
-        is ExpressionNode.FieldAccess -> {
-            val pathMatch = extractFieldPath(node)
-            if (pathMatch != null) {
-                val (baseName, fieldPath) = pathMatch
-                val fields = paramMap[baseName]
-                if (fields != null && fieldPath in fields) {
-                    val (expandedName, fieldType) = fields[fieldPath]!!
-                    val symbolMap = getInnermostVariable(node)?.variableSymbol?.symbolMap
-                    return ExpressionNode.Variable(
-                        Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap ?: IdentifierCache, initialized = true)
-                    )
-                }
-                if (fields != null && fieldPath !in fields) {
-                    val innermostVar = getInnermostVariable(node)
-                    if (innermostVar != null) {
-                        val varType = innermostVar.variableSymbol.type
-                        if (varType is Type.JFClass) {
-                            val cons = varType.constructor
-                            if (cons != null && cons.parameters.size == 1 && cons.parameters[0].name == fieldPath) {
-                                val sm = innermostVar.variableSymbol.symbolMap
-                                return ExpressionNode.Variable(
-                                    Type.JFVariableSymbol(
-                                        name = innermostVar.variableSymbol.name,
-                                        type = cons.parameters[0].type,
-                                        symbolMap = sm ?: IdentifierCache,
-                                        initialized = true
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            node
-        }
-        is ExpressionNode.Variable -> {
-            val cleanName = node.variableSymbol.name
-            val fields = paramMap[cleanName]
-            if (fields != null) {
-                val vcType = node.variableSymbol.type
-                if (vcType is Type.JFClass) {
-                    val cons = vcType.constructor
-                    if (cons != null) {
-                        val symbolMap = node.variableSymbol.symbolMap
-                        val ciArgs = cons.parameters.map { fieldParam ->
-                            val flatFieldsFromParam = flattenType(fieldParam.type, fieldParam.name)
-                            val fieldPaths = flatFieldsFromParam.map { it.path }
-                            when {
-                                fieldPaths.isEmpty() -> null
-                                fieldPaths.size == 1 -> {
-                                    val path = fieldPaths[0]
-                                    fields[path]?.let { (expandedName, fieldType) ->
-                                        ExpressionNode.Variable(
-                                            Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap, initialized = true)
-                                        )
-                                    }
-                                }
-                                else -> {
-                                    val innerCons = (fieldParam.type as? Type.JFClass)?.constructor
-                                    if (innerCons != null) {
-                                        val innerArgs = fieldPaths.mapNotNull { path ->
-                                            fields[path]?.let { (expandedName, fieldType) ->
-                                                ExpressionNode.Variable(
-                                                    Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap, initialized = true)
-                                                )
-                                            }
-                                        }
-                                        if (innerArgs.size == fieldPaths.size) {
-                                            ExpressionNode.ConstructorInvocation(innerCons, innerArgs)
-                                        } else null
-                                    } else null
-                                }
-                            }
-                        }
-                        if (ciArgs.none { it == null }) {
-                            return ExpressionNode.ConstructorInvocation(cons, ciArgs.filterNotNull())
-                        }
-                    }
-                }
-            }
-            node
-        }
-        else -> node
-    }
-
     private fun getInnermostVariable(expr: ExpressionNode.Phase2_3Expression): ExpressionNode.Variable? {
         return when (expr) {
             is ExpressionNode.Variable -> expr
@@ -505,7 +458,7 @@ object VCBinder {
         }
     }
 
-    // --- Phase 5b: Call site expansion ---
+    // --- Phase 3: Call site expansion ---
 
     private fun flattenCIArgs(ci: ExpressionNode.ConstructorInvocation): List<ExpressionNode.Phase2_3Expression> {
         val cons = ci.cons
@@ -633,4 +586,5 @@ object VCBinder {
             expandParameterRecursively(fieldParam.type, newBaseName)
         }
     }
+
 }
