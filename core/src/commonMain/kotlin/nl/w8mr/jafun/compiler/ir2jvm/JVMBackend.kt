@@ -114,8 +114,12 @@ class JVMBackend {
                     }
 
                     is ExpressionNode.WhenPhase3 -> {
-                        val after = createTarget()
-                        instruction.matches.forEach { match ->
+                        val after = label()
+                        val matches = instruction.matches.iterator()
+
+                        fun processMatches() {
+                            if (!matches.hasNext()) return
+                            val match = matches.next()
                             when (match.first) {
                                 ExpressionNode.BooleanLiteral(true) -> {
                                     compile(match.second, asStatement)
@@ -123,15 +127,18 @@ class JVMBackend {
 
                                 else -> {
                                     compile(match.first)
-                                    val next = createTarget()
+                                    val next = label()
                                     ifequal(next)
                                     compile(match.second, asStatement)
                                     goto(after)
-                                    insertInstructionBlock(next)
+                                    next { processMatches() }
                                 }
                             }
                         }
-                        insertInstructionBlock(after)
+
+                        processMatches()
+                        after { }
+                        nextBlock()
                     }
 
                     is ExpressionNode.ExpressionList -> {
@@ -144,22 +151,26 @@ class JVMBackend {
                     }
 
                     is ExpressionNode.DoWhile -> {
-                        val body = createTarget()
-                        insertInstructionBlock(body)
-                        compile(instruction.expressions, false) // TODO: evaluate: Should DoWhile be an expression?
-                        compile(instruction.condition)
-                        ifnotequal(body)
+                        val body = label()
+                        body {
+                            compile(instruction.expressions, false)
+                            compile(instruction.condition)
+                            ifnotequal(body)
+                        }
+                        nextBlock()
                     }
 
                     is ExpressionNode.WhilePhase3 -> {
-                        val after = createTarget()
-                        val body = createTarget()
-                        insertInstructionBlock(body)
-                        compile(instruction.condition)
-                        ifequal(after)
-                        compile(instruction.expressions, true)
-                        goto(body)
-                        insertInstructionBlock(after)
+                        val after = label()
+                        val body = label()
+                        body {
+                            compile(instruction.condition)
+                            ifequal(after)
+                            compile(instruction.expressions, true)
+                            goto(body)
+                        }
+                        after { }
+                        nextBlock()
                     }
 
                     is ExpressionNode.Convert -> {
@@ -315,6 +326,7 @@ fun buildClass(
                 m.instructions.forEachIndexed { index, instruction ->
                     context.compile(instruction, asStatement = (index != lastIndex))
                 }
+                nextBlock()
                 when (m.returnType) {
                     is OperandType.Unit -> {
                         if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) != m.returnType) pop()
