@@ -3504,6 +3504,23 @@ class CompilerTest {
     }
 
     @Test
+    fun vcAssignmentWithFunctionCallInConstructor() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    fun getX(p: Point): Int {
+                        p.x
+                    }
+                    val p = Point(getX(Point(5, 6)), 7)
+                    println p.x
+                """.trimIndent()
+                expectedOutput = "5\n"
+            }
+        }
+    }
+
+    @Test
     fun vcChainedNestedAccess() {
         test {
             file {

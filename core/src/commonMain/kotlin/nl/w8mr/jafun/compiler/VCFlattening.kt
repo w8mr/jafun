@@ -381,7 +381,6 @@ fun unboxSingleFieldVCType(type: OperandType<*>): OperandType<*>? {
  */
 fun expandAssignmentIfNeeded(
     assignment: ExpressionNode.Assignment,
-    expandMI: ((ExpressionNode.MethodInvocation) -> ExpressionNode.MethodInvocation)? = null,
 ): List<ExpressionNode.Phase2_3Expression> {
     val varType = assignment.variableSymbol.type
 
@@ -459,7 +458,6 @@ fun expandAssignmentIfNeeded(
 
         if (matchingArgIndex >= 0 && matchingArgIndex < ci.arguments.size) {
             var arg = ci.arguments[matchingArgIndex]
-            if (arg is ExpressionNode.MethodInvocation && expandMI != null) arg = expandMI(arg)
             
             // Remove the first component if it matches the arg parameter name
             val param = constructorParams[matchingArgIndex]
@@ -487,8 +485,7 @@ fun expandAssignmentIfNeeded(
                     val fieldName = remainingPath[0]
                     val fieldIndex = arg.cons.parameters.indexOfFirst { it.name == fieldName }
                     if (fieldIndex >= 0 && fieldIndex < arg.arguments.size) {
-                        var fieldArg = arg.arguments[fieldIndex]
-                        if (fieldArg is ExpressionNode.MethodInvocation && expandMI != null) fieldArg = expandMI(fieldArg)
+                        val fieldArg = arg.arguments[fieldIndex]
                         if (remainingPath.size == 1) fieldArg
                         else createNestedFieldAccess(remainingPath.drop(1), fieldArg)
                     } else null
