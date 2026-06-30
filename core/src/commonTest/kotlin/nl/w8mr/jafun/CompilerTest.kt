@@ -2212,10 +2212,11 @@ class CompilerTest {
                         next {
                             loadConstant("Else")
                         }
-                        after { }
+                        after {
+                            pop()
+                            `return`()
+                        }
 
-                        pop()
-                        `return`()
                     }
                 }
 
@@ -2291,6 +2292,8 @@ class CompilerTest {
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
                         val next1 = label()
+                        val next2 = label()
+                        val next3 = label()
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
@@ -2298,27 +2301,25 @@ class CompilerTest {
                             iload("a")
                             loadConstant(2)
                             invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                            val next2 = label()
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
-                            next2 {
-                                iload("a")
-                                loadConstant(3)
-                                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                                val next3 = label()
-                                ifequal(next3)
-                                loadConstant("Three")
-                                goto(after)
-                                next3 {
-                                    loadConstant("More")
-                                }
-                            }
                         }
-                        after { }
-
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        next2 {
+                            iload("a")
+                            loadConstant(3)
+                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            ifequal(next3)
+                            loadConstant("Three")
+                            goto(after)
+                        }
+                        next3 {
+                            loadConstant("More")
+                        }
+                        after {
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2343,12 +2344,14 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         val after = label()
+                        val next1 = label()
+                        val next2 = label()
+                        val next3 = label()
                         loadConstant(2)
                         istore("a")
                         iload("a")
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                        val next1 = label()
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
@@ -2356,27 +2359,25 @@ class CompilerTest {
                             iload("a")
                             loadConstant(2)
                             invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                            val next2 = label()
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
-                            next2 {
-                                iload("a")
-                                loadConstant(3)
-                                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                                val next3 = label()
-                                ifequal(next3)
-                                loadConstant("Three")
-                                goto(after)
-                                next3 {
-                                    loadConstant("More")
-                                }
-                            }
                         }
-                        after { }
-
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        next2 {
+                            iload("a")
+                            loadConstant(3)
+                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            ifequal(next3)
+                            loadConstant("Three")
+                            goto(after)
+                        }
+                        next3 {
+                            loadConstant("More")
+                        }
+                        after {
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2400,6 +2401,9 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         val after = label()
+                        val next1 = label()
+                        val next2 = label()
+                        val next3 = label()
                         loadConstant(1)
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "+", "(II)I")
@@ -2407,7 +2411,6 @@ class CompilerTest {
                         iload("tmp")
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                        val next1 = label()
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
@@ -2415,27 +2418,25 @@ class CompilerTest {
                             iload("tmp")
                             loadConstant(2)
                             invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                            val next2 = label()
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
-                            next2 {
-                                iload("tmp")
-                                loadConstant(3)
-                                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                                val next3 = label()
-                                ifequal(next3)
-                                loadConstant("Three")
-                                goto(after)
-                                next3 {
-                                    loadConstant("More")
-                                }
-                            }
                         }
-                        after { }
-
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        next2 {
+                            iload("tmp")
+                            loadConstant(3)
+                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            ifequal(next3)
+                            loadConstant("Three")
+                            goto(after)
+                        }
+                        next3 {
+                            loadConstant("More")
+                        }
+                        after {
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2474,6 +2475,9 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         val after = label()
+                        val next1 = label()
+                        val next2 = label()
+                        val next3 = label()
                         loadConstant(1)
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "+", "(II)I")
@@ -2481,7 +2485,6 @@ class CompilerTest {
                         iload("a")
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                        val next1 = label()
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
@@ -2489,27 +2492,25 @@ class CompilerTest {
                             iload("a")
                             loadConstant(2)
                             invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                            val next2 = label()
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
-                            next2 {
-                                iload("a")
-                                loadConstant(3)
-                                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                                val next3 = label()
-                                ifequal(next3)
-                                loadConstant("Three")
-                                goto(after)
-                                next3 {
-                                    loadConstant("More")
-                                }
-                            }
                         }
-                        after { }
-
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        next2 {
+                            iload("a")
+                            loadConstant(3)
+                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            ifequal(next3)
+                            loadConstant("Three")
+                            goto(after)
+                        }
+                        next3 {
+                            loadConstant("More")
+                        }
+                        after {
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2549,6 +2550,9 @@ class CompilerTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         val after = label()
+                        val next1 = label()
+                        val next2 = label()
+                        val next3 = label()
                         loadConstant(1)
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "+", "(II)I")
@@ -2556,7 +2560,6 @@ class CompilerTest {
                         iload("a")
                         loadConstant(1)
                         invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                        val next1 = label()
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
@@ -2564,7 +2567,6 @@ class CompilerTest {
                             iload("a")
                             loadConstant(2)
                             invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                            val next2 = label()
                             ifequal(next2)
                             `new`("java/lang/StringBuilder")
                             dup()
@@ -2576,23 +2578,22 @@ class CompilerTest {
                             invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
                             invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
                             goto(after)
-                            next2 {
-                                iload("a")
-                                loadConstant(3)
-                                invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
-                                val next3 = label()
-                                ifequal(next3)
-                                loadConstant("Three")
-                                goto(after)
-                                next3 {
-                                    loadConstant("More")
-                                }
-                            }
                         }
-                        after { }
-
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        next2 {
+                            iload("a")
+                            loadConstant(3)
+                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            ifequal(next3)
+                            loadConstant("Three")
+                            goto(after)
+                        }
+                        next3 {
+                            loadConstant("More")
+                        }
+                        after {
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2641,9 +2642,9 @@ class CompilerTest {
                             invokeStatic("Script", "factorial", "(I)I")
                             invokeStatic("jafun/lang/IntKt", "*", "(II)I")
                         }
-                        after { }
-
-                        ireturn()
+                        after {
+                            ireturn()
+                        }
                     }
                 }
             }
@@ -2722,9 +2723,9 @@ class CompilerTest {
                             istore("i")
                             goto(body)
                         }
-                        after { }
-
-                        `return`()
+                        after {
+                            `return`()
+                        }
                     }
                 }
             }
@@ -2754,12 +2755,14 @@ class CompilerTest {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
+                        val outerAfter = label()
+                        val outerBody = label()
+                        val innerAfter = label()
+                        val innerBody = label()
                         loadConstant(1)
                         istore("i")
                         loadConstant("Start")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        val outerAfter = label()
-                        val outerBody = label()
                         outerBody {
                             iload("i")
                             loadConstant(4)
@@ -2767,37 +2770,35 @@ class CompilerTest {
                             ifequal(outerAfter)
                             loadConstant(1)
                             istore("j")
-                            val innerAfter = label()
-                            val innerBody = label()
-                            innerBody {
-                                iload("j")
-                                loadConstant(4)
-                                invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
-                                ifequal(innerAfter)
-                                iload("i")
-                                iload("j")
-                                invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                                invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
-                                invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                                iload("j")
-                                loadConstant(1)
-                                invokeStatic("jafun/lang/IntKt", "+", "(II)I")
-                                istore("j")
-                                goto(innerBody)
-                            }
-                            innerAfter { }
-    
+                        }
+                        innerBody {
+                            iload("j")
+                            loadConstant(4)
+                            invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                            ifequal(innerAfter)
+                            iload("i")
+                            iload("j")
+                            invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                            invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            iload("j")
+                            loadConstant(1)
+                            invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                            istore("j")
+                            goto(innerBody)
+                        }
+                        innerAfter {
                             iload("i")
                             loadConstant(1)
                             invokeStatic("jafun/lang/IntKt", "+", "(II)I")
                             istore("i")
                             goto(outerBody)
                         }
-                        outerAfter { }
-
-                        loadConstant("End")
-                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
-                        `return`()
+                        outerAfter {
+                            loadConstant("End")
+                            invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                            `return`()
+                        }
                     }
                 }
             }
