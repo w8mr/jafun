@@ -271,6 +271,13 @@ object VCBinder {
                 instance
             }
             is ExpressionNode.FieldAccess -> resolveFieldAccess(instance)
+            is ExpressionNode.ConstructorInvocation -> {
+                val idx = instance.cons.parameters.indexOfFirst { it.name == node.fieldName }
+                if (idx >= 0 && idx < instance.arguments.size) {
+                    return instance.arguments[idx]
+                }
+                instance
+            }
             else -> instance
         }
 
