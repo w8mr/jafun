@@ -10,12 +10,6 @@ import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 
-
-import nl.w8mr.jafun.compiler.expandValueClassParams
-import nl.w8mr.jafun.compiler.findParamSymbolMap
-import nl.w8mr.jafun.compiler.buildFunctionParameters
-import nl.w8mr.jafun.compiler.setExpandedFieldsOnParameterVariables
-
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
     expression: ExpressionNode.Phase2_3Expression,
