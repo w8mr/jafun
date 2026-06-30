@@ -167,7 +167,14 @@ private fun resolveIdentityShortcut(node: ExpressionNode.FieldAccess): Expressio
         if (singleFieldName != null && node.fieldName != singleFieldName) {
             error("Field '${node.fieldName}' not found in value class ${instanceType.name}")
         }
-        return node.instance
+        val instance = node.instance
+        // For single-field VC, accessing the identity field is a no-op for Variables
+        // (unwrapping happens via resolveSingleFieldVariable). But for ConstructorInvocation,
+        // we need to return the unwrapped argument.
+        if (instance is ExpressionNode.ConstructorInvocation && instance.arguments.isNotEmpty()) {
+            return instance.arguments.first()
+        }
+        return instance
     }
     return null
 }
@@ -176,7 +183,9 @@ private fun resolveSingleFieldVariable(node: ExpressionNode.Variable): Expressio
     val expandedFields = node.variableSymbol.expandedFields
     if (expandedFields != null && expandedFields.size == 1) {
         val singleField = expandedFields[0]
+        System.err.println("  DEBUG resolveSingleFieldVariable: ${node.variableSymbol.name} -> singleField=${singleField.name}, actualSymbol=${singleField.actualSymbol?.name}, actualSymbol.type=${singleField.actualSymbol?.type}, actualSymbol.effectiveType=${singleField.actualSymbol?.effectiveType}, node.variableSymbol.type=${node.variableSymbol.type}, effectiveJvmType=${effectiveJvmType(node.variableSymbol.type)}")
         if (singleField.actualSymbol != null) {
+            singleField.actualSymbol.effectiveType = effectiveJvmType(node.variableSymbol.type)
             return ExpressionNode.Variable(singleField.actualSymbol!!)
         }
     }
@@ -194,6 +203,9 @@ private fun resolveExpandedFieldAccessInstr(
             ?: error("Field '${node.fieldName}' not found in value class ${varSymbol.type}")
         System.err.println("  DEBUG expandedFields for ${varSymbol.name}.${node.fieldName}: expandedFields=${expandedFields}, field=${field}, actualSymbol=${field.actualSymbol}, sourceVCFields=${field.sourceVCFields}, sourceVC=${field.sourceVC}")
         if (field.actualSymbol != null) {
+            if (varSymbol.type is Type.JFClass) {
+                field.actualSymbol.effectiveType = effectiveJvmType(varSymbol.type as Type.JFClass)
+            }
             return ExpressionNode.Variable(field.actualSymbol)
         }
         if (field.sourceVCFields != null) {
