@@ -535,15 +535,19 @@ object VCBinder {
                         }
                     }
                 } else {
-                    val unwrappedArg = if (arg is ExpressionNode.ConstructorInvocation &&
+                    val resolvedArg = if (arg is ExpressionNode.Variable &&
+                        arg.variableSymbol.expandedFieldSymbols != null) {
+                        resolveVariable(arg)
+                    } else arg
+                    val unwrappedArg = if (resolvedArg is ExpressionNode.ConstructorInvocation &&
                         !paramWasExpanded && isVCParam && paramExpandedType != null) {
                         val origCons = (origParam.type as? Type.JFClass)?.constructor
                         if (origCons != null && origCons.parameters.size == 1 &&
                             origCons.parameters[0].type == paramExpandedType &&
-                            arg.arguments.size == 1) {
-                            arg.arguments[0]
-                        } else arg
-                    } else arg
+                            resolvedArg.arguments.size == 1) {
+                            resolvedArg.arguments[0]
+                        } else resolvedArg
+                    } else resolvedArg
                     if (unwrappedArg != null) newArgs.add(unwrappedArg)
                     if (expandedIdx < expandedParams.size) {
                         val ep = expandedParams[expandedIdx]
