@@ -2213,7 +2213,7 @@ class CompilerTest {
                             loadConstant("Else")
                         }
                         after { }
-                        nextBlock()
+
                         pop()
                         `return`()
                     }
@@ -2316,7 +2316,7 @@ class CompilerTest {
                             }
                         }
                         after { }
-                        nextBlock()
+
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
                     }
@@ -2374,7 +2374,7 @@ class CompilerTest {
                             }
                         }
                         after { }
-                        nextBlock()
+
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
                     }
@@ -2433,7 +2433,7 @@ class CompilerTest {
                             }
                         }
                         after { }
-                        nextBlock()
+
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
                     }
@@ -2507,7 +2507,7 @@ class CompilerTest {
                             }
                         }
                         after { }
-                        nextBlock()
+
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
                     }
@@ -2590,7 +2590,7 @@ class CompilerTest {
                             }
                         }
                         after { }
-                        nextBlock()
+
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
                     }
@@ -2642,7 +2642,7 @@ class CompilerTest {
                             invokeStatic("jafun/lang/IntKt", "*", "(II)I")
                         }
                         after { }
-                        nextBlock()
+
                         ireturn()
                     }
                 }
@@ -2723,7 +2723,7 @@ class CompilerTest {
                             goto(body)
                         }
                         after { }
-                        nextBlock()
+
                         `return`()
                     }
                 }
@@ -2786,7 +2786,7 @@ class CompilerTest {
                                 goto(innerBody)
                             }
                             innerAfter { }
-                            nextBlock()
+    
                             iload("i")
                             loadConstant(1)
                             invokeStatic("jafun/lang/IntKt", "+", "(II)I")
@@ -2794,7 +2794,7 @@ class CompilerTest {
                             goto(outerBody)
                         }
                         outerAfter { }
-                        nextBlock()
+
                         loadConstant("End")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()

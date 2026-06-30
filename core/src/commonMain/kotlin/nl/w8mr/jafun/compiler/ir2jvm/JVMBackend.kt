@@ -138,7 +138,6 @@ class JVMBackend {
 
                         processMatches()
                         after { }
-                        nextBlock()
                     }
 
                     is ExpressionNode.ExpressionList -> {
@@ -157,7 +156,6 @@ class JVMBackend {
                             compile(instruction.condition)
                             ifnotequal(body)
                         }
-                        nextBlock()
                     }
 
                     is ExpressionNode.WhilePhase3 -> {
@@ -170,7 +168,6 @@ class JVMBackend {
                             goto(body)
                         }
                         after { }
-                        nextBlock()
                     }
 
                     is ExpressionNode.Convert -> {
@@ -326,7 +323,6 @@ fun buildClass(
                 m.instructions.forEachIndexed { index, instruction ->
                     context.compile(instruction, asStatement = (index != lastIndex))
                 }
-                nextBlock()
                 when (m.returnType) {
                     is OperandType.Unit -> {
                         if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) != m.returnType) pop()
