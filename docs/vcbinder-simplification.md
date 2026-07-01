@@ -41,36 +41,34 @@ Post-walk:
 
 ## Simplification Candidates
 
-### Candidate 1: Remove `paramFieldMap` by setting `expandedFields` on parameter symbols
+### Candidate 1: Set `expandedFields` on synthetic symbols in resolveViaParamFieldMap
 
-**Problem**: `paramFieldMap` is a separate mechanism to resolve `p.field` → expanded variable for method parameters. It exists because parameter variable symbols don't have `expandedFields` set — only `val`/`var` assignment symbols do.
+**Status**: Partially implemented (2026-07-01)
 
-**Solution**: Set `expandedFields` and `expandedFieldSymbols` on parameter symbols during pre-processing (or lazily when first accessed). Then `resolveExpandedFieldAccessInstr` handles them the same way as local variables.
+**What was done**: Added `setExpandedFieldsFromType()` helper that sets `expandedFields` on synthetic symbols created by `resolveViaParamFieldMap` when the field type is a multi-field VC. This fixes nested field access like `box.topLeft.x` on parameters.
 
-**Impact**: Deletes ~80 lines: `resolveViaParamFieldMap`, `buildParamFieldMap`, `extractFieldPath`, `getInnermostVariable`, the `paramFieldMap` parameter threading through `onPhase1`. Unified resolution path.
+**Remaining work**: The full candidate would set `expandedFields` on parameter symbols during preprocessing, allowing `resolveExpandedFieldAccessInstr` to handle them the same way as local variables. This would eliminate `resolveViaParamFieldMap` entirely. However, initial attempts at this caused parameter type corruption because `transformTree` returns early when `onNode` returns a different node, bypassing subsequent phase processing.
 
-**Risk**: Method parameters are shared across all call sites. Mutating them during pipeline execution could cause subtle issues if a method is visited multiple times. Would need a lazy or copy-on-first-write approach.
+**Key insight**: The preprocessing approach failed because modifying parameter symbols' `expandedFields` during preprocessing affected subsequent phase processing in subtle ways. A lazy or copy-on-first-write approach is needed.
 
 ---
 
-### Candidate 2: Restore chain-resolution in Phase 1a + move identity shortcut there
+### Candidate 2: Restore chain-resolution in Phase 1a + move identity shortcut
 
-**Problem**: Phase 4b exists because Phase 1a's `resolveFieldAccess` doesn't resolve chains fully. When `FieldAccess(FieldAccess(Variable(b), "topLeft"), "x")` is encountered, the old code resolved `b.topLeft` to `b_topLeft`, then immediately resolved `.x` on the result. The current code resolves `b.topLeft` to `b_topLeft` but returns a new `FieldAccess(Variable(b_topLeft), "x")` without resolving `.x`, relying on Phase 4b to catch it.
+**Status**: Failed
 
-**Solution**: Make Phase 1a's `resolveFieldAccess` recursively resolve through FieldAccess chains (as the old code did), and move `resolveIdentityShortcut` from Phase 4b to Phase 1a. This removes the need for the FieldAccess/Variable handling in Phase 4b, leaving it only to catch nodes created by Phase 2 (call site expansion).
+**Why it failed**: Moving `resolveIdentityShortcut` to Phase 1 causes it to short-circuit before `resolveViaParamFieldMap` can resolve `p.field` → `p_field` for method parameters. The two resolutions conflict.
 
-**Impact**: Phase 4b shrinks from ~65 lines to ~25 lines (only handles nodes created by call site expansion, plus residual cases from `ExpressionList` processing). No new mechanism needed — restoring old behavior plus moving one function.
-
-**Risk**: Low — restores a pattern that was working before unification. The old code had this exact chain-resolution and it passed all tests.
+**Prerequisite**: Complete Candidate 1 (removing `paramFieldMap`) before this can work.
 
 ---
 
 ### Candidate 3: Eliminate the ExpressionList special case
 
-**Problem**: Lines 48-60 manually recurse into `ExpressionList` children with a nested `transformTree` call, duplicating the transform logic. This exists because `transformTree` returns immediately when `onNode` returns a different node, so the `ExpressionList` children wouldn't be processed otherwise.
+**Status**: Deferred (too invasive)
 
-**Solution**: Instead of returning `ExpressionList` from `onPhase1` (which triggers the early return in `transformTree`), delay the expansion: mark the assignment for expansion and let a later phase handle it. Or restructure the assignment expansion to emit separate top-level instructions rather than an `ExpressionList`.
+**Why deferred**: The ExpressionList special case exists because `transformTree` returns early when `onNode` returns a different node. The nested `transformTree` call in the special case is necessary to properly apply all 3 phases to each expanded child expression before returning.
 
-**Impact**: Deletes ~15 lines of special-case code. Simpler transform loop. Could also eliminate the need for early `return@transformTree` entirely.
+Simply inlining the logic (without `transformTree`) breaks tests because `transformTree` handles recursive child processing in a specific way that the inline version doesn't replicate.
 
-**Risk**: Medium — assignment expansion timing is delicate. If delayed, later phases (call site expansion, return type update) might see un-expanded assignments. Would need careful ordering.
+**Alternative approach**: "Delay the expansion" - mark assignments for expansion and handle in a later phase. This requires restructuring the pipeline significantly and was deemed too risky for now.
