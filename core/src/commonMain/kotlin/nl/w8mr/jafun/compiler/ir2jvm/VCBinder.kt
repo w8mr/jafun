@@ -10,6 +10,7 @@ import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
 import nl.w8mr.jafun.compiler.expandVariable
 import nl.w8mr.jafun.compiler.flattenType
+import nl.w8mr.jafun.compiler.isMultiFieldVC
 import nl.w8mr.jafun.compiler.reconstructVCFromExpanded
 import nl.w8mr.jafun.compiler.shouldExpandVC
 import nl.w8mr.jafun.compiler.transformTree
@@ -149,6 +150,22 @@ object VCBinder {
         return node
     }
 
+    private fun setExpandedFieldsFromType(symbol: Type.JFVariableSymbol, fieldType: OperandType<*>) {
+        if (fieldType !is Type.JFClass || fieldType.kind != Type.ClassKind.VALUE_CLASS) return
+        if (!isMultiFieldVC(fieldType)) return
+        val cons = fieldType.constructor ?: return
+        symbol.expandedFields = cons.parameters.map { ctorParam ->
+            Type.ExpandedField(
+                name = ctorParam.name,
+                type = ctorParam.type,
+                sourceVC = ctorParam.type as? Type.JFClass,
+                sourceVCFields = if (isMultiFieldVC(ctorParam.type)) {
+                    flattenType(ctorParam.type, ctorParam.name + "_").map { it.path.substringAfter("_") to it.type }
+                } else null,
+            )
+        }
+    }
+
     private fun resolveViaParamFieldMap(
         node: ExpressionNode.Phase2_3Expression,
         paramFieldMap: Map<String, Map<String, Pair<String, OperandType<*>>>>
@@ -162,9 +179,9 @@ object VCBinder {
                     if (fields != null && fieldPath in fields) {
                         val (expandedName, fieldType) = fields[fieldPath]!!
                         val symbolMap = getInnermostVariable(node)?.variableSymbol?.symbolMap
-                        return ExpressionNode.Variable(
-                            Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap ?: IdentifierCache, initialized = true)
-                        )
+                        val symbol = Type.JFVariableSymbol(expandedName, fieldType, symbolMap = symbolMap ?: IdentifierCache, initialized = true)
+                        setExpandedFieldsFromType(symbol, fieldType)
+                        return ExpressionNode.Variable(symbol)
                     }
                     if (fields != null && fieldPath !in fields) {
                         val innermostVar = getInnermostVariable(node)
