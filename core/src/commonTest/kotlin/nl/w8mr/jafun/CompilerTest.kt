@@ -3609,6 +3609,26 @@ class CompilerTest {
     }
 
     @Test
+    fun vcDeeperNesting() {
+        test {
+            file {
+                code = """
+                    value class A(value: Int)
+                    value class B(a: A)
+                    value class C(b: B)
+                    value class D(c: C)
+                    fun getValue(d: D): Int {
+                        d.c.b.a.value
+                    }
+                    val d = D(C(B(A(42))))
+                    println getValue(d)
+                """.trimIndent()
+                expectedOutput = "42\n"
+            }
+        }
+    }
+
+    @Test
     fun vcFieldAccessOnCallResult() {
         test {
             file {

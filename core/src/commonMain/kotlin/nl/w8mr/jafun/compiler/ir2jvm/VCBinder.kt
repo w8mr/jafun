@@ -67,6 +67,11 @@ object VCBinder {
                     }
             }.toMutableList()
 
+            // Phase 4b: resolve remaining VC field accesses and variable shortcuts
+            for (j in combinedInstructions.indices) {
+                combinedInstructions[j] = resolveVCFieldAccesses(combinedInstructions[j])
+            }
+
             val unboxedType = unboxSingleFieldVCType(method.returnType)
             if (unboxedType != null && combinedInstructions.isNotEmpty()) {
                 val unboxed = tryUnboxCI(combinedInstructions.last(), method.returnType as Type.JFClass)
@@ -99,6 +104,7 @@ object VCBinder {
                         if (e is ExpressionNode.ValAssignment) {
                             val ci = e.expression as? ExpressionNode.ConstructorInvocation
                             if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
+                            e.variableSymbol.effectiveType = effectiveJvmType(e.variableSymbol.type)
                         }
                         e
                     })
@@ -111,6 +117,7 @@ object VCBinder {
                         if (e is ExpressionNode.VarAssignment) {
                             val ci = e.expression as? ExpressionNode.ConstructorInvocation
                             if (ci != null) e.variableSymbol.constructorArgs = ci.arguments
+                            e.variableSymbol.effectiveType = effectiveJvmType(e.variableSymbol.type)
                         }
                         e
                     })
@@ -627,4 +634,153 @@ object VCBinder {
         }
     }
 
+    // ---- Phase 4b: VC field access resolution on IR instructions ----
+
+    private fun resolveVCFieldAccesses(expr: ExpressionNode.Phase2_3Expression): ExpressionNode.Phase2_3Expression {
+        val resolved = when (expr) {
+            is ExpressionNode.FieldAccess -> {
+                val viaExpanded = (expr.instance as? ExpressionNode.Variable)?.let {
+                    resolveExpandedFieldAccessInstr(expr, it)
+                }
+                if (viaExpanded != null) return resolveVCFieldAccesses(viaExpanded)
+
+                val shortcutResult = resolveIdentityShortcut(expr)
+                if (shortcutResult != null) return resolveVCFieldAccesses(shortcutResult)
+
+                val resolvedInstance = resolveVCFieldAccesses(expr.instance)
+                if (resolvedInstance !== expr.instance) expr.copy(instance = resolvedInstance) else expr
+            }
+            is ExpressionNode.Variable -> {
+                resolveSingleFieldVariable(expr) ?: expr
+            }
+            is ExpressionNode.MethodInvocation -> {
+                val resolvedArgs = expr.arguments.map { resolveVCFieldAccesses(it) }
+                if (resolvedArgs != expr.arguments) {
+                    ExpressionNode.MethodInvocation(
+                        expr.methodName, expr.parentPath, expr.parameters,
+                        expr.rtnLookup, expr.field, resolvedArgs,
+                    )
+                } else expr
+            }
+            is ExpressionNode.ConstructorInvocation -> {
+                val resolvedArgs = expr.arguments.map { resolveVCFieldAccesses(it) }
+                if (resolvedArgs != expr.arguments) expr.copy(arguments = resolvedArgs) else expr
+            }
+            is ExpressionNode.ValAssignment -> {
+                val resolvedExpr = resolveVCFieldAccesses(expr.expression)
+                if (resolvedExpr !== expr.expression) expr.copy(expression = resolvedExpr) else expr
+            }
+            is ExpressionNode.VarAssignment -> {
+                val resolvedExpr = resolveVCFieldAccesses(expr.expression)
+                if (resolvedExpr !== expr.expression) expr.copy(expression = resolvedExpr) else expr
+            }
+            is ExpressionNode.ExpressionList -> {
+                val resolvedExprs = expr.expressions.map { resolveVCFieldAccesses(it) }
+                if (resolvedExprs != expr.expressions) ExpressionNode.ExpressionList(resolvedExprs) else expr
+            }
+            is ExpressionNode.Convert -> {
+                val resolvedInner = resolveVCFieldAccesses(expr.expression)
+                if (resolvedInner !== expr.expression) expr.copy(expression = resolvedInner) else expr
+            }
+            is ExpressionNode.WhenPhase3 -> {
+                val resolvedMatches = expr.matches.map { (c, e) -> resolveVCFieldAccesses(c) to resolveVCFieldAccesses(e) }
+                if (resolvedMatches != expr.matches) ExpressionNode.WhenPhase3(resolvedMatches) else expr
+            }
+            is ExpressionNode.WhilePhase3 -> {
+                val resolvedCond = resolveVCFieldAccesses(expr.condition)
+                val resolvedBody = resolveVCFieldAccesses(expr.expressions)
+                if (resolvedCond !== expr.condition || resolvedBody !== expr.expressions)
+                    ExpressionNode.WhilePhase3(resolvedCond, resolvedBody)
+                else expr
+            }
+            is ExpressionNode.Function -> {
+                val resolvedBlock = expr.block.map { resolveVCFieldAccesses(it) }
+                if (resolvedBlock != expr.block) ExpressionNode.Function(expr.symbol, resolvedBlock) else expr
+            }
+            else -> expr
+        }
+        return resolved
+    }
+
+    private fun resolveIdentityShortcut(node: ExpressionNode.FieldAccess): ExpressionNode.Phase2_3Expression? {
+        val instanceType = node.instance.type()
+        if (instanceType is Type.JFClass && instanceType.isInlineValueClass) {
+            val singleFieldName = instanceType.constructor?.parameters?.singleOrNull()?.name
+            if (singleFieldName != null && node.fieldName != singleFieldName) {
+                error("Field '${node.fieldName}' not found in value class ${instanceType.name}")
+            }
+            val instance = node.instance
+            if (instance is ExpressionNode.ConstructorInvocation && instance.arguments.isNotEmpty()) {
+                return instance.arguments.first()
+            }
+            return instance
+        }
+        return null
+    }
+
+    private fun resolveSingleFieldVariable(node: ExpressionNode.Variable): ExpressionNode.Phase2_3Expression? {
+        val expandedFields = node.variableSymbol.expandedFields
+        if (expandedFields != null && expandedFields.size == 1) {
+            val singleField = expandedFields[0]
+            if (singleField.actualSymbol != null) {
+                singleField.actualSymbol.effectiveType = effectiveJvmType(node.variableSymbol.type)
+                return ExpressionNode.Variable(singleField.actualSymbol!!)
+            }
+        }
+        return null
+    }
+
+    private fun resolveExpandedFieldAccessInstr(
+        node: ExpressionNode.FieldAccess,
+        instance: ExpressionNode.Variable,
+    ): ExpressionNode.Phase2_3Expression? {
+        val varSymbol = instance.variableSymbol
+        val expandedFields = varSymbol.expandedFields
+        if (expandedFields != null) {
+            val field = expandedFields.find { it.name == node.fieldName }
+                ?: error("Field '${node.fieldName}' not found in value class ${varSymbol.type}")
+            if (field.actualSymbol != null) {
+                if (varSymbol.type is Type.JFClass) {
+                    field.actualSymbol.effectiveType = effectiveJvmType(varSymbol.type as Type.JFClass)
+                }
+                return ExpressionNode.Variable(field.actualSymbol)
+            }
+            if (field.sourceVCFields != null) {
+                val syntheticVar = Type.JFVariableSymbol(
+                    name = "${varSymbol.name}_${field.name}",
+                    type = field.type,
+                    symbolMap = varSymbol.symbolMap,
+                    initialized = true,
+                )
+                syntheticVar.effectiveType = effectiveJvmType(field.type)
+                val parentSymbols = varSymbol.expandedFieldSymbols
+                val hasAnyActual = field.sourceVCFields.any { (subFieldPath, _) ->
+                    val fullPath = "${field.name}_$subFieldPath"
+                    parentSymbols?.get(fullPath) != null
+                }
+                if (hasAnyActual) {
+                    syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
+                        val fullPath = "${field.name}_$subFieldPath"
+                        val actualSymbol = parentSymbols?.get(fullPath)
+                        Type.ExpandedField(
+                            name = subFieldPath, type = subFieldType,
+                            sourceVC = null, sourceVCFields = null,
+                            actualSymbol = actualSymbol,
+                        )
+                    }
+                }
+                return ExpressionNode.Variable(syntheticVar)
+            } else {
+                val expandedVar = Type.JFVariableSymbol(
+                    name = "${varSymbol.name}_${field.name}",
+                    type = field.type,
+                    symbolMap = varSymbol.symbolMap,
+                    initialized = true,
+                )
+                expandedVar.effectiveType = effectiveJvmType(field.type)
+                return ExpressionNode.Variable(expandedVar)
+            }
+        }
+        return null
+    }
 }
