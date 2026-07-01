@@ -235,16 +235,22 @@ object VCBinder {
                 initialized = true,
             )
             val parentSymbols = varSymbol.expandedFieldSymbols
-            syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
+            val hasAnyActual = field.sourceVCFields.any { (subFieldPath, _) ->
                 val fullPath = "${field.name}_$subFieldPath"
-                val actualSymbol = parentSymbols?.get(fullPath)
-                Type.ExpandedField(
-                    name = subFieldPath,
-                    type = subFieldType,
-                    sourceVC = null,
-                    sourceVCFields = null,
-                    actualSymbol = actualSymbol,
-                )
+                parentSymbols?.get(fullPath) != null
+            }
+            if (hasAnyActual) {
+                syntheticVar.expandedFields = field.sourceVCFields.map { (subFieldPath, subFieldType) ->
+                    val fullPath = "${field.name}_$subFieldPath"
+                    val actualSymbol = parentSymbols?.get(fullPath)
+                    Type.ExpandedField(
+                        name = subFieldPath,
+                        type = subFieldType,
+                        sourceVC = null,
+                        sourceVCFields = null,
+                        actualSymbol = actualSymbol,
+                    )
+                }
             }
             return ExpressionNode.Variable(syntheticVar)
         }
