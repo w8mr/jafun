@@ -6,9 +6,13 @@ import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
+import nl.w8mr.jafun.compiler.referentialListDiff
+import nl.w8mr.jafun.compiler.transformTree
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -291,7 +295,6 @@ class VCBinderTests {
         val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
-        resolved as ExpressionNode.Variable
         assertEquals("b_topLeft_x", resolved.variableSymbol.name)
         assertEquals(intType(), resolved.variableSymbol.type)
     }
@@ -318,7 +321,593 @@ class VCBinderTests {
         val resolved = VCBinder.resolveFieldAccessToScalar(faOnX)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
-        resolved as ExpressionNode.Variable
         assertEquals("b_x", resolved.variableSymbol.name)
+    }
+
+    // ================================================================================
+    // setExpandedFieldsOnSymbol: Issue #1 — propagate expandedFields to param symbols
+    // ================================================================================
+
+    @Test
+    fun setExpandedFields_multiFieldVC_setsExpandedFields() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        assertNull(b.expandedFields)
+
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        assertNotNull(b.expandedFields)
+        assertEquals(1, b.expandedFields!!.size)
+
+        val topLeftField = b.expandedFields!![0]
+        assertEquals("topLeft", topLeftField.name)
+        assertEquals(pointVc, topLeftField.type)
+        val fields = topLeftField.sourceVCFields
+        assertNotNull(fields)
+        assertEquals(2, fields.size)
+        assertEquals("x", fields[0].first)
+        assertEquals(intType(), fields[0].second)
+        assertEquals("y", fields[1].first)
+        assertEquals(intType(), fields[1].second)
+    }
+
+    @Test
+    fun setExpandedFields_multiFieldVC_setsExpandedFieldSymbols() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        assertNotNull(b.expandedFieldSymbols)
+        assertEquals(setOf("topLeft_x", "topLeft_y"), b.expandedFieldSymbols!!.keys)
+
+        val symX = b.expandedFieldSymbols!!["topLeft_x"]
+        assertNotNull(symX)
+        assertEquals("b_topLeft_x", symX.name)
+        assertEquals(intType(), symX.type)
+
+        val symY = b.expandedFieldSymbols!!["topLeft_y"]
+        assertNotNull(symY)
+        assertEquals("b_topLeft_y", symY.name)
+        assertEquals(intType(), symY.type)
+    }
+
+    @Test
+    fun setExpandedFields_nonVC_doesNothing() {
+        val s = Type.JFVariableSymbol("s", stringType())
+        VCBinder.setExpandedFieldsOnSymbol(s)
+        assertNull(s.expandedFields)
+        assertNull(s.expandedFieldSymbols)
+    }
+
+    @Test
+    fun setExpandedFields_alreadySet_doesNotOverwrite() {
+        val boxVc = createVC("Box", "x" to intType())
+        val b = Type.JFVariableSymbol("b", boxVc)
+        // Simulate R1 setting expandedFields
+        expandAssignmentIfNeeded(valAssign(b, ci(boxVc.constructor!!, intLiteral(99))))
+
+        val existingFields = b.expandedFields
+        val existingSymbols = b.expandedFieldSymbols
+
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        // Should be the same references (not overwritten)
+        assertTrue(b.expandedFields === existingFields)
+        assertTrue(b.expandedFieldSymbols === existingSymbols)
+    }
+
+    @Test
+    fun setExpandedFields_singleFieldVC_containingMultiField_setsCorrectStructure() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        // Box has one constructor param (topLeft: Point).
+        // isMultiFieldVC(Point) = true, so sourceVCFields = [(x, Int), (y, Int)]
+        val fields = b.expandedFields
+        assertNotNull(fields)
+        val field = fields[0]
+        assertEquals("topLeft", field.name)
+        val sourceFields = field.sourceVCFields
+        assertNotNull(sourceFields)
+        assertEquals(2, sourceFields.size)
+    }
+
+    @Test
+    fun setExpandedFields_enablesFieldAccessResolution() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        // Build b.topLeft.x
+        val topLeftFa = ExpressionNode.FieldAccess(
+            instance = ExpressionNode.Variable(b),
+            fieldName = "topLeft",
+            fieldIndex = 0,
+            fieldType = pointVc,
+            arguments = emptyList()
+        )
+        val outerFa = ExpressionNode.FieldAccess(
+            instance = topLeftFa,
+            fieldName = "x",
+            fieldIndex = 0,
+            fieldType = intType(),
+            arguments = emptyList()
+        )
+
+        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
+        assertNotNull(resolved)
+        assertTrue(resolved is ExpressionNode.Variable)
+        assertEquals("b_topLeft_x", resolved.variableSymbol.name)
+    }
+
+    // ================================================================================
+    // flattenCIArgs: recursive CI argument flattening
+    // ================================================================================
+
+    @Test
+    fun flattenCIArgs_singleLevel_returnsFlatArgs() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
+
+        val flattened = VCBinder.flattenCIArgs(innerCi)
+        assertNotNull(flattened)
+        assertEquals(2, flattened.size)
+        assertEquals(intLiteral(1), flattened[0])
+        assertEquals(intLiteral(2), flattened[1])
+    }
+
+    @Test
+    fun flattenCIArgs_primitiveField_returnsArgUnchanged() {
+        val boxVc = createVC("Box", "x" to intType())
+        val ci = ci(boxVc.constructor!!, intLiteral(42))
+
+        val flattened = VCBinder.flattenCIArgs(ci)
+        assertNotNull(flattened)
+        assertEquals(1, flattened.size)
+        assertEquals(intLiteral(42), flattened[0])
+    }
+
+    @Test
+    fun flattenCIArgs_nested_returnsAllScalars() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
+        val outerCi = ci(boxVc.constructor!!, innerCi)
+
+        val flattened = VCBinder.flattenCIArgs(outerCi)
+        assertNotNull(flattened)
+        assertEquals(2, flattened.size)
+        assertEquals(intLiteral(1), flattened[0])
+        assertEquals(intLiteral(2), flattened[1])
+    }
+
+    @Test
+    fun flattenCIArgs_deeplyNested_returnsAllScalars() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+        val wrapperVc = createVC("Wrapper", "box" to boxVc)
+
+        val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
+        val midCi = ci(boxVc.constructor!!, innerCi)
+        val outerCi = ci(wrapperVc.constructor!!, midCi)
+
+        val flattened = VCBinder.flattenCIArgs(outerCi)
+        assertNotNull(flattened)
+        assertEquals(2, flattened.size)
+        assertEquals(intLiteral(1), flattened[0])
+        assertEquals(intLiteral(2), flattened[1])
+    }
+
+    // ================================================================================
+    // expandArgForCallSite: expand a single arg to match expanded param
+    // ================================================================================
+
+    @Test
+    fun expandArgForCallSite_variableWithSymbols_returnsScalarVars() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val myBox = Type.JFVariableSymbol("myBox", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(myBox)
+
+        val expanded = VCBinder.expandArgForCallSite(
+            ExpressionNode.Variable(myBox),
+            Parameter(boxVc, "b")
+        )
+        assertNotNull(expanded)
+        assertEquals(2, expanded.size)
+        assertEquals("myBox_topLeft_x", (expanded[0] as ExpressionNode.Variable).variableSymbol.name)
+        assertEquals(intType(), (expanded[0] as ExpressionNode.Variable).variableSymbol.type)
+        assertEquals("myBox_topLeft_y", (expanded[1] as ExpressionNode.Variable).variableSymbol.name)
+        assertEquals(intType(), (expanded[1] as ExpressionNode.Variable).variableSymbol.type)
+    }
+
+    @Test
+    fun expandArgForCallSite_ciArg_returnsFlatExprs() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
+        val outerCi = ci(boxVc.constructor!!, innerCi)
+
+        val expanded = VCBinder.expandArgForCallSite(outerCi, Parameter(boxVc, "b"))
+        assertNotNull(expanded)
+        assertEquals(2, expanded.size)
+        assertEquals(intLiteral(1), expanded[0])
+        assertEquals(intLiteral(2), expanded[1])
+    }
+
+    @Test
+    fun expandArgForCallSite_nonVCParam_returnsNull() {
+        val expanded = VCBinder.expandArgForCallSite(intLiteral(5), Parameter(intType(), "x"))
+        assertNull(expanded)
+    }
+
+    @Test
+    fun expandArgForCallSite_variableWithoutSymbols_returnsNull() {
+        val boxVc = createVC("Box", "x" to intType())
+        val myBox = Type.JFVariableSymbol("myBox", boxVc)
+
+        val expanded = VCBinder.expandArgForCallSite(
+            ExpressionNode.Variable(myBox),
+            Parameter(boxVc, "b")
+        )
+        assertNull(expanded)
+    }
+
+    // ================================================================================
+    // expandCallSiteArgs: rewrite MethodInvocation with expanded args
+    // ================================================================================
+
+    @Test
+    fun expandCallSiteArgs_expandsArgForMultiFieldVCParam() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val origParams = listOf(Parameter(boxVc, "b"))
+        val expandedParams = expandParameterRecursively(boxVc, "b")
+        val methodSigs = mapOf("foo" to Triple(origParams, expandedParams, OperandType.Unit))
+
+        val myBox = Type.JFVariableSymbol("myBox", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(myBox)
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "foo",
+            parentPath = "",
+            parameters = listOf(Type.JFVariableSymbol("b", boxVc)),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(ExpressionNode.Variable(myBox))
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.MethodInvocation)
+
+        assertEquals(2, result.arguments.size)
+        assertTrue(result.arguments[0] is ExpressionNode.Variable)
+        assertTrue(result.arguments[1] is ExpressionNode.Variable)
+        assertEquals("myBox_topLeft_x", (result.arguments[0] as ExpressionNode.Variable).variableSymbol.name)
+        assertEquals("myBox_topLeft_y", (result.arguments[1] as ExpressionNode.Variable).variableSymbol.name)
+    }
+
+    @Test
+    fun expandCallSiteArgs_ciArg_flattensCorrectly() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val origParams = listOf(Parameter(boxVc, "b"))
+        val expandedParams = expandParameterRecursively(boxVc, "b")
+        val methodSigs = mapOf("foo" to Triple(origParams, expandedParams, OperandType.Unit))
+
+        val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
+        val outerCi = ci(boxVc.constructor!!, innerCi)
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "foo",
+            parentPath = "",
+            parameters = listOf(Type.JFVariableSymbol("b", boxVc)),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(outerCi)
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        assertNotNull(result)
+        result as ExpressionNode.MethodInvocation
+
+        assertEquals(2, result.arguments.size)
+        assertEquals(intLiteral(1), result.arguments[0])
+        assertEquals(intLiteral(2), result.arguments[1])
+    }
+
+    @Test
+    fun expandCallSiteArgs_nonVCMethod_returnsNull() {
+        val origParams = listOf(Parameter(intType(), "x"))
+        val methodSigs = mapOf("add" to Triple(origParams, origParams, intType()))
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "add",
+            parentPath = "",
+            parameters = listOf(Type.JFVariableSymbol("x", intType())),
+            rtnLookup = { intType() },
+            field = null,
+            arguments = listOf(intLiteral(3))
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        assertNull(result)
+    }
+
+    @Test
+    fun expandCallSiteArgs_nonInvocation_returnsNull() {
+        val result = VCBinder.expandCallSiteArgs(intLiteral(42), emptyMap())
+        assertNull(result)
+    }
+
+    @Test
+    fun expandCallSiteArgs_unknownMethod_returnsNull() {
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "unknown",
+            parentPath = "",
+            parameters = emptyList(),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = emptyList()
+        )
+        val result = VCBinder.expandCallSiteArgs(callSite, emptyMap())
+        assertNull(result)
+    }
+
+    @Test
+    fun expandCallSiteArgs_updatesParameterList() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val origParams = listOf(Parameter(boxVc, "b"))
+        val expandedParams = expandParameterRecursively(boxVc, "b")
+        val methodSigs = mapOf("foo" to Triple(origParams, expandedParams, OperandType.Unit))
+
+        val myBox = Type.JFVariableSymbol("myBox", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(myBox)
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "foo",
+            parentPath = "",
+            parameters = listOf(Type.JFVariableSymbol("b", boxVc)),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(ExpressionNode.Variable(myBox))
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs) as ExpressionNode.MethodInvocation
+        assertEquals(2, result.parameters.size)
+        assertEquals(intType(), result.parameters[0].type)
+        assertEquals(intType(), result.parameters[1].type)
+    }
+
+    // ================================================================================
+    // expandCallSiteArgs: return type only change (R5 scenario)
+    // ================================================================================
+
+    @Test
+    fun expandCallSiteArgs_returnTypeOnlyChanged_returnsUpdatedMI() {
+        val idVc = createVC("Id", "value" to intType())
+        val origParams = emptyList<Parameter>()
+        val expandedParams = emptyList<Parameter>()
+        val methodSigs = mapOf("makeId" to Triple(origParams, expandedParams, idVc))
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        result as ExpressionNode.MethodInvocation
+
+        assertEquals("makeId", result.methodName)
+        assertEquals(intType(), result.type(), "rtnLookup should return Int after unboxing Id")
+    }
+
+    @Test
+    fun expandCallSiteArgs_returnTypeOnlyChanged_paramsPreserved() {
+        val idVc = createVC("Id", "value" to intType())
+        val origParams = emptyList<Parameter>()
+        val expandedParams = emptyList<Parameter>()
+        val methodSigs = mapOf("makeId" to Triple(origParams, expandedParams, idVc))
+
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs) as ExpressionNode.MethodInvocation
+
+        assertEquals(callSite.parameters, result.parameters, "parameters should be preserved when paramsUnchanged")
+        assertEquals(callSite.arguments, result.arguments, "arguments should be preserved when paramsUnchanged")
+        assertEquals(callSite.parentPath, result.parentPath)
+        assertEquals(callSite.field, result.field)
+    }
+
+    @Test
+    fun expandCallSiteArgs_returnTypeChangedAndParamsExpanded_returnsUpdatedMI() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val origParams = listOf(Parameter(boxVc, "b"))
+        val expandedParams = expandParameterRecursively(boxVc, "b")
+        val methodSigs = mapOf("getX" to Triple(origParams, expandedParams, pointVc))
+
+        val boxParam = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(boxParam)
+
+        // fun getX(b: Box): Point — makeId-like scenario where return type is single-field VC
+        val callSite = ExpressionNode.MethodInvocation(
+            methodName = "getX",
+            parentPath = "",
+            parameters = listOf(boxParam),
+            rtnLookup = { pointVc },
+            field = null,
+            arguments = listOf(ExpressionNode.Variable(boxParam))
+        )
+
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        result as ExpressionNode.MethodInvocation
+
+        // Return type: Point has 2 fields, so intType since it's not a single-field VC chain
+        assertEquals(pointVc, result.type(), "Point has 2 fields, no single-field unboxing")
+        assertEquals(2, result.parameters.size, "Box parameter should expand to 2 scalars")
+        assertEquals(2, result.arguments.size, "Argument should expand to 2 scalars")
+    }
+
+    // ================================================================================
+    // transformTree integration: rtnLookup change propagation
+    // ================================================================================
+
+    @Test
+    fun transformTree_propagatesNestedMethodInvocationRtnLookupChange() {
+        val idVc = createVC("Id", "value" to intType())
+        val methodSigs = mapOf("makeId" to Triple(emptyList<Parameter>(), emptyList<Parameter>(), idVc))
+
+        // Build: MethodInvocation(println, args=[Convert(from=Id, to=Object, expr=MethodInvocation(makeId))])
+        val innerMI = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+
+        val objType = Type.JFClass("java.lang.Object")
+        val convert = ExpressionNode.Convert(innerMI, idVc, objType)
+
+        val outerMI = ExpressionNode.MethodInvocation(
+            methodName = "println",
+            parentPath = "jafun.io.ConsoleKt",
+            parameters = listOf(Type.JFVariableSymbol("x", objType)),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(convert)
+        )
+
+        // Apply transformTree with the same lambda as VCBinder Step 2
+        val result = outerMI.transformTree { node ->
+            VCBinder.expandCallSiteArgs(node, methodSigs) ?: node
+        }
+
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        result as ExpressionNode.MethodInvocation
+
+        assertEquals(1, result.arguments.size, "Should still have 1 argument")
+
+        val resultConvert = result.arguments[0]
+        assertTrue(resultConvert is ExpressionNode.Convert)
+        resultConvert as ExpressionNode.Convert
+
+        val resultInnerMI = resultConvert.expression
+        assertTrue(resultInnerMI is ExpressionNode.MethodInvocation)
+        resultInnerMI as ExpressionNode.MethodInvocation
+
+        // Verify rtnLookup was updated from Id to Int
+        assertTrue(
+            resultInnerMI.type() != idVc,
+            "Inner MI type should no longer be Id after expandCallSiteArgs"
+        )
+        assertEquals(
+            intType(), resultInnerMI.type(),
+            "Inner MI type should be Int after R5 unboxing"
+        )
+    }
+
+    @Test
+    fun transformTree_nestedMI_outerMIRecreatedWhenInnerChanges() {
+        val idVc = createVC("Id", "value" to intType())
+        val methodSigs = mapOf("makeId" to Triple(emptyList<Parameter>(), emptyList<Parameter>(), idVc))
+
+        val innerMI = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+
+        val convert = ExpressionNode.Convert(innerMI, idVc, Type.JFClass("java.lang.Object"))
+
+        val outerMI = ExpressionNode.MethodInvocation(
+            methodName = "println",
+            parentPath = "jafun.io.ConsoleKt",
+            parameters = listOf(Type.JFVariableSymbol("x", Type.JFClass("java.lang.Object"))),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(convert)
+        )
+
+        val originalIdentity = System.identityHashCode(outerMI)
+
+        val result = outerMI.transformTree { node ->
+            VCBinder.expandCallSiteArgs(node, methodSigs) ?: node
+        }
+
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        assertTrue(
+            result !== outerMI,
+            "Outer MI should be a different object (recreated due to inner MI rtnLookup change)"
+        )
+    }
+
+    // ================================================================================
+    // referentialListDiff
+    // ================================================================================
+
+    @Test
+    fun referentialListDiff_sameElements_returnsFalse() {
+        val a = intLiteral(1)
+        val b = intLiteral(2)
+        val list = listOf(a, b)
+        assertFalse(referentialListDiff(list, list.toList()))
+    }
+
+    @Test
+    fun referentialListDiff_differentElements_returnsTrue() {
+        val a = intLiteral(1)
+        val b = intLiteral(2)
+        val c = intLiteral(3)
+        assertTrue(referentialListDiff(listOf(a, b), listOf(a, c)))
+    }
+
+    @Test
+    fun referentialListDiff_differentSizes_returnsTrue() {
+        val a = intLiteral(1)
+        assertTrue(referentialListDiff(listOf(a), listOf(a, a)))
+    }
+
+    @Test
+    fun referentialListDiff_emptyLists_returnsFalse() {
+        assertFalse(referentialListDiff(emptyList<Int>(), emptyList<Int>()))
     }
 }

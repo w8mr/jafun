@@ -59,32 +59,103 @@ The current `VCBinder` already has:
 - **R1** — `expandAssignmentIfNeeded` reused on ValAssignment/VarAssignment
 - **R3** — `resolveFieldAccessToScalar` resolves a chained FieldAccess to a scalar Variable
 - **Param expansion** — `expandParameterForVC` flattens multi-field VC params
+- **`setExpandedFieldsOnSymbol`** — propagates `expandedFields`/`expandedFieldSymbols` to any
+  `JFVariableSymbol` whose type is a multi-field VC (solves issue #1)
+- **`expandCallSiteArgs`** — rewrites `MethodInvocation` nodes to expand args when the target
+  method had expanded params. Handles Variable args (via `expandedFieldSymbols`) and
+  ConstructorInvocation args (via `flattenCIArgs`).
 
-It does NOT yet have:
-- **R5** — single-field VC return unboxing
-- **R4** — reconstruct boxed VC from scalars at call site
-- **Call site arg expansion** — when calling a function with expanded params, pass scalars instead of boxed VC
-- **Param expansion side effect** — body Variable symbols matching parameter names don't yet have `expandedFields` set
+### Pure functions (tested in isolation in VCBinderTests)
+
+| Function | Input | Output | Tests |
+|---|---|---|---|
+| `expandAssignmentIfNeeded` | `ValAssignment`/`VarAssignment` | `List<Phase2_3Expression>` | 4 (R1) |
+| `expandParameterRecursively` | `OperandType`, baseName | `List<Parameter>` | 2 (paramExpand) |
+| `resolveFieldAccessToScalar` | `Phase2_3Expression` | `Phase2_3Expression?` | 4 (R3) |
+| `setExpandedFieldsOnSymbol` | `JFVariableSymbol` | Unit (side-effect on symbol) | 5 |
+| `flattenCIArgs` | `ConstructorInvocation` | `List<Phase2_3Expression>?` | 4 |
+| `expandArgForCallSite` | arg, param | `List<Phase2_3Expression>?` | 4 |
+| `expandCallSiteArgs` | node, methodSigs | `Phase2_3Expression?` | 9 |
+| `unboxSingleFieldReturnExpr` | `Phase2_3Expression` | `Phase2_3Expression` | 4 |
+| `referentialListDiff` | `List<T>`, `List<T>` | `Boolean` | 4 |
+
+### Known failures (7 CompilerTest)
+
+| Test | Rule | Symptom |
+|---|---|---|
+| `vcReturnSingleFieldWithVal` | R5 | `val id = makeId()` stores int, but `println id` expects Object (missing boxing) |
+| `vcReturnSingleFieldFieldAccess` | R5 + R3 | `println makeId().value` — field access on call result |
+| `vcReturnSingleFieldFieldAccessWithVal` | R5 + R3 | Same with val assignment |
+| `testBoxSingleField` | R5 + R2 | Single-field VC param + field access on function call result |
+| `testBoxSingleFieldWorking` | R5 + R2 | Same, inline CI arg |
+| `testMultiArgReconstruction` | R4 | Reconstruct boxed VC from scalars at call site |
+| `vcFieldAccessOnCallResult` | R2 | Field access on function call result |
+
+All 7 fail because variable type propagation after R5 unboxing is not implemented
+(the variable's declared type stays `Id` but runtime value is `int`, so `Convert(from=Id, to=Object)`
+is stale). Fixing this requires either updating variable symbol types after the return type
+change, or adjusting the call site to insert the correct boxing Convert.
 
 ### Test results (current)
 
-- `VCBinderTests[jvm]` — 10 tests passing (R1, R3, paramExpand unit tests)
-- `CompilerTest[jvm]` — 19 tests failing (pre-existing IR bytecode assertions + new
-  ones where param/call expansion still incomplete)
-- All non-VC tests — green
+- `VCBinderTests[jvm]` — **35 tests passing** (R1, R3, paramExpand, setExpandedFieldsOnSymbol,
+  flattenCIArgs, expandArgForCallSite, expandCallSiteArgs, unboxSingleFieldReturnExpr,
+  referentialListDiff, transformTree integration)
+- `CompilerTest[jvm]` — **7 tests failing** (see table above; was 12 before this commit, 5 fixed:
+  `vcReturnSingleField`, plus the 4 `@Disabled` tests that were never enabled)
+- All non-VC tests — green (no regressions)
 
-### Open issues in current state
+### Fixed issues
 
-1. When a parameter is a multi-field VC, the body's `Variable(paramName)` symbol
-   does not have `expandedFields` set, so `user.street` chain does not resolve to
-   a scalar. **Need**: walk body, patch parameter symbols with `expandedFields`.
+1. ~~Parameter `expandedFields` not set on body Variable symbols~~ — Solved by
+   `setExpandedFieldsOnSymbol`, called from `handle()` during Step 1b.
 
-2. The call site `invokestatic` carries the original (boxed) MethodInvocation
-   parameters + arguments. **Need**: rewrite to use the expanded param list
-   with scalar args.
+2. ~~Call site arg expansion not implemented~~ — Solved by `expandCallSiteArgs`,
+   `expandArgForCallSite`, and `flattenCIArgs`. Integrated in `handle()` Step 2.
 
-3. R5 (single-field return unboxing) is not yet done.
+3. ~~`transformTree` list comparison uses structural equality (`!=`) instead of
+   referential (`!==`), so `MethodInvocation.rtnLookup` changes (which are excluded
+   from `equals()`) silently disappear~~ — Fixed by replacing `!=` with
+   `referentialListDiff` (element-wise `!==`) in `TreeTransform.kt`.
+
+4. ~~R5 basic (direct call site without variable)~~ — `vcReturnSingleField` now passes.
+   `unboxSingleFieldReturnExpr` implemented + `expandCallSiteArgs` updates `rtnLookup`
+   for return type changes. Step 2b (`fixedConverts`) updates `Convert.from` when
+   inner expression type changes after R5.
+
+### Open issues (remaining)
+
+1. **R5 variable propagation** — When R5 unboxes a method's return type, call sites
+   that assign to val/var need the variable's type updated AND all references to it
+   need correct Convert.from values. Currently `Convert(from=Id, to=Object)` stays
+   stale because the Variable's declared type is still `Id`.
+2. **R4** — reconstruct boxed VC from scalars at call site.
+3. **R2** — lazy unboxing on function call result.
+
+## Module structure
+
+All VC binding logic lives in a single file:
+- `VCBinder.kt` (`commonMain`) — the `handle()` pipeline and all pure functions
+- `VCBinderTests.kt` (`commonTest`) — 30 unit tests covering each function in isolation
+
+Helpers reused from `VCFlattening.kt`:
+- `flattenType`, `expandVariable`, `expandAssignmentIfNeeded`, `expandParameterRecursively`,
+  `isMultiFieldVC`
 
 ## Next Steps
 
-(none to add here — fill in as we go)
+1. **Fix variable type propagation after R5** — When `makeId()` unboxes to return `int`, the
+   call site `val id = makeId()` stores an int, but `id`'s declared type stays `Id`. The
+   Convert `Convert(from=Id, to=Object)` wrapping `Variable(id)` is therefore stale — it
+   should be `Convert(from=Int, to=Object)`. Two approaches:
+   - **Approach A**: After R5 unboxes a return, update the variable symbol's type and all
+     `Convert.from` values at its uses.
+   - **Approach B**: Instead of unboxing at the function definition, unbox at each call site
+     via `expandCallSiteArgs` and let variable types follow naturally.
+
+2. **Implement R4** — `reconstructFromScalars(node)` to rebuild a boxed VC from scalar args
+   at a call site that expects the boxed type.
+
+3. **Implement R2** — `resolveFieldAccessOnCallResult(node)` for `getPoint(b).x` patterns.
+
+4. **Write unit tests** for each new function before integrating in `handle()`.

@@ -1,5 +1,8 @@
 package nl.w8mr.jafun.compiler
 
+fun <T> referentialListDiff(a: List<T>, b: List<T>): Boolean =
+    a.size != b.size || a.withIndex().any { (i, elem) -> elem !== b[i] }
+
 fun ExpressionNode.Phase2_3Expression.transformTree(
     onNode: (ExpressionNode.Phase2_3Expression) -> ExpressionNode.Phase2_3Expression
 ): ExpressionNode.Phase2_3Expression {
@@ -17,11 +20,11 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
         }
         is ExpressionNode.MethodInvocation -> {
             val newArgs = arguments.map { it.transformTree(onNode) }
-            if (newArgs != arguments) ExpressionNode.MethodInvocation(methodName, parentPath, parameters, rtnLookup, field, newArgs) else this
+            if (referentialListDiff(newArgs, arguments)) ExpressionNode.MethodInvocation(methodName, parentPath, parameters, rtnLookup, field, newArgs) else this
         }
         is ExpressionNode.ConstructorInvocation -> {
             val newArgs = arguments.map { it.transformTree(onNode) }
-            if (newArgs != arguments) ExpressionNode.ConstructorInvocation(cons, newArgs) else this
+            if (referentialListDiff(newArgs, arguments)) ExpressionNode.ConstructorInvocation(cons, newArgs) else this
         }
         is ExpressionNode.FieldAccess -> {
             val newInstance = instance.transformTree(onNode)
@@ -29,7 +32,7 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
         }
         is ExpressionNode.ExpressionList -> {
             val newExprs = expressions.map { it.transformTree(onNode) }
-            if (newExprs != expressions) ExpressionNode.ExpressionList(newExprs) else this
+            if (referentialListDiff(newExprs, expressions)) ExpressionNode.ExpressionList(newExprs) else this
         }
         is ExpressionNode.WhilePhase3 -> {
             val newCond = condition.transformTree(onNode)
@@ -38,11 +41,12 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
         }
         is ExpressionNode.WhenPhase3 -> {
             val newMatches = matches.map { (cond, expr) -> cond.transformTree(onNode) to expr.transformTree(onNode) }
-            if (newMatches != matches) ExpressionNode.WhenPhase3(newMatches) else this
+            if (newMatches.asSequence().withIndex().any { (idx, p) -> p.first !== matches[idx].first || p.second !== matches[idx].second })
+                ExpressionNode.WhenPhase3(newMatches) else this
         }
         is ExpressionNode.Function -> {
             val newBlock = block.map { it.transformTree(onNode) }
-            if (newBlock != block) ExpressionNode.Function(symbol, newBlock) else this
+            if (referentialListDiff(newBlock, block)) ExpressionNode.Function(symbol, newBlock) else this
         }
         is ExpressionNode.Convert -> {
             val newExpr = expression.transformTree(onNode)
