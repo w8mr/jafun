@@ -61,10 +61,49 @@ object VCBinder {
                 }
             }
 
+            // Step 2c: Update variable symbol effectiveType when assignment RHS
+            // expression type changed (e.g., after R5 return unboxing, a ValAssignment's
+            // MI expression returns Int but the symbol still has type Id).
+            // This sets effectiveType on the shared symbol reference, so Variable nodes
+            // (which delegate to effectiveType ?: type) report the correct type, and
+            // Step 2b can fix Convert.from values.
+            val updatedVarTypes = resolved.map { instruction ->
+                when (instruction) {
+                    is ExpressionNode.ValAssignment -> {
+                        val exprType = instruction.expression.type()
+                        val sym = instruction.variableSymbol
+                        if (exprType != sym.type && exprType != sym.effectiveType) {
+                            sym.effectiveType = exprType
+                        }
+                        instruction
+                    }
+                    is ExpressionNode.VarAssignment -> {
+                        val exprType = instruction.expression.type()
+                        val sym = instruction.variableSymbol
+                        if (exprType != sym.type && exprType != sym.effectiveType) {
+                            sym.effectiveType = exprType
+                        }
+                        instruction
+                    }
+                    else -> instruction
+                }
+            }
+
+            // Step 2d (R2): Eliminate FieldAccess on single-field VC call results.
+            // When a MethodInvocation's return type was unboxed from Id to Int,
+            // `makeId().value` becomes FieldAccess(MI(int), "value") — the .value
+            // field access is now redundant since the return IS the value.
+            // Same for `id.value` when id's effectiveType was updated to Int.
+            val r2Resolved = updatedVarTypes.map { instruction ->
+                instruction.transformTree { node ->
+                    resolveFieldAccessOnCallResult(node, methodSigs) ?: node
+                }
+            }
+
             // Step 2b: Update Convert.from when inner expression type changed
             // (e.g., after R5 unboxes a return type, Convert nodes wrapping call
             //  sites need their `from` updated so the JVM backend emits correct boxing)
-            val fixedConverts = resolved.map { instruction ->
+            val fixedConverts = r2Resolved.map { instruction ->
                 instruction.transformTree { node ->
                     if (node is ExpressionNode.Convert) {
                         val actualType = node.expression.type()
@@ -206,6 +245,42 @@ object VCBinder {
         val targetScalar = pathMap[pathKey] ?: return null
 
         return ExpressionNode.Variable(targetScalar)
+    }
+
+    // ---- R2: Eliminate FieldAccess on single-field VC call result ----
+
+    /**
+     * When a single-field VC's return is unboxed (R5), call sites that access
+     * the single field become redundant: `makeId().value` → just `makeId()`
+     * (since makeId returns Int directly). Similarly for variables whose
+     * effectiveType was updated by Step 2c: `id.value` → `id`.
+     *
+     * This function checks if a FieldAccess targets the single field of a
+     * single-field VC whose instance expression has been (or will be) unboxed.
+     * If so, returns the instance expression directly (eliminating the access).
+     */
+    internal fun resolveFieldAccessOnCallResult(
+        node: ExpressionNode.Phase2_3Expression,
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+    ): ExpressionNode.Phase2_3Expression? {
+        if (node !is ExpressionNode.FieldAccess) return null
+
+        val originalVCType = when (val instance = node.instance) {
+            is ExpressionNode.MethodInvocation -> {
+                methodSigs[instance.methodName]?.third as? Type.JFClass
+            }
+            is ExpressionNode.Variable -> {
+                instance.variableSymbol.type as? Type.JFClass
+            }
+            else -> null
+        }
+        val vcClass = originalVCType ?: return null
+        if (vcClass.kind != Type.ClassKind.VALUE_CLASS) return null
+        val cons = vcClass.constructor ?: return null
+        if (cons.parameters.size != 1) return null
+        if (cons.parameters[0].name != node.fieldName) return null
+
+        return node.instance
     }
 
     // ---- R5: Single-field VC return unboxing ----

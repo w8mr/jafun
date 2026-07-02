@@ -910,4 +910,84 @@ class VCBinderTests {
     fun referentialListDiff_emptyLists_returnsFalse() {
         assertFalse(referentialListDiff(emptyList<Int>(), emptyList<Int>()))
     }
+
+    // ================================================================================
+    // resolveFieldAccessOnCallResult (R2)
+    // ================================================================================
+
+    @Test
+    fun resolveFieldAccessOnCallResult_MI_singleField_eliminatesAccess() {
+        val idVc = createVC("Id", "value" to intType())
+        val methodSigs = mapOf("makeId" to Triple(emptyList<Parameter>(), emptyList<Parameter>(), idVc))
+
+        val innerMI = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+        val fieldAccess = ExpressionNode.FieldAccess(innerMI, "value", 0, intType(), emptyList())
+
+        val result = VCBinder.resolveFieldAccessOnCallResult(fieldAccess, methodSigs)
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        assertEquals("makeId", (result as ExpressionNode.MethodInvocation).methodName)
+    }
+
+    @Test
+    fun resolveFieldAccessOnCallResult_MI_wrongField_returnsNull() {
+        val idVc = createVC("Id", "value" to intType())
+        val methodSigs = mapOf("makeId" to Triple(emptyList<Parameter>(), emptyList<Parameter>(), idVc))
+
+        val innerMI = ExpressionNode.MethodInvocation(
+            methodName = "makeId",
+            parentPath = "Script",
+            parameters = emptyList(),
+            rtnLookup = { idVc },
+            field = null,
+            arguments = emptyList()
+        )
+        val fieldAccess = ExpressionNode.FieldAccess(innerMI, "wrongField", 0, intType(), emptyList())
+
+        assertNull(VCBinder.resolveFieldAccessOnCallResult(fieldAccess, methodSigs))
+    }
+
+    @Test
+    fun resolveFieldAccessOnCallResult_MI_multiFieldVC_returnsNull() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val methodSigs = mapOf("getPoint" to Triple(emptyList<Parameter>(), emptyList<Parameter>(), pointVc))
+
+        val innerMI = ExpressionNode.MethodInvocation(
+            methodName = "getPoint",
+            parentPath = "",
+            parameters = emptyList(),
+            rtnLookup = { pointVc },
+            field = null,
+            arguments = emptyList()
+        )
+        val fieldAccess = ExpressionNode.FieldAccess(innerMI, "x", 0, intType(), emptyList())
+
+        assertNull(VCBinder.resolveFieldAccessOnCallResult(fieldAccess, methodSigs))
+    }
+
+    @Test
+    fun resolveFieldAccessOnCallResult_Variable_singleField_eliminatesAccess() {
+        val idVc = createVC("Id", "value" to intType())
+        val sym = Type.JFVariableSymbol("myId", idVc)
+        val varNode = ExpressionNode.Variable(sym)
+        val fieldAccess = ExpressionNode.FieldAccess(varNode, "value", 0, intType(), emptyList())
+
+        val result = VCBinder.resolveFieldAccessOnCallResult(fieldAccess, emptyMap())
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.Variable)
+        assertEquals("myId", (result as ExpressionNode.Variable).variableSymbol.name)
+    }
+
+    @Test
+    fun resolveFieldAccessOnCallResult_nonFieldAccess_returnsNull() {
+        val result = VCBinder.resolveFieldAccessOnCallResult(intLiteral(42), emptyMap())
+        assertNull(result)
+    }
 }
