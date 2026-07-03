@@ -191,7 +191,5 @@ sealed interface ExpressionNode: Printable {
     interface Phase2 : ExpressionNode // AST
 
     interface Phase3 : ExpressionNode // TreeIR
-
-    interface Phase4 : ExpressionNode // StackIR
 }
 

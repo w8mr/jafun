@@ -62,28 +62,6 @@ fun flattenType(type: OperandType<*>, pathPrefix: String = ""): List<FlattenedFi
 }
 
 /**
- * Gets the effective JVM type for a variable.
- * For non-VC types, returns the type itself.
- * For single-field VC types, recursively unwraps to the innermost type.
- * For multi-field VC types, returns the VC type itself.
- */
-fun effectiveVariableType(type: OperandType<*>): OperandType<*> {
-    if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) {
-        return type
-    }
-    
-    val cons = type.constructor ?: return type
-    
-    // Multi-field VC - can't unwrap further
-    if (cons.parameters.size > 1) {
-        return type
-    }
-    
-    // Single-field VC - unwrap one level
-    return effectiveVariableType(cons.parameters[0].type)
-}
-
-/**
  * Expands a variable into its flattened components.
  * Each component becomes a separate JFVariableSymbol with the flattened path appended to the variable name.
  * 
@@ -130,16 +108,6 @@ fun isMultiFieldVC(type: OperandType<*>): Boolean {
     }
     
     return false
-}
-
-/**
- * Generate JVM signature character for a type
- */
-fun signatureForType(type: OperandType<*>): String = when (type) {
-    OperandType.SInt32 -> "I"
-    OperandType.StringType -> "Ljava/lang/String;"
-    is Type.JFClass -> "L${type.path.replace('.', '/')};"
-    else -> "V"
 }
 
 /**
@@ -199,54 +167,6 @@ fun createNestedFieldAccess(
 }
 
 /**
- * Determines whether a value class parameter should be expanded into its fields.
- * Multi-field VCs always expand. Single-field VCs wrapping other VCs also expand.
- */
-fun shouldExpandVC(vc: Type.JFClass): Boolean {
-    val cons = vc.constructor ?: return false
-    if (cons.parameters.size > 1) return true
-
-    val fieldType = cons.parameters.singleOrNull()?.type ?: return false
-    if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-        return true
-    }
-
-    return true
-}
-
-/**
- * Reconstructs a VC object from its expanded primitive fields.
- * For multi-field VCs, creates a ConstructorInvocation with reconstructed args.
- * Returns null if reconstruction isn't possible (e.g., missing symbols).
- */
-fun reconstructVCFromExpanded(
-    vcType: Type.JFClass,
-    expandedFieldSymbols: Map<String, Type.JFVariableSymbol>,
-    pathPrefix: String = ""
-): ExpressionNode.Phase2_3Expression? {
-    val cons = vcType.constructor ?: return null
-    val constructorArgs = mutableListOf<ExpressionNode.Phase2_3Expression>()
-    for (fieldParam in cons.parameters) {
-        val fieldPath = if (pathPrefix.isEmpty()) fieldParam.name else "${pathPrefix}_${fieldParam.name}"
-        val fieldType = fieldParam.type
-
-        val arg: ExpressionNode.Phase2_3Expression?
-        if (fieldType is Type.JFClass && fieldType.kind == Type.ClassKind.VALUE_CLASS) {
-            arg = reconstructVCFromExpanded(fieldType, expandedFieldSymbols, fieldPath)
-        } else {
-            if (fieldPath in expandedFieldSymbols) {
-                arg = ExpressionNode.Variable(expandedFieldSymbols[fieldPath]!!)
-            } else {
-                arg = null
-            }
-        }
-        if (arg == null) return null
-        constructorArgs.add(arg)
-    }
-    return ExpressionNode.ConstructorInvocation(cons, constructorArgs)
-}
-
-/**
  * Recursively expand a parameter type if it's a multi-field VC.
  * For primitive types and single-field VCs, returns a single Parameter.
  * For multi-field VCs, expands to multiple Parameters for each field.
@@ -269,18 +189,6 @@ fun expandParameterRecursively(type: OperandType<*>, baseName: String?): List<Pa
         val newBaseName = if (baseName != null) "${baseName}_${fieldName}" else fieldName
         expandParameterRecursively(fieldParam.type, newBaseName)
     }
-}
-
-/**
- * Unwraps a type to its effective JVM representation.
- * Single-field inline VCs are unwrapped recursively to their underlying type.
- * Multi-field VCs and non-VC types are returned unchanged.
- */
-fun effectiveJvmType(type: OperandType<*>): OperandType<*> {
-    if (type is Type.JFClass && type.isInlineValueClass) {
-        return effectiveJvmType(type.constructor!!.parameters.single().type)
-    }
-    return type
 }
 
 /**

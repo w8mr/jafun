@@ -1,7 +1,6 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.Associativity
-import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.debug.Printable
@@ -34,8 +33,6 @@ interface Type : TypeSymbol {
     data class JFClass(override val name: String, override val parent: ClassParent? = null, val kind: ClassKind = ClassKind.NORMAL) :
         Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent {
         var constructor: JFConstructor? = null
-        val isInlineValueClass: Boolean
-            get() = kind == ClassKind.VALUE_CLASS && constructor?.parameters?.size == 1
     }
 
     data class JFPackage(override val name: String, override val parent: PackageParent? = null) :
@@ -100,10 +97,8 @@ interface Type : TypeSymbol {
         val mutable: Boolean = false,
         val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
-        var constructorArgs: List<ExpressionNode.Phase2_3Expression>? = null
         var expandedFields: List<ExpandedField>? = null
         var expandedFieldSymbols: Map<String, JFVariableSymbol>? = null  // Maps field paths to actual symbols
-        var skipExpansion: Boolean = false  // Set when function definition cannot expand this param
         var effectiveType: OperandType<*>? = null  // Unwrapped JVM type set by Phase 3 expansion
 
         override fun equals(other: Any?): Boolean =
