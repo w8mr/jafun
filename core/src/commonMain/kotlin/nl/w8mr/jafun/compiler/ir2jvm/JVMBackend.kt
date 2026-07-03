@@ -311,6 +311,48 @@ fun buildClass(
                 `return`()
             }
         }
+        // Generate toString() for data-class-style output: ClassName(field1=val1, field2=val2)
+        if (classContext.fields.isNotEmpty()) {
+            val simpleName = className.split(".").last().split("$").last()
+            method {
+                name = "toString"
+                access = 1u
+                signature = "()Ljava/lang/String;"
+                parameter("thisRef")
+                new("java/lang/StringBuilder")
+                dup()
+                invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                loadConstant("$simpleName(")
+                invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                classContext.fields.forEachIndexed { index, (fieldName, fieldType) ->
+                    if (index > 0) {
+                        loadConstant(", ")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                    }
+                    loadConstant("$fieldName=")
+                    invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                    aload("thisRef")
+                    getField(className, fieldName, signature(fieldType))
+                    when (fieldType) {
+                        is OperandType.StringType ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        is OperandType.SInt32 ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+                        is OperandType.UInt1 ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Z)Ljava/lang/StringBuilder;")
+                        is OperandType.CharType ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(C)Ljava/lang/StringBuilder;")
+                        is Type.JFClass ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/Object;)Ljava/lang/StringBuilder;")
+                        else -> error("Unexpected field type: $fieldType")
+                    }
+                }
+                loadConstant(")")
+                invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                areturn()
+            }
+        }
         classContext.methods.forEach { m ->
             method {
                 name = m.name

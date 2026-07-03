@@ -3333,6 +3333,33 @@ class CompilerTest {
                         putField("Address", "street", "Ljava/lang/String;")
                         `return`()
                      }
+                    method {
+                        name = "toString"
+                        signature = "()Ljava/lang/String;"
+                        access = 1u
+                        parameter("this")
+                        new("java/lang/StringBuilder")
+                        dup()
+                        invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                        loadConstant("Address(")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        loadConstant("number=")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        aload("this")
+                        getField("Address", "number", "I")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+                        loadConstant(", ")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        loadConstant("street=")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        aload("this")
+                        getField("Address", "street", "Ljava/lang/String;")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        loadConstant(")")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                        areturn()
+                    }
                 }
             }
         }
@@ -3624,6 +3651,25 @@ class CompilerTest {
                     println getValue(d)
                 """.trimIndent()
                 expectedOutput = "42\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcReconstructWithToString() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int)
+
+                    fun show(a: Address) {
+                        println a
+                    }
+
+                    val a = Address("Privet drive", 4)
+                    show(a)
+                """.trimIndent()
+                expectedOutput = "Address(street=Privet drive, number=4)\n"
             }
         }
     }
