@@ -449,6 +449,85 @@ class VCBinderTests {
         assertEquals("b_topLeft_x", resolved.variableSymbol.name)
     }
 
+    @Test
+    fun resolveFieldAccess_multiFieldVC_reconstructsConstructorInvocation() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        // b.topLeft where Point is multi-field — should reconstruct Point(x, y)
+        val fieldAccess = ExpressionNode.FieldAccess(
+            instance = ExpressionNode.Variable(b),
+            fieldName = "topLeft",
+            fieldIndex = 0,
+            fieldType = pointVc,
+            arguments = emptyList()
+        )
+
+        val resolved = VCBinder.resolveFieldAccessToScalar(fieldAccess)
+        assertNotNull(resolved)
+        assertTrue(resolved is ExpressionNode.ConstructorInvocation)
+
+        val ci = resolved as ExpressionNode.ConstructorInvocation
+        assertEquals(pointVc, ci.type())
+        assertEquals(2, ci.arguments.size)
+
+        val arg0 = ci.arguments[0] as ExpressionNode.Variable
+        assertEquals("b_topLeft_x", arg0.variableSymbol.name)
+
+        val arg1 = ci.arguments[1] as ExpressionNode.Variable
+        assertEquals("b_topLeft_y", arg1.variableSymbol.name)
+    }
+
+    @Test
+    fun resolveFieldAccess_multiFieldVC_nestedAccess_resolvesToScalar() {
+        // b.topLeft.x should still resolve directly to scalar (not reconstruction)
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val boxVc = createVC("Box", "topLeft" to pointVc)
+
+        val b = Type.JFVariableSymbol("b", boxVc)
+        VCBinder.setExpandedFieldsOnSymbol(b)
+
+        val topLevelFa = ExpressionNode.FieldAccess(
+            instance = ExpressionNode.Variable(b),
+            fieldName = "topLeft",
+            fieldIndex = 0,
+            fieldType = pointVc,
+            arguments = emptyList()
+        )
+        val outerFa = ExpressionNode.FieldAccess(
+            instance = topLevelFa,
+            fieldName = "x",
+            fieldIndex = 0,
+            fieldType = intType(),
+            arguments = emptyList()
+        )
+
+        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
+        assertNotNull(resolved)
+        assertTrue(resolved is ExpressionNode.Variable)
+        assertEquals("b_topLeft_x", resolved.variableSymbol.name)
+    }
+
+    @Test
+    fun resolveFieldAccess_nonExpandedVariable_returnsNull() {
+        val pointVc = createVC("Point", "x" to intType(), "y" to intType())
+        val p = Type.JFVariableSymbol("p", pointVc)
+        // NOT calling setExpandedFieldsOnSymbol — variable has no expandedFieldSymbols
+
+        val fa = ExpressionNode.FieldAccess(
+            instance = ExpressionNode.Variable(p),
+            fieldName = "x",
+            fieldIndex = 0,
+            fieldType = intType(),
+            arguments = emptyList()
+        )
+
+        assertNull(VCBinder.resolveFieldAccessToScalar(fa))
+    }
+
     // ================================================================================
     // flattenCIArgs: recursive CI argument flattening
     // ================================================================================
