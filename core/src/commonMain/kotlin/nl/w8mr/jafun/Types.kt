@@ -99,7 +99,6 @@ interface Type : TypeSymbol {
     ) : Type, InvocationTarget, Printable {
         var expandedFields: List<ExpandedField>? = null
         var expandedFieldSymbols: Map<String, JFVariableSymbol>? = null  // Maps field paths to actual symbols
-        var effectiveType: OperandType<*>? = null  // Unwrapped JVM type set by Phase 3 expansion
 
         override fun equals(other: Any?): Boolean =
             when (other) {

@@ -78,7 +78,7 @@ class JVMBackend {
                         with(method) {
                             val methodClassName = instruction.parentPath.replace('.', '/')
                             val methodSignature =
-                                "(${instruction.parameters.joinToString("") { signature(it.effectiveType ?: it.type) }})" +
+                                "(${instruction.parameters.joinToString("") { signature(it.type) }})" +
                                         signature(instruction.type())
                             when (instruction.field) {
                                 null -> invokeStatic(
@@ -193,7 +193,7 @@ class JVMBackend {
         private fun ClassBuilder.MethodDSL.DSL.storeVariable(instruction: ExpressionNode.Assignment) {
             val variableName =
                 "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (instruction.variableSymbol.effectiveType ?: instruction.expression.type()) {
+            when (instruction.expression.type()) {
                 is OperandType.SInt32 -> istore(variableName)
                 is OperandType.StringType -> astore(variableName)
                 is OperandType.UInt1 -> istore(variableName)
@@ -238,7 +238,7 @@ class JVMBackend {
 
         fun ClassBuilder.MethodDSL.DSL.loadVariable(instruction: ExpressionNode.Variable) {
             val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
-            when (instruction.variableSymbol.effectiveType ?: instruction.variableSymbol.type) {
+            when (instruction.variableSymbol.type) {
                 is OperandType.SInt32 -> iload(variableName)
                 is OperandType.StringType -> aload(variableName)
                 is OperandType.UInt1 -> iload(variableName)

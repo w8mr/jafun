@@ -57,4 +57,12 @@ The compiler supports four extension points:
   - `parseBodies()` processes only top-level functions (those collected by the outermost `structurePass` call). It runs a fixed-point loop over function descriptors, parsing each body inside its correct symbol map scope (`symbolMapManager.override(fn.descriptor.symbolMap)`) and updating the return type via `replaceType()` when the inferred type differs. Symbol lookups and replacements happen inside the override.
 - **`MethodInvocation` lazy symbol lookup**: Stores `methodName`/`parentPath`/`parameters` and a `rtnLookup` lambda instead of a direct `JFMethod` reference. `type()` re-looks up from the symbol map, ensuring forward-referenced return types resolve correctly.
 - **Immutable IR nodes**: All `ExpressionNode` classes use `val` fields. `MethodInvocation` is a regular class (not data class) — its `equals`/`hashCode` explicitly exclude the `rtnLookup` lambda to avoid broken structural equality.
-- **Multi-class output**: `compile()` returns `Map<String, ByteArray>` — the main class plus any value class `.class` files. `compileAll()` in `JVMBackend.kt` iterates builder classes and value classes, generating each via `buildClass`/`buildValueClass`.
+  - **Multi-class output**: `compile()` returns `Map<String, ByteArray>` — the main class plus any value class `.class` files. `compileAll()` in `JVMBackend.kt` iterates builder classes and value classes, generating each via `buildClass`/`buildValueClass`.
+- **VCBinder — JVMBackend is VC-unaware**: Value-class unboxing and field-access rewriting happen exclusively in `VCBinder.Phase3Plugin`. `JFVariableSymbol` stores no boxed-state metadata (`effectiveType` was removed); JVMBackend reads `variable.type` / `expression.type()` directly. VCBinder replaces assignment symbols with an unboxed symbol copy so downstream consumers see the correct primitive type via `.type`.
+- **VCBinder rewrite stages (applied in order)**:
+  - R3 — `resolveFieldAccessToScalar`: rewrites `param.field` on expanded parameters to a scalar `Variable`.
+  - R3 — `expandCallSiteArgs`: rewrites call-site arguments and return-type lookup when a callee was unboxed.
+  - R4 — `reconstructFromScalars`: reconstructs a boxed VC `ConstructorInvocation` when an expanded parameter is used as a value.
+  - Step 2c (symbol replacement): replaces the `variableSymbol` on `ValAssignment`/`VarAssignment` with a copy whose `.type` is the unboxed primitive when the RHS expression type changed.
+  - R2 — `resolveFieldAccessOnCallResult`: strips a redundant `.field` access on a single-field VC value (call result or replaced variable).
+  - R5 — `unboxSingleFieldReturnExpr`: unwraps single-field VC constructor/value-class return expressions to their inner scalar.

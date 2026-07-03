@@ -29,7 +29,7 @@ The `Type` sealed interface represents named entities in the type system:
 - **`JFMethod`** — a method with parameters, return type, associativity, and precedence
 - **`JFConstructor`** — a constructor
 - **`JFField`** — a field with a name and type
-- **`JFVariableSymbol`** — a variable or parameter with name, type, mutability
+- **`JFVariableSymbol`** — a variable or parameter with name, type, mutability. Its `type` always reflects the current representation used downstream; VCBinder replaces the symbol with a copied symbol whose `type` is unboxed when a VC is flattened, so JVMBackend never consults `effectiveType` (that property was removed).
 - **`JFFieldMethod`** — a method accessed via a field (e.g., `obj.method`)
 - **`JFVariableMethod`** — a method accessed via a variable
 

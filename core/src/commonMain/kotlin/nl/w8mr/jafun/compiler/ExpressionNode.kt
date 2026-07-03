@@ -162,7 +162,7 @@ sealed interface ExpressionNode: Printable {
     }
 
     data class Variable(val variableSymbol: Type.JFVariableSymbol) : Phase2Expression {
-        override fun type() = variableSymbol.effectiveType ?: variableSymbol.type
+        override fun type() = variableSymbol.type
     }
 
     data class Function(val symbol: Type.JFMethod, val block: List<Phase2_3Expression>) : Phase2Expression {
