@@ -8,3 +8,15 @@
 6. **Match existing style** — Code, naming, formatting, and patterns must follow conventions already present in the surrounding code.
 
 See `docs/` for project context and implementation documentation.
+
+## Test workflow
+
+When running tests, tee the output to a temp file so you can grep/tail it without re-running gradle:
+
+    scripts/test.sh VCBinderTests | tee /tmp/test.out
+    grep "FAILED|tests completed" /tmp/test.out
+    grep "e:" /tmp/test.out   # compilation errors
+
+For the full suite:
+
+    scripts/test.sh | tee /tmp/test.out

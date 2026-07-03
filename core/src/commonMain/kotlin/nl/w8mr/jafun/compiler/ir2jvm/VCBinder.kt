@@ -242,9 +242,32 @@ object VCBinder {
         val rootSym = current.variableSymbol
         val pathMap = rootSym.expandedFieldSymbols ?: return null
         val pathKey = pathFromRoot.joinToString("_")
-        val targetScalar = pathMap[pathKey] ?: return null
+        val targetScalar = pathMap[pathKey]
+        if (targetScalar != null) return ExpressionNode.Variable(targetScalar)
 
-        return ExpressionNode.Variable(targetScalar)
+        // Case 2: Multi-field VC reconstruction.
+        // When the field access targets a multi-field VC (e.g. `box.topLeft` where
+        // Point has 2 fields), reconstruct the VC from its component scalars.
+        val fields = rootSym.expandedFields ?: return null
+        val ef = fields.find { it.name == pathFromRoot.firstOrNull() } ?: return null
+        val sourceVC = ef.sourceVC ?: return null
+        val scFields = ef.sourceVCFields ?: return null
+        val cons = sourceVC.constructor ?: return null
+
+        // The remaining path from the first component, e.g. for
+        // `box.topLeft` -> ["topLeft"] -> remaining = empty.
+        val remaining = pathFromRoot.drop(1)
+        if (remaining.isNotEmpty()) return null
+
+        val args = cons.parameters.map { param ->
+            val fullPath = "${ef.name}_${param.name}"
+            val scalarSym = pathMap[fullPath] ?: return null
+            ExpressionNode.Variable(scalarSym) as ExpressionNode.Phase2_3Expression
+        }
+        return ExpressionNode.ConstructorInvocation(
+            cons = cons,
+            arguments = args.toMutableList()
+        )
     }
 
     // ---- R2: Eliminate FieldAccess on single-field VC call result ----
@@ -276,8 +299,8 @@ object VCBinder {
         }
         val vcClass = originalVCType ?: return null
         if (vcClass.kind != Type.ClassKind.VALUE_CLASS) return null
+        if (unboxSingleFieldVCType(vcClass) == null) return null
         val cons = vcClass.constructor ?: return null
-        if (cons.parameters.size != 1) return null
         if (cons.parameters[0].name != node.fieldName) return null
 
         return node.instance
