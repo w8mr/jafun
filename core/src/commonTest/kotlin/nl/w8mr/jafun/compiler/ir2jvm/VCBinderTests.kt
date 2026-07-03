@@ -1069,4 +1069,80 @@ class VCBinderTests {
         val result = VCBinder.resolveFieldAccessOnCallResult(intLiteral(42), emptyMap())
         assertNull(result)
     }
+
+    // ================================================================================
+    // reconstructFromScalars (R4): reconstruct boxed VC from expanded scalars
+    // ================================================================================
+
+    @Test
+    fun reconstructFromScalars_plainFields_reconstructsCI() {
+        val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
+
+        val a = Type.JFVariableSymbol("a", addrVc)
+        VCBinder.setExpandedFieldsOnSymbol(a)
+
+        val result = VCBinder.reconstructFromScalars(ExpressionNode.Variable(a))
+        assertNotNull(result)
+        assertTrue(result is ExpressionNode.ConstructorInvocation)
+
+        val ci = result as ExpressionNode.ConstructorInvocation
+        assertEquals(addrVc, ci.type())
+        assertEquals(2, ci.arguments.size)
+
+        val arg0 = ci.arguments[0] as ExpressionNode.Variable
+        assertTrue("a_street" in arg0.variableSymbol.name)
+
+        val arg1 = ci.arguments[1] as ExpressionNode.Variable
+        assertTrue("a_number" in arg1.variableSymbol.name)
+    }
+
+    @Test
+    fun reconstructFromScalars_nonExpandedVariable_returnsNull() {
+        val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
+        val a = Type.JFVariableSymbol("a", addrVc)
+        // No expandedFieldSymbols set
+
+        assertNull(VCBinder.reconstructFromScalars(ExpressionNode.Variable(a)))
+    }
+
+    @Test
+    fun reconstructFromScalars_nonVariable_returnsNull() {
+        assertNull(VCBinder.reconstructFromScalars(intLiteral(42)))
+    }
+
+    @Test
+    fun reconstructFromScalars_integration_reconstructsExpandedParam() {
+        // Simulate: fun show(a: Address) { println a }
+        // After param expansion, 'a' in body needs reconstruction.
+        val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
+
+        val a = Type.JFVariableSymbol("a", addrVc)
+        VCBinder.setExpandedFieldsOnSymbol(a)
+
+        // The body: println a → MethodInvocation(println, args=[Variable(a)])
+        val printlnMI = ExpressionNode.MethodInvocation(
+            methodName = "println",
+            parentPath = "jafun.io.ConsoleKt",
+            parameters = listOf(Type.JFVariableSymbol("x", Type.JFClass("java.lang.Object"))),
+            rtnLookup = { OperandType.Unit },
+            field = null,
+            arguments = listOf(ExpressionNode.Variable(a))
+        )
+
+        // When processed by transformTree with reconstructFromScalars in the chain,
+        // Variable(a) should be replaced by CI(Address, [a_street, a_number])
+        val result = printlnMI.transformTree { node ->
+            VCBinder.reconstructFromScalars(node) ?: node
+        }
+
+        assertTrue(result is ExpressionNode.MethodInvocation)
+        val mi = result as ExpressionNode.MethodInvocation
+        assertEquals(1, mi.arguments.size)
+
+        val arg = mi.arguments[0]
+        assertTrue(arg is ExpressionNode.ConstructorInvocation)
+        val ci = arg as ExpressionNode.ConstructorInvocation
+        assertEquals(addrVc, ci.type())
+        assertEquals(2, ci.arguments.size)
+    }
 }

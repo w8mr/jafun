@@ -52,11 +52,15 @@ object VCBinder {
                 }
             }
 
-            // Step 2: R3 - rewrite FieldAccess to scalar Variables, expand call site args
+            // Step 2: R3 - rewrite FieldAccess to scalar Variables, expand call site args,
+            // R4 - reconstruct boxed VCs from scalar components when a Variable with
+            // expandedFieldSymbols is used directly (e.g. `println a` where a: Address
+            // was expanded to a_street and a_number).
             val resolved = withParamFields.map { instruction ->
                 instruction.transformTree { node ->
                     resolveFieldAccessToScalar(node)
                         ?: expandCallSiteArgs(node, methodSigs)
+                        ?: reconstructFromScalars(node)
                         ?: node
                 }
             }
@@ -467,5 +471,51 @@ object VCBinder {
             }
         }
         return result
+    }
+
+    // ---- R4: Reconstruct boxed VC from scalars ----
+
+    /**
+     * When a Variable with expandedFieldSymbols is used directly (not as the instance
+     * of a FieldAccess), reconstruct the boxed VC from its component scalars.
+     *
+     * Example: `show(a: Address)` where Address(street, number) was expanded to
+     * `a_street: String, a_number: Int`. The body `println a` references the original
+     * parameter, which no longer exists — so we reconstruct:
+     *   println ConstructorInvocation(Address.constructor, [a_street, a_number])
+     *
+     * Returns the reconstructed ConstructorInvocation, or null if the node is not a
+     * reconstructable Variable.
+     */
+    internal fun reconstructFromScalars(
+        node: ExpressionNode.Phase2_3Expression
+    ): ExpressionNode.Phase2_3Expression? {
+        if (node !is ExpressionNode.Variable) return null
+        val sym = node.variableSymbol
+        val pathMap = sym.expandedFieldSymbols ?: return null
+        val vcType = sym.type as? Type.JFClass ?: return null
+        if (vcType.kind != Type.ClassKind.VALUE_CLASS) return null
+        val cons = vcType.constructor ?: return null
+        val fields = sym.expandedFields ?: return null
+
+        val args = cons.parameters.map { param ->
+            val scalarSym = pathMap[param.name]
+            if (scalarSym != null) {
+                ExpressionNode.Variable(scalarSym) as ExpressionNode.Phase2_3Expression
+            } else {
+                // Constructor param is a nested VC (e.g. Box.topLeft: Point).
+                // Find the matching ExpandedField and look up sub-fields.
+                val ef = fields.find { it.name == param.name && it.sourceVC != null } ?: return null
+                val sourceCons = ef.sourceVC!!.constructor ?: return null
+                val subArgs = ef.sourceVCFields?.map { (localPath, _) ->
+                    val fullPath = "${param.name}_$localPath"
+                    val subSym = pathMap[fullPath] ?: return null
+                    ExpressionNode.Variable(subSym) as ExpressionNode.Phase2_3Expression
+                } ?: return null
+                ExpressionNode.ConstructorInvocation(sourceCons, subArgs.toMutableList())
+            }
+        }
+
+        return ExpressionNode.ConstructorInvocation(cons, args.toMutableList())
     }
 }
