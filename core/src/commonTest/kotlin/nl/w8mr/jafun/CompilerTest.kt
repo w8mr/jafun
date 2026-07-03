@@ -3360,6 +3360,55 @@ class CompilerTest {
                         invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
                         areturn()
                     }
+                    method {
+                        name = "equals"
+                        signature = "(Ljava/lang/Object;)Z"
+                        access = 1u
+                        parameter("thisRef")
+                        parameter("other")
+                        val returnFalse = label()
+                        aload("other")
+                        invokeStatic("java/util/Objects", "isNull", "(Ljava/lang/Object;)Z")
+                        ifnotequal(returnFalse)
+                        aload("thisRef")
+                        invokeVirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;")
+                        invokeVirtual("java/lang/Class", "getName", "()Ljava/lang/String;")
+                        aload("other")
+                        invokeVirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;")
+                        invokeVirtual("java/lang/Class", "getName", "()Ljava/lang/String;")
+                        invokeVirtual("java/lang/String", "equals", "(Ljava/lang/Object;)Z")
+                        ifequal(returnFalse)
+                        aload("thisRef")
+                        invokeVirtual("java/lang/Object", "toString", "()Ljava/lang/String;")
+                        aload("other")
+                        invokeVirtual("java/lang/Object", "toString", "()Ljava/lang/String;")
+                        invokeVirtual("java/lang/String", "equals", "(Ljava/lang/Object;)Z")
+                        ifequal(returnFalse)
+                        loadConstant(1)
+                        ireturn()
+                        returnFalse {
+                            loadConstant(0)
+                            ireturn()
+                        }
+                    }
+                    method {
+                        name = "hashCode"
+                        signature = "()I"
+                        access = 1u
+                        parameter("thisRef")
+                        new("java/lang/StringBuilder")
+                        dup()
+                        invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                        aload("thisRef")
+                        getField("Address", "number", "I")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+                        aload("thisRef")
+                        getField("Address", "street", "Ljava/lang/String;")
+                        invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                        invokeVirtual("java/lang/String", "hashCode", "()I")
+                        ireturn()
+                    }
                 }
             }
         }
@@ -3688,6 +3737,88 @@ class CompilerTest {
                     println getTopLeft(b).x
                 """.trimIndent()
                 expectedOutput = "99\n"
+            }
+        }
+    }
+
+    // TODO: Replace helper functions with native == operator once Jafun supports
+    // inheritance-based method lookup for JFClass -> Object types.
+    // objectEquals(a, b) is a temporary stand-in for a == b.
+
+    @Test
+    fun vcEqualsPositive() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int)
+                    val a1 = Address("Main St", 42)
+                    val a2 = Address("Main St", 42)
+                    println objectEquals(a1, a2)
+                """.trimIndent()
+                expectedOutput = "true\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcEqualsNegative() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int)
+                    val a1 = Address("Main St", 42)
+                    val a2 = Address("Other St", 99)
+                    println objectEquals(a1, a2)
+                """.trimIndent()
+                expectedOutput = "false\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcDeepNestingEquals() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Box(topLeft: Point)
+                    val b1 = Box(Point(10, 20))
+                    val b2 = Box(Point(10, 20))
+                    println objectEquals(b1, b2)
+                """.trimIndent()
+                expectedOutput = "true\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcHashCodeEqualObjects() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int)
+                    val a1 = Address("Main St", 42)
+                    val a2 = Address("Main St", 42)
+                    println objectHash(a1)
+                    println objectHash(a2)
+                """.trimIndent()
+                expectedOutput = "1693788838\n1693788838\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcHashCodeDifferentObjects() {
+        test {
+            file {
+                code = """
+                    value class Address(street: String, number: Int)
+                    val a1 = Address("Main St", 42)
+                    val a2 = Address("Other St", 99)
+                    println objectHash(a1)
+                    println objectHash(a2)
+                """.trimIndent()
+                expectedOutput = "1693788838\n1752083601\n"
             }
         }
     }

@@ -35,3 +35,7 @@ data class SimpleObject(val a: Int) {
 }
 
 fun getSimpleObject5() = SimpleObject(5)
+
+fun objectEquals(a: Any?, b: Any?): Boolean = a == b
+
+fun objectHash(a: Any?): Int = a?.hashCode() ?: 0

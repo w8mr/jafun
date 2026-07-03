@@ -352,6 +352,68 @@ fun buildClass(
                 invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
                 areturn()
             }
+            // Generate equals(Object) — based on toString() output
+            method {
+                name = "equals"
+                access = 1u
+                signature = "(Ljava/lang/Object;)Z"
+                parameter("thisRef")
+                parameter("other")
+                val returnFalse = label()
+                aload("other")
+                invokeStatic("java/util/Objects", "isNull", "(Ljava/lang/Object;)Z")
+                ifnotequal(returnFalse)
+                aload("thisRef")
+                invokeVirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;")
+                invokeVirtual("java/lang/Class", "getName", "()Ljava/lang/String;")
+                aload("other")
+                invokeVirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;")
+                invokeVirtual("java/lang/Class", "getName", "()Ljava/lang/String;")
+                invokeVirtual("java/lang/String", "equals", "(Ljava/lang/Object;)Z")
+                ifequal(returnFalse)
+                aload("thisRef")
+                invokeVirtual("java/lang/Object", "toString", "()Ljava/lang/String;")
+                aload("other")
+                invokeVirtual("java/lang/Object", "toString", "()Ljava/lang/String;")
+                invokeVirtual("java/lang/String", "equals", "(Ljava/lang/Object;)Z")
+                ifequal(returnFalse)
+                loadConstant(1)
+                ireturn()
+                returnFalse {
+                    loadConstant(0)
+                    ireturn()
+                }
+            }
+            // Generate hashCode()
+            method {
+                name = "hashCode"
+                access = 1u
+                signature = "()I"
+                parameter("thisRef")
+                new("java/lang/StringBuilder")
+                dup()
+                invokeSpecial("java/lang/StringBuilder", "<init>", "()V")
+                classContext.fields.forEach { (fieldName, fieldType) ->
+                    aload("thisRef")
+                    getField(className, fieldName, signature(fieldType))
+                    when (fieldType) {
+                        is OperandType.StringType ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                        is OperandType.SInt32 ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+                        is OperandType.UInt1 ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Z)Ljava/lang/StringBuilder;")
+                        is OperandType.CharType ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(C)Ljava/lang/StringBuilder;")
+                        is Type.JFClass ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/Object;)Ljava/lang/StringBuilder;")
+                        else -> error("Unexpected field type: $fieldType")
+                    }
+                }
+                invokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+                invokeVirtual("java/lang/String", "hashCode", "()I")
+                ireturn()
+            }
         }
         classContext.methods.forEach { m ->
             method {
