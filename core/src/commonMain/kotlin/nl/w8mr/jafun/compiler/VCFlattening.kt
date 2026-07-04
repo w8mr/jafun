@@ -3,7 +3,6 @@ package nl.w8mr.jafun.compiler
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
-import nl.w8mr.jafun.compiler.SymbolMap
 
 /**
  * Value Class Flattening and Expansion

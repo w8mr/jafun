@@ -4,6 +4,9 @@ import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -504,5 +507,221 @@ class VCFlatteningTests {
         assertEquals(createIntType(), result[0].type)
         assertEquals("u_name", result[1].varName)
         assertEquals(OperandType.StringType, result[1].type)
+    }
+
+    // ============================================================================
+    // unboxSingleFieldVCType
+    // ============================================================================
+
+    @Test
+    fun unboxSingleFieldVCType_primitive_returnsNull() {
+        assertNull(unboxSingleFieldVCType(createIntType()))
+    }
+
+    @Test
+    fun unboxSingleFieldVCType_multiField_returnsNull() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        assertNull(unboxSingleFieldVCType(point))
+    }
+
+    @Test
+    fun unboxSingleFieldVCType_singleField_returnsInnerType() {
+        val id = createVC("Id", "value" to createIntType())
+        assertEquals(createIntType(), unboxSingleFieldVCType(id))
+    }
+
+    @Test
+    fun unboxSingleFieldVCType_nestedChain_returnsInnermostPrimitive() {
+        val id = createVC("Id", "value" to createIntType())
+        val userId = createVC("UserId", "id" to id)
+        assertEquals(createIntType(), unboxSingleFieldVCType(userId))
+    }
+
+    @Test
+    fun unboxSingleFieldVCType_noConstructor_returnsNull() {
+        val vc = Type.JFClass("Empty", kind = Type.ClassKind.VALUE_CLASS)
+        assertNull(unboxSingleFieldVCType(vc))
+    }
+
+    // ============================================================================
+    // fieldTypeForAccess
+    // ============================================================================
+
+    @Test
+    fun fieldTypeForAccess_vcType_matchingField_returnsFieldType() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        assertEquals(createIntType(), fieldTypeForAccess(point, "x"))
+    }
+
+    @Test
+    fun fieldTypeForAccess_vcType_unknownField_fallsBackToSInt32() {
+        val point = createVC("Point", "x" to createIntType())
+        assertEquals(OperandType.SInt32, fieldTypeForAccess(point, "unknown"))
+    }
+
+    @Test
+    fun fieldTypeForAccess_primitiveType_fallsBackToSInt32() {
+        assertEquals(OperandType.SInt32, fieldTypeForAccess(createIntType(), "x"))
+    }
+
+    // ============================================================================
+    // computeExpandedInfo
+    // ============================================================================
+
+    @Test
+    fun computeExpandedInfo_nonVC_returnsNull() {
+        val sym = Type.JFVariableSymbol("x", createIntType())
+        assertNull(computeExpandedInfo(sym))
+    }
+
+    @Test
+    fun computeExpandedInfo_singleFieldVC_returnsInfo() {
+        val id = createVC("Id", "value" to createIntType())
+        val sym = Type.JFVariableSymbol("id", id)
+        val info = computeExpandedInfo(sym)
+        assertNotNull(info)
+        assertEquals(1, info.fields?.size)
+        assertEquals("value", info.fields?.get(0)?.name)
+        assertEquals(1, info.fieldSymbols?.size)
+        assertNotNull(info.fieldSymbols?.get("value"))
+    }
+
+    @Test
+    fun computeExpandedInfo_multiFieldVC_returnsFieldsInOrder() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val sym = Type.JFVariableSymbol("p", point)
+        val info = computeExpandedInfo(sym)
+        assertNotNull(info)
+        assertEquals(2, info.fields?.size)
+        assertEquals("x", info.fields?.get(0)?.name)
+        assertEquals("y", info.fields?.get(1)?.name)
+        assertEquals(2, info.fieldSymbols?.size)
+    }
+
+    @Test
+    fun computeExpandedInfo_nestedVC_containsSourceVCFields() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val box = createVC("Box", "topLeft" to point, "bottomRight" to point)
+        val sym = Type.JFVariableSymbol("b", box)
+        val info = computeExpandedInfo(sym)
+        assertNotNull(info)
+        assertEquals(2, info.fields?.size)
+        val topLeft = info.fields!!.find { it.name == "topLeft" }!!
+        assertNotNull(topLeft.sourceVC)
+        assertNotNull(topLeft.sourceVCFields)
+        assertEquals(2, topLeft.sourceVCFields!!.size)
+    }
+
+    @Test
+    fun computeExpandedInfo_noConstructor_returnsNull() {
+        val vc = Type.JFClass("Empty", kind = Type.ClassKind.VALUE_CLASS)
+        val sym = Type.JFVariableSymbol("e", vc)
+        assertNull(computeExpandedInfo(sym))
+    }
+
+    // ============================================================================
+    // extractExpandedArg
+    // ============================================================================
+
+    @Test
+    fun extractExpandedArg_directField_returnsLiteral() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val ci = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(42), ExpressionNode.IntegerLiteral(100))
+        )
+        val field = FlattenedField("x", createIntType())
+        val result = extractExpandedArg(field, ci, point.constructor!!.parameters, emptyMap())
+        assertEquals(ExpressionNode.IntegerLiteral(42), result)
+    }
+
+    @Test
+    fun extractExpandedArg_variableArg_resolvesThroughExpandedInfo() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val box = createVC("Box", "topLeft" to point, "bottomRight" to point)
+
+        val a = Type.JFVariableSymbol("a", point)
+        val aInfo = computeExpandedInfo(a)!!
+        val expandedInfo = mutableMapOf("a" to aInfo)
+
+        val aVar = ExpressionNode.Variable(a)
+        val innerCi = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
+        )
+        val ci = ExpressionNode.ConstructorInvocation(
+            box.constructor!!,
+            listOf(aVar, innerCi)
+        )
+
+        val field = FlattenedField("topLeft_x", createIntType())
+        val result = extractExpandedArg(field, ci, box.constructor!!.parameters, expandedInfo)
+
+        assertTrue(result is ExpressionNode.Variable)
+        assertEquals("a_x", (result as ExpressionNode.Variable).variableSymbol.name)
+    }
+
+    @Test
+    fun extractExpandedArg_ciArg_extractsNestedField() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val box = createVC("Box", "topLeft" to point, "bottomRight" to point)
+
+        val innerCi1 = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(1), ExpressionNode.IntegerLiteral(2))
+        )
+        val innerCi2 = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
+        )
+        val ci = ExpressionNode.ConstructorInvocation(
+            box.constructor!!,
+            listOf(innerCi1, innerCi2)
+        )
+
+        val field = FlattenedField("bottomRight_y", createIntType())
+        val result = extractExpandedArg(field, ci, box.constructor!!.parameters, emptyMap())
+
+        assertEquals(ExpressionNode.IntegerLiteral(4), result)
+    }
+
+    @Test
+    fun extractExpandedArg_fallback_createsNestedFieldAccess() {
+        val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
+        val box = createVC("Box", "topLeft" to point, "bottomRight" to point)
+
+        val p = Type.JFVariableSymbol("p", point)
+        val pVar = ExpressionNode.Variable(p)
+        val innerCi = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
+        )
+        val ci = ExpressionNode.ConstructorInvocation(
+            box.constructor!!,
+            listOf(pVar, innerCi)
+        )
+
+        // "p" is a Variable NOT in expandedInfo → fallback to FieldAccess
+        val field = FlattenedField("topLeft_x", createIntType())
+        val result = extractExpandedArg(field, ci, box.constructor!!.parameters, emptyMap())
+
+        assertTrue(result is ExpressionNode.FieldAccess)
+        val fa = result as ExpressionNode.FieldAccess
+        assertEquals("x", fa.fieldName)
+        assertTrue(fa.instance is ExpressionNode.Variable)
+        assertEquals("p", (fa.instance as ExpressionNode.Variable).variableSymbol.name)
+    }
+
+    @Test
+    fun extractExpandedArg_unknownPath_throwsError() {
+        val point = createVC("Point", "x" to createIntType())
+        val ci = ExpressionNode.ConstructorInvocation(
+            point.constructor!!,
+            listOf(ExpressionNode.IntegerLiteral(42))
+        )
+        val field = FlattenedField("nonexistent", createIntType())
+        assertFailsWith<IllegalStateException> {
+            extractExpandedArg(field, ci, point.constructor!!.parameters, emptyMap())
+        }
     }
 }

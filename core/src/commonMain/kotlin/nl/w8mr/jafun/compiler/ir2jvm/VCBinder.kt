@@ -7,7 +7,6 @@ import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
-import nl.w8mr.jafun.compiler.expandVariable
 import nl.w8mr.jafun.compiler.computeExpandedInfo
 import nl.w8mr.jafun.compiler.flattenType
 import nl.w8mr.jafun.compiler.transformTree
@@ -122,12 +121,12 @@ object VCBinder {
 
     // ---- R3: FieldAccess resolution ----
 
-    internal fun resolveFieldAccessToScalar(
-        node: ExpressionNode.Phase2_3Expression,
-        expandedInfo: Map<String, Type.ExpandedInfo>
-    ): ExpressionNode.Phase2_3Expression? {
-        if (node !is ExpressionNode.FieldAccess) return null
-
+    /**
+     * Walk up a chain of FieldAccess nodes to collect the full path from root.
+     * Returns the path components (in order from root to leaf) and the root
+     * Variable. Returns null if the chain root is not a Variable.
+     */
+    private fun walkUpFieldAccessChain(node: ExpressionNode.FieldAccess): Pair<List<String>, ExpressionNode.Variable>? {
         val pathFromRoot = mutableListOf<String>()
         var current: ExpressionNode.Phase2_3Expression = node
         while (current is ExpressionNode.FieldAccess) {
@@ -135,8 +134,18 @@ object VCBinder {
             current = current.instance
         }
         if (current !is ExpressionNode.Variable) return null
+        return pathFromRoot to current
+    }
 
-        val rootSym = current.variableSymbol
+    internal fun resolveFieldAccessToScalar(
+        node: ExpressionNode.Phase2_3Expression,
+        expandedInfo: Map<String, Type.ExpandedInfo>
+    ): ExpressionNode.Phase2_3Expression? {
+        if (node !is ExpressionNode.FieldAccess) return null
+
+        val (pathFromRoot, root) = walkUpFieldAccessChain(node) ?: return null
+
+        val rootSym = root.variableSymbol
         val info = expandedInfo[rootSym.name] ?: return null
         val pathMap = info.fieldSymbols ?: return null
         val pathKey = pathFromRoot.joinToString("_")
@@ -511,13 +520,8 @@ object VCBinder {
                 maybeExpandField(node.variableSymbol, expandedInfo, assignedVarNames)
             }
             is ExpressionNode.FieldAccess -> {
-                var current: ExpressionNode.Phase2_3Expression = node
-                while (current is ExpressionNode.FieldAccess) {
-                    current = current.instance
-                }
-                if (current is ExpressionNode.Variable) {
-                    maybeExpandField(current.variableSymbol, expandedInfo, assignedVarNames)
-                }
+                val (_, root) = walkUpFieldAccessChain(node) ?: return
+                maybeExpandField(root.variableSymbol, expandedInfo, assignedVarNames)
             }
             is ExpressionNode.MethodInvocation -> {
                 for (arg in node.arguments) {
