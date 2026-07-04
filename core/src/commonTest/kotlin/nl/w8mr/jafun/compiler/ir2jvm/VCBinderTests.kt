@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 /**
  * Unit tests for VCBinder pure functions.
  *
- * Each concept from docs/vc-unboxing-process.md maps to one function
+ * Each concept from docs/archive/vc-unboxing-process.md maps to one function
  * tested in isolation. Tests build minimal IR nodes directly so each
  * function can be verified independently before integration.
  */

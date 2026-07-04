@@ -58,11 +58,13 @@ The compiler supports four extension points:
 - **`MethodInvocation` lazy symbol lookup**: Stores `methodName`/`parentPath`/`parameters` and a `rtnLookup` lambda instead of a direct `JFMethod` reference. `type()` re-looks up from the symbol map, ensuring forward-referenced return types resolve correctly.
 - **Immutable IR nodes**: All `ExpressionNode` classes use `val` fields. `MethodInvocation` is a regular class (not data class) — its `equals`/`hashCode` explicitly exclude the `rtnLookup` lambda to avoid broken structural equality.
   - **Multi-class output**: `compile()` returns `Map<String, ByteArray>` — the main class plus any value class `.class` files. `compileAll()` in `JVMBackend.kt` iterates builder classes and value classes, generating each via `buildClass`/`buildValueClass`.
-- **VCBinder — JVMBackend is VC-unaware**: Value-class unboxing and field-access rewriting happen exclusively in `VCBinder.Phase3Plugin`. `JFVariableSymbol` stores no boxed-state metadata (`effectiveType` was removed); JVMBackend reads `variable.type` / `expression.type()` directly. VCBinder replaces assignment symbols with an unboxed symbol copy so downstream consumers see the correct primitive type via `.type`.
-- **VCBinder rewrite stages (applied in order)**:
-  - R3 — `resolveFieldAccessToScalar`: rewrites `param.field` on expanded parameters to a scalar `Variable`.
-  - R3 — `expandCallSiteArgs`: rewrites call-site arguments and return-type lookup when a callee was unboxed.
-  - R4 — `reconstructFromScalars`: reconstructs a boxed VC `ConstructorInvocation` when an expanded parameter is used as a value.
-  - Step 2c (symbol replacement): replaces the `variableSymbol` on `ValAssignment`/`VarAssignment` with a copy whose `.type` is the unboxed primitive when the RHS expression type changed.
-  - R2 — `resolveFieldAccessOnCallResult`: strips a redundant `.field` access on a single-field VC value (call result or replaced variable).
-  - R5 — `unboxSingleFieldReturnExpr`: unwraps single-field VC constructor/value-class return expressions to their inner scalar.
+- **VCBinder — JVMBackend is VC-unaware**: Value-class unboxing and field-access rewriting happen exclusively in the `VCBinder` Phase3 plugin. `JFVariableSymbol` stores no boxed-state metadata (`effectiveType` was removed); JVMBackend reads `variable.type` / `expression.type()` directly. VCBinder replaces symbols with unboxed copies and rewrites the IR so downstream consumers see the correct primitive type.
+- **VCBinder single-pass pipeline**: The `handle()` method processes each method in one `flatMap`:
+  1. **Expand assignments** — `expandAssignmentIfNeeded` splits `b = Box(Point(1,2), ...)` into one scalar assignment per flattened field, storing the field hierarchy in `expandedInfo`.
+  2. **Single transformTree pass** — each instruction (expanded or not) is visited once. Inside the callback:
+     - `eagerlyExpandVariableIfNeeded` (side effect) pre-populates `expandedInfo` for referenced variables so subsequent resolvers can look up their structure.
+     - `Variable` nodes check a pre-computed symbol replacement map; if none, `reconstructFromScalars` rebuilds a boxed VC from scalars when an expanded variable is used as a value.
+     - `Convert` nodes get their `from` type fixed via `expectedExpressionType`.
+     - Other nodes fall through a resolver chain: `resolveFieldAccessToScalar` → `expandCallSiteArgs` → `resolveFieldAccessOnCallResult` → identity.
+  3. **Unbox return** — if the method's return type is a single-field VC, `unboxSingleFieldReturnExpr` strips the wrapper.
+  The three call-site handlers each return `null` to pass to the next: `resolveFieldAccessToScalar` rewrites `p.x` to direct scalar variables (or reconstructs a multi-field VC from scalars), `expandCallSiteArgs` rewrites method arguments/return types when a callee's parameters were flattened, and `resolveFieldAccessOnCallResult` strips redundant `.field` on single-field VC results.
