@@ -221,7 +221,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         symbolMapManager.add(name.value, jfClass)
 
         val cons = Type.JFConstructor(parameters, jfClass)
-        jfClass.constructor = cons
+        jfClass.constructor = cons  // TODO: pass constructor at JFClass creation instead of late mutation
         symbolMapManager.add(jfClass, cons.name, cons)
 
         for ((index, param) in parameters.withIndex()) {
