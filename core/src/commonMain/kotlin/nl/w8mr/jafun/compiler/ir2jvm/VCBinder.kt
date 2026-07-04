@@ -8,9 +8,8 @@ import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
 import nl.w8mr.jafun.compiler.expandVariable
+import nl.w8mr.jafun.compiler.computeExpandedInfo
 import nl.w8mr.jafun.compiler.flattenType
-import nl.w8mr.jafun.compiler.FlattenedField
-import nl.w8mr.jafun.compiler.isMultiFieldVC
 import nl.w8mr.jafun.compiler.transformTree
 import nl.w8mr.jafun.compiler.unboxSingleFieldVCType
 
@@ -102,11 +101,7 @@ object VCBinder {
      * list of scalar Parameters. Non-VC types are returned unchanged.
      */
     private fun expandParameterForVC(param: Parameter): List<Parameter> {
-        val type = param.type
-        if (type is Type.JFClass && type.kind == Type.ClassKind.VALUE_CLASS) {
-            return expandParameterRecursively(type, param.varName)
-        }
-        return listOf(param)
+        return expandParameterRecursively(param.type, param.varName)
     }
 
     // ---- expandedFields propagation ----
@@ -120,49 +115,9 @@ object VCBinder {
         symbol: Type.JFVariableSymbol,
         expandedInfo: MutableMap<String, Type.ExpandedInfo>
     ) {
-        val type = symbol.type
-        if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) return
         if (symbol.name in expandedInfo) return
-
-        val cons = type.constructor ?: return
-        val flattened = flattenType(type)
-        val expandedVars = expandVariable(symbol)
-
-        val fieldPathToSymbol = mutableMapOf<String, Type.JFVariableSymbol>()
-        expandedVars.forEachIndexed { index, expandedVar ->
-            fieldPathToSymbol[flattened[index].path] = expandedVar
-        }
-
-        val fields = cons.parameters.map { param ->
-            val paramFlattened = flattened.filter { field ->
-                field.path.startsWith(param.name + "_") || field.path == param.name
-            }
-            val sourceVCFields = if (isMultiFieldVC(param.type) && paramFlattened.size > 1) {
-                paramFlattened.map { field ->
-                    val localPath = if (field.path.startsWith(param.name + "_")) {
-                        field.path.substring((param.name + "_").length)
-                    } else {
-                        field.path
-                    }
-                    localPath to field.type
-                }
-            } else {
-                null
-            }
-            val actualSymbol = if (paramFlattened.size == 1 && sourceVCFields == null) {
-                fieldPathToSymbol[paramFlattened[0].path]
-            } else {
-                null
-            }
-            Type.ExpandedField(
-                name = param.name,
-                type = param.type,
-                sourceVC = if (isMultiFieldVC(param.type)) param.type as? Type.JFClass else null,
-                sourceVCFields = sourceVCFields,
-                actualSymbol = actualSymbol
-            )
-        }
-        expandedInfo[symbol.name] = Type.ExpandedInfo(fields, fieldPathToSymbol)
+        val info = computeExpandedInfo(symbol) ?: return
+        expandedInfo[symbol.name] = info
     }
 
     // ---- R3: FieldAccess resolution ----
@@ -189,28 +144,32 @@ object VCBinder {
         if (targetScalar != null) return ExpressionNode.Variable(targetScalar)
 
         // Case 2: Multi-field VC reconstruction.
-        // When the field access targets a multi-field VC (e.g. `box.topLeft` where
-        // Point has 2 fields), reconstruct the VC from its component scalars.
+        return reconstructVCFromScalars(info, pathFromRoot)
+    }
+
+    /**
+     * When the field access targets a multi-field VC (e.g. `box.topLeft` where
+     * Point has 2 fields), reconstruct the VC from its component scalars.
+     */
+    private fun reconstructVCFromScalars(
+        info: Type.ExpandedInfo,
+        pathFromRoot: List<String>
+    ): ExpressionNode.ConstructorInvocation? {
         val fields = info.fields ?: return null
         val ef = fields.find { it.name == pathFromRoot.firstOrNull() } ?: return null
         val sourceVC = ef.sourceVC ?: return null
         val scFields = ef.sourceVCFields ?: return null
         val cons = sourceVC.constructor ?: return null
 
-        // The remaining path from the first component, e.g. for
-        // `box.topLeft` -> ["topLeft"] -> remaining = empty.
         val remaining = pathFromRoot.drop(1)
         if (remaining.isNotEmpty()) return null
 
         val args = cons.parameters.map { param ->
             val fullPath = "${ef.name}_${param.name}"
-            val scalarSym = pathMap[fullPath] ?: return null
+            val scalarSym = info.fieldSymbols?.get(fullPath) ?: return null
             ExpressionNode.Variable(scalarSym) as ExpressionNode.Phase2_3Expression
         }
-        return ExpressionNode.ConstructorInvocation(
-            cons = cons,
-            arguments = args.toMutableList()
-        )
+        return ExpressionNode.ConstructorInvocation(cons, args.toMutableList())
     }
 
     // ---- R2: Eliminate FieldAccess on single-field VC call result ----

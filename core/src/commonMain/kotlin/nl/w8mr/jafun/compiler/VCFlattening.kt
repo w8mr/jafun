@@ -119,6 +119,14 @@ fun isMultiFieldVC(type: OperandType<*>): Boolean {
  * @param arg The base expression to access fields from
  * @return Expression representing the nested field access
  */
+fun fieldTypeForAccess(containerType: OperandType<*>, fieldName: String): OperandType<*> {
+    if (containerType is Type.JFClass && containerType.kind == Type.ClassKind.VALUE_CLASS) {
+        return containerType.constructor?.parameters?.find { it.name == fieldName }?.type
+            ?: OperandType.SInt32
+    }
+    return OperandType.SInt32
+}
+
 fun createNestedFieldAccess(
     pathComponents: List<String>,
     arg: ExpressionNode.Phase2_3Expression,
@@ -127,16 +135,7 @@ fun createNestedFieldAccess(
     if (pathComponents.size == 1) {
         // Single field - this is a primitive type access
         val fieldName = pathComponents[0]
-        // For simple field access to a primitive, we need the field type
-        // This will be resolved during compilation
-        val fieldType = arg.type().let { argType ->
-            if (argType is Type.JFClass && argType.kind == Type.ClassKind.VALUE_CLASS) {
-                argType.constructor?.parameters?.find { it.name == fieldName }?.type
-                    ?: OperandType.SInt32 // fallback
-            } else {
-                OperandType.SInt32 // fallback
-            }
-        }
+        val fieldType = fieldTypeForAccess(arg.type(), fieldName)
         return ExpressionNode.FieldAccess(
             instance = arg,
             fieldIndex = 0, // Will be resolved during compilation
@@ -148,14 +147,7 @@ fun createNestedFieldAccess(
     
     // Nested access - recurse
     val firstField = pathComponents[0]
-    val fieldType = arg.type().let { argType ->
-        if (argType is Type.JFClass && argType.kind == Type.ClassKind.VALUE_CLASS) {
-            argType.constructor?.parameters?.find { it.name == firstField }?.type
-                ?: OperandType.SInt32 // fallback
-        } else {
-            OperandType.SInt32 // fallback
-        }
-    }
+    val fieldType = fieldTypeForAccess(arg.type(), firstField)
     val firstAccess = ExpressionNode.FieldAccess(
         instance = arg,
         fieldIndex = 0, // Will be resolved during compilation
@@ -205,6 +197,111 @@ fun unboxSingleFieldVCType(type: OperandType<*>): OperandType<*>? {
 }
 
 /**
+ * Compute ExpandedInfo for a variable symbol whose type is a VC.
+ * Returns null if the type is not a VC or has no constructor.
+ * Shared by expandAssignmentIfNeeded and VCBinder's setExpandedFieldsOnSymbol.
+ */
+fun computeExpandedInfo(symbol: Type.JFVariableSymbol): Type.ExpandedInfo? {
+    val type = symbol.type
+    if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) return null
+    val cons = type.constructor ?: return null
+
+    val flattened = flattenType(type)
+    val expandedVars = expandVariable(symbol)
+
+    val fieldPathToSymbol = mutableMapOf<String, Type.JFVariableSymbol>()
+    expandedVars.forEachIndexed { index, expandedVar ->
+        fieldPathToSymbol[flattened[index].path] = expandedVar
+    }
+
+    val fields = cons.parameters.map { param ->
+        val paramFlattened = flattened.filter { field ->
+            field.path.startsWith(param.name + "_") || field.path == param.name
+        }
+        val sourceVCFields = if (isMultiFieldVC(param.type) && paramFlattened.size > 1) {
+            paramFlattened.map { field ->
+                val localPath = if (field.path.startsWith(param.name + "_")) {
+                    field.path.substring((param.name + "_").length)
+                } else {
+                    field.path
+                }
+                localPath to field.type
+            }
+        } else {
+            null
+        }
+        val actualSymbol = if (paramFlattened.size == 1 && sourceVCFields == null) {
+            fieldPathToSymbol[paramFlattened[0].path]
+        } else {
+            null
+        }
+        Type.ExpandedField(
+            name = param.name,
+            type = param.type,
+            sourceVC = if (isMultiFieldVC(param.type)) param.type as? Type.JFClass else null,
+            sourceVCFields = sourceVCFields,
+            actualSymbol = actualSymbol
+        )
+    }
+    return Type.ExpandedInfo(fields, fieldPathToSymbol)
+}
+
+/**
+ * Extract a single expanded argument expression from a ConstructorInvocation
+ * for a specific flattened field. Resolves through three strategies:
+ * 1. Variable arg → lookup in expandedInfo's fieldSymbols
+ * 2. ConstructorInvocation arg → extract matching constructor argument
+ * 3. Fallback → create a nested FieldAccess chain
+ */
+fun extractExpandedArg(
+    field: FlattenedField,
+    ci: ExpressionNode.ConstructorInvocation,
+    constructorParams: List<Type.JFVariableSymbol>,
+    expandedInfo: Map<String, Type.ExpandedInfo>
+): ExpressionNode.Phase2_3Expression {
+    val matchingArgIndex = constructorParams.indexOfFirst { param ->
+        field.path.startsWith(param.name + "_") || field.path == param.name
+    }
+
+    if (matchingArgIndex < 0 || matchingArgIndex >= ci.arguments.size) {
+        error("Could not match field path ${field.path} to constructor arguments")
+    }
+
+    val arg = ci.arguments[matchingArgIndex]
+    val param = constructorParams[matchingArgIndex]
+
+    val remainingPath = if (field.path.startsWith(param.name + "_")) {
+        field.path.substring((param.name + "_").length).split("_")
+    } else if (field.path == param.name) {
+        emptyList()
+    } else {
+        field.path.split("_")
+    }
+
+    if (remainingPath.isEmpty()) return arg
+
+    val resolvedFromVariable = if (arg is ExpressionNode.Variable) {
+        val fieldPath = remainingPath.joinToString("_")
+        expandedInfo[arg.variableSymbol.name]?.fieldSymbols?.get(fieldPath)
+            ?.let { ExpressionNode.Variable(it) }
+    } else {
+        null
+    }
+
+    val resolvedFromConstructor = if (arg is ExpressionNode.ConstructorInvocation && resolvedFromVariable == null) {
+        val fieldName = remainingPath[0]
+        val fieldIndex = arg.cons.parameters.indexOfFirst { it.name == fieldName }
+        if (fieldIndex >= 0 && fieldIndex < arg.arguments.size) {
+            val fieldArg = arg.arguments[fieldIndex]
+            if (remainingPath.size == 1) fieldArg
+            else createNestedFieldAccess(remainingPath.drop(1), fieldArg)
+        } else null
+    } else null
+
+    return resolvedFromVariable ?: resolvedFromConstructor ?: createNestedFieldAccess(remainingPath, arg)
+}
+
+/**
  * Expand an Assignment of a multi-field VC into multiple Assignment nodes
  * of primitive types (val for val, var for var).
  *
@@ -234,106 +331,18 @@ fun expandAssignmentIfNeeded(
     }
     val ci = assignment.expression as ExpressionNode.ConstructorInvocation
 
-    // Get the flattened fields for the entire structure
+    // Build and store the hierarchical structure using the shared helper.
+    val info = computeExpandedInfo(assignment.variableSymbol)
+        ?: return listOf(assignment as ExpressionNode.Phase2_3Expression)
+    expandedInfo[assignment.variableSymbol.name] = info
+
+    // Recomputed for argument extraction (cheap leaf operations on types/symbols).
     val flattened = flattenType(varType)
     val expandedVars = expandVariable(assignment.variableSymbol)
-
-    // Store the hierarchical structure on the original symbol
     val constructorParams = (varType as Type.JFClass).constructor!!.parameters
 
-    // Build a map from flattened field paths to their expanded symbols
-    val fieldPathToSymbol = mutableMapOf<String, Type.JFVariableSymbol>()
-    expandedVars.forEachIndexed { index, expandedVar ->
-        fieldPathToSymbol[flattened[index].path] = expandedVar
-    }
-
-    val fields = constructorParams.map { param ->
-        // Find all flattened fields belonging to this parameter
-        val paramFlattened = flattened.filter { field ->
-            field.path.startsWith(param.name + "_") || field.path == param.name
-        }
-
-        // For nested VCs, extract the sub-structure
-        val sourceVCFields = if (isMultiFieldVC(param.type) && paramFlattened.size > 1) {
-            paramFlattened.map { field ->
-                // Strip the parameter name prefix to get local path
-                val localPath = if (field.path.startsWith(param.name + "_")) {
-                    field.path.substring((param.name + "_").length)
-                } else {
-                    field.path
-                }
-                localPath to field.type
-            }
-        } else {
-            null
-        }
-
-        // Find the actual symbol if this is a direct field (not nested)
-        val actualSymbol = if (paramFlattened.size == 1 && sourceVCFields == null) {
-            fieldPathToSymbol[paramFlattened[0].path]
-        } else {
-            null
-        }
-
-        Type.ExpandedField(
-            name = param.name,
-            type = param.type,
-            sourceVC = if (isMultiFieldVC(param.type)) param.type as? Type.JFClass else null,
-            sourceVCFields = sourceVCFields,
-            actualSymbol = actualSymbol  // For top-level primitive fields
-        )
-    }
-
-    expandedInfo[assignment.variableSymbol.name] = Type.ExpandedInfo(fields, fieldPathToSymbol)
-
-    // For each flattened field, create a nested field access expression
     val expandedArgs = flattened.map { field ->
-        val pathComponents = field.path.split("_")
-
-        // Find which constructor argument this path belongs to
-        val matchingArgIndex = constructorParams.indexOfFirst { param ->
-            field.path.startsWith(param.name + "_") || field.path == param.name
-        }
-
-        if (matchingArgIndex >= 0 && matchingArgIndex < ci.arguments.size) {
-            var arg = ci.arguments[matchingArgIndex]
-            
-            // Remove the first component if it matches the arg parameter name
-            val param = constructorParams[matchingArgIndex]
-            val remainingPath = if (field.path.startsWith(param.name + "_")) {
-                field.path.substring((param.name + "_").length).split("_")
-            } else if (field.path == param.name) {
-                emptyList()
-            } else {
-                field.path.split("_")
-            }
-
-            if (remainingPath.isEmpty()) {
-                arg
-            } else {
-                // Resolve through expanded field symbols when the arg is a variable
-                val resolvedFromVariable = if (arg is ExpressionNode.Variable) {
-                    val fieldPath = remainingPath.joinToString("_")
-                    expandedInfo[arg.variableSymbol.name]?.fieldSymbols?.get(fieldPath)
-                        ?.let { ExpressionNode.Variable(it) }
-                } else {
-                    null
-                }
-                // When arg is a ConstructorInvocation, extract the matching constructor argument
-                val resolvedFromConstructor = if (arg is ExpressionNode.ConstructorInvocation && resolvedFromVariable == null) {
-                    val fieldName = remainingPath[0]
-                    val fieldIndex = arg.cons.parameters.indexOfFirst { it.name == fieldName }
-                    if (fieldIndex >= 0 && fieldIndex < arg.arguments.size) {
-                        val fieldArg = arg.arguments[fieldIndex]
-                        if (remainingPath.size == 1) fieldArg
-                        else createNestedFieldAccess(remainingPath.drop(1), fieldArg)
-                    } else null
-                } else null
-                resolvedFromVariable ?: resolvedFromConstructor ?: createNestedFieldAccess(remainingPath, arg)
-            }
-        } else {
-            error("Could not match field path ${field.path} to constructor arguments")
-        }
+        extractExpandedArg(field, ci, constructorParams, expandedInfo)
     }
 
     // Create separate Assignment for each expanded variable (val for val, var for var)
