@@ -22,7 +22,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode
 /**
  * Represents a single flattened primitive component of a VC type.
  * 
- * @param path The dot-separated path from the original VC to this primitive
+ * @param path The underscore-separated path from the original VC to this primitive
  *             Examples: "x", "topLeft_x", "box_topLeft_x"
  * @param type The primitive OperandType
  */

@@ -45,9 +45,11 @@ object VCBinder {
             val symbolReplacements = computeSymbolReplacements(method.instructions, methodSigs)
             val unboxedReturnType = unboxSingleFieldVCType(method.returnType)
 
-            // R1 + unified walk + R5: expand CI assignments, then eagerly populate
-            // expandedInfo + R3 + expandCallSiteArgs + R4 + Variable substitution
-            // + R2 + Convert fix, then unbox single-field VC return.
+            // Pipeline: expand CI assignments into scalar assignments, then
+            // run a single transformTree pass that eagerly populates expandedInfo,
+            // substitutes corrected symbols, reconstructs boxed VCs, resolves
+            // field accesses, expands call-site args, and strips redundant
+            // field accesses. Finally unbox single-field VC return expressions.
             val instructions = method.instructions.flatMap { instruction ->
                 val expanded = when (instruction) {
                     is ExpressionNode.ValAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
@@ -212,11 +214,6 @@ object VCBinder {
   if (vcClass.kind != Type.ClassKind.VALUE_CLASS) return null
   val singleFieldType = unboxSingleFieldVCType(vcClass) ?: return null
 
-  // R2-corrected: instead of mutating a side-channel effectiveType on the symbol,
-  // R2 eliminates the redundant field access here while variable type substitutions
-  // below are still visible via methodSigs.
-  // effect on usages. Here we only strip the redundant field access when there's
-  // a single constructor parameter whose name matches the field access.
   val cons = vcClass.constructor ?: return null
   if (cons.parameters[0].name != node.fieldName) return null
 
