@@ -38,68 +38,27 @@ object VCBinder {
                 }
             }
 
-            // Step 1b: Propagate expandedFields to parameter Variable symbols only.
-            // A Variable is a parameter reference iff its name is not the target of any
-            // ValAssignment/VarAssignment in this method body.
+            // Collect assigned variable names (for distinguishing params from locals).
             val assignedVarNames = collectAssignedVarNames(expanded)
-            val withParamFields = expanded.map { instruction ->
-                instruction.transformTree { node ->
-                    if (node is ExpressionNode.Variable
-                        && node.variableSymbol.name !in expandedInfo
-                        && node.variableSymbol.name !in assignedVarNames
-                    ) {
-                        setExpandedFieldsOnSymbol(node.variableSymbol, expandedInfo)
-                    }
-                    node
-                }
-            }
 
-            // Step 2: R3 - rewrite FieldAccess to scalar Variables, expand call site args,
-            // R4 - reconstruct boxed VCs from scalar components when a Variable with
-            // expandedFieldSymbols is used directly (e.g. `println a` where a: Address
-            // was expanded to a_street and a_number).
-            val resolved = withParamFields.map { instruction ->
-                instruction.transformTree { node ->
-                    resolveFieldAccessToScalar(node, expandedInfo)
-                        ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
-                        ?: reconstructFromScalars(node, expandedInfo)
-                        ?: node
-                }
-            }
+            // Read-only scan: compute symbol replacements from methodSigs directly,
+            // without needing expandCallSiteArgs to have run first.
+            val symbolReplacements = computeSymbolReplacements(expanded, methodSigs)
 
-    val symbolReplacements = mutableMapOf<String, Type.JFVariableSymbol>()
-    val updatedVarTypes = resolved.map { instruction ->
-                when (instruction) {
-                    is ExpressionNode.ValAssignment -> {
-                        val exprType = instruction.expression.type()
-                        val sym = instruction.variableSymbol
-                        if (exprType != sym.type) {
-                            val newSym = sym.copy(type = exprType)
-                            symbolReplacements[sym.name] = newSym
-                            instruction.copy(variableSymbol = newSym)
-                        } else instruction
-                    }
-                    is ExpressionNode.VarAssignment -> {
-                        val exprType = instruction.expression.type()
-                        val sym = instruction.variableSymbol
-                        if (exprType != sym.type) {
-                            val newSym = sym.copy(type = exprType)
-                            symbolReplacements[sym.name] = newSym
-                            instruction.copy(variableSymbol = newSym)
-                        } else instruction
-                    }
-                    else -> instruction
-                }
-            }
-
-            // Step 2c+2d+2b: Variable substitution + R2 + Convert fix in one walk.
-            val fixedConverts = updatedVarTypes.map { instruction ->
+            // Unified walk: eagerly populate expandedInfo + R3 + expandCallSiteArgs + R4
+            // + Variable substitution + R2 + Convert fix.
+            val fixedConverts = expanded.map { instruction ->
                 instruction.transformTree { node ->
+                    eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames)
+
                     when {
                         node is ExpressionNode.Variable -> {
                             val replacement = symbolReplacements[node.variableSymbol.name]
-                            if (replacement != null && replacement !== node.variableSymbol) ExpressionNode.Variable(replacement)
-                            else node
+                            if (replacement != null && replacement !== node.variableSymbol) {
+                                ExpressionNode.Variable(replacement)
+                            } else {
+                                reconstructFromScalars(node, expandedInfo) ?: node
+                            }
                         }
                         node is ExpressionNode.Convert -> {
                             val effectiveFrom = when (val expr = node.expression) {
@@ -107,12 +66,21 @@ object VCBinder {
                                     val replacement = symbolReplacements[expr.variableSymbol.name]
                                     replacement?.type ?: expr.type()
                                 }
+                                is ExpressionNode.MethodInvocation -> {
+                                    expectedExpressionType(expr, methodSigs)
+                                }
                                 else -> expr.type()
                             }
                             if (effectiveFrom != node.from) ExpressionNode.Convert(node.expression, effectiveFrom, node.to)
                             else node
                         }
-                        else -> resolveFieldAccessOnCallResult(node, methodSigs) ?: node
+                        else -> {
+                            resolveFieldAccessToScalar(node, expandedInfo)
+                                ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
+                                ?: reconstructFromScalars(node, expandedInfo)
+                                ?: resolveFieldAccessOnCallResult(node, methodSigs)
+                                ?: node
+                        }
                     }
                 }
             }
@@ -538,5 +506,101 @@ object VCBinder {
         }
 
         return ExpressionNode.ConstructorInvocation(cons, args.toMutableList())
+    }
+
+    // ---- Symbol replacement computation (read-only scan) ----
+
+    internal fun computeSymbolReplacements(
+        instructions: List<ExpressionNode.Phase2_3Expression>,
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+    ): Map<String, Type.JFVariableSymbol> {
+        val replacements = mutableMapOf<String, Type.JFVariableSymbol>()
+        fun walk(node: ExpressionNode.Phase2_3Expression) {
+            when (node) {
+                is ExpressionNode.ValAssignment -> checkAssignment(node, replacements, methodSigs)
+                is ExpressionNode.VarAssignment -> checkAssignment(node, replacements, methodSigs)
+                is ExpressionNode.ExpressionList -> node.expressions.forEach { walk(it) }
+                else -> {}
+            }
+        }
+        instructions.forEach { walk(it) }
+        return replacements
+    }
+
+    private fun checkAssignment(
+        assignment: ExpressionNode.Assignment,
+        replacements: MutableMap<String, Type.JFVariableSymbol>,
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+    ) {
+        val expectedType = expectedExpressionType(assignment.expression, methodSigs)
+        val sym = assignment.variableSymbol
+        if (expectedType != sym.type) {
+            replacements[sym.name] = sym.copy(type = expectedType)
+        }
+    }
+
+    internal fun expectedExpressionType(
+        expr: ExpressionNode.Phase2_3Expression,
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+    ): OperandType<*> {
+        return when (expr) {
+            is ExpressionNode.MethodInvocation -> {
+                val rtnType = methodSigs[expr.methodName]?.third
+                if (rtnType == null) expr.type()
+                else unboxSingleFieldVCType(rtnType) ?: expr.type()
+            }
+            is ExpressionNode.FieldAccess -> {
+                if (expr.instance is ExpressionNode.MethodInvocation) {
+                    expectedExpressionType(expr.instance, methodSigs)
+                } else {
+                    expr.type()
+                }
+            }
+            else -> expr.type()
+        }
+    }
+
+    // ---- Eager expandedInfo population ----
+
+    internal fun eagerlyExpandVariableIfNeeded(
+        node: ExpressionNode.Phase2_3Expression,
+        expandedInfo: MutableMap<String, Type.ExpandedInfo>,
+        assignedVarNames: Set<String>
+    ) {
+        when (node) {
+            is ExpressionNode.Variable -> {
+                maybeExpandField(node.variableSymbol, expandedInfo, assignedVarNames)
+            }
+            is ExpressionNode.FieldAccess -> {
+                var current: ExpressionNode.Phase2_3Expression = node
+                while (current is ExpressionNode.FieldAccess) {
+                    current = current.instance
+                }
+                if (current is ExpressionNode.Variable) {
+                    maybeExpandField(current.variableSymbol, expandedInfo, assignedVarNames)
+                }
+            }
+            is ExpressionNode.MethodInvocation -> {
+                for (arg in node.arguments) {
+                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames)
+                }
+            }
+            is ExpressionNode.ConstructorInvocation -> {
+                for (arg in node.arguments) {
+                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames)
+                }
+            }
+            else -> {}
+        }
+    }
+
+    private fun maybeExpandField(
+        sym: Type.JFVariableSymbol,
+        expandedInfo: MutableMap<String, Type.ExpandedInfo>,
+        assignedVarNames: Set<String>
+    ) {
+        if (sym.name !in expandedInfo && sym.name !in assignedVarNames) {
+            setExpandedFieldsOnSymbol(sym, expandedInfo)
+        }
     }
 }
