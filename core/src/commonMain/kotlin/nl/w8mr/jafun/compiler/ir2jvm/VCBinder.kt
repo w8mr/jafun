@@ -117,27 +117,15 @@ object VCBinder {
                 updatedVarTypes
             }
 
-            // Step 2d (R2): Eliminate FieldAccess on single-field VC call results.
-            // When a MethodInvocation's return type was unboxed from Id to Int,
-            // `makeId().value` becomes FieldAccess(MI(int), "value") — the .value
-            // field access is now redundant since the return IS the value.
-            // Same for `id.value` when id's type was corrected by Step 2c.
-            val r2Resolved = withReplacedVars.map { instruction ->
+            // Step 2d+2b: R2 (post-substitution) + Convert fix in one walk.
+            val fixedConverts = withReplacedVars.map { instruction ->
                 instruction.transformTree { node ->
-                    resolveFieldAccessOnCallResult(node, methodSigs) ?: node
-                }
-            }
-
-            // Step 2b: Update Convert.from when inner expression type changed
-            // (e.g., after R5 unboxes a return type, Convert nodes wrapping call
-            //  sites need their `from` updated so the JVM backend emits correct boxing)
-            val fixedConverts = r2Resolved.map { instruction ->
-                instruction.transformTree { node ->
-                    if (node is ExpressionNode.Convert) {
+                    val r2 = resolveFieldAccessOnCallResult(node, methodSigs)
+                    if (r2 != null) r2
+                    else if (node is ExpressionNode.Convert) {
                         val actualType = node.expression.type()
-                        if (actualType != node.from) {
-                            ExpressionNode.Convert(node.expression, actualType, node.to)
-                        } else node
+                        if (actualType != node.from) ExpressionNode.Convert(node.expression, actualType, node.to)
+                        else node
                     } else node
                 }
             }
