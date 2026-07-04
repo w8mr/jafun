@@ -29,57 +29,58 @@ object VCBinder {
 
             val expandedInfo = mutableMapOf<String, Type.ExpandedInfo>()
 
-            // Step 1: R1 - expand CI assignments
-            val expanded = method.instructions.flatMap { instruction ->
-                when (instruction) {
+            // Collect assigned variable names from the original instruction list.
+            // R1-expanded variables have scalar types, so setExpandedFieldsOnSymbol
+            // would bail for them regardless; computing pre-R1 is safe.
+            val assignedVarNames = collectAssignedVarNames(method.instructions)
+
+            // Read-only scan: compute symbol replacements from methodSigs directly,
+            // without needing expandCallSiteArgs to have run first.
+            val symbolReplacements = computeSymbolReplacements(method.instructions, methodSigs)
+
+            // R1 + unified walk: expand CI assignments, then eagerly populate
+            // expandedInfo + R3 + expandCallSiteArgs + R4 + Variable substitution
+            // + R2 + Convert fix.
+            val fixedConverts = method.instructions.flatMap { instruction ->
+                val expanded = when (instruction) {
                     is ExpressionNode.ValAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
                     is ExpressionNode.VarAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
                     else -> listOf(instruction)
                 }
-            }
+                expanded.map { instr ->
+                    instr.transformTree { node ->
+                        eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames)
 
-            // Collect assigned variable names (for distinguishing params from locals).
-            val assignedVarNames = collectAssignedVarNames(expanded)
-
-            // Read-only scan: compute symbol replacements from methodSigs directly,
-            // without needing expandCallSiteArgs to have run first.
-            val symbolReplacements = computeSymbolReplacements(expanded, methodSigs)
-
-            // Unified walk: eagerly populate expandedInfo + R3 + expandCallSiteArgs + R4
-            // + Variable substitution + R2 + Convert fix.
-            val fixedConverts = expanded.map { instruction ->
-                instruction.transformTree { node ->
-                    eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames)
-
-                    when {
-                        node is ExpressionNode.Variable -> {
-                            val replacement = symbolReplacements[node.variableSymbol.name]
-                            if (replacement != null && replacement !== node.variableSymbol) {
-                                ExpressionNode.Variable(replacement)
-                            } else {
-                                reconstructFromScalars(node, expandedInfo) ?: node
-                            }
-                        }
-                        node is ExpressionNode.Convert -> {
-                            val effectiveFrom = when (val expr = node.expression) {
-                                is ExpressionNode.Variable -> {
-                                    val replacement = symbolReplacements[expr.variableSymbol.name]
-                                    replacement?.type ?: expr.type()
+                        when {
+                            node is ExpressionNode.Variable -> {
+                                val replacement = symbolReplacements[node.variableSymbol.name]
+                                if (replacement != null && replacement !== node.variableSymbol) {
+                                    ExpressionNode.Variable(replacement)
+                                } else {
+                                    reconstructFromScalars(node, expandedInfo) ?: node
                                 }
-                                is ExpressionNode.MethodInvocation -> {
-                                    expectedExpressionType(expr, methodSigs)
-                                }
-                                else -> expr.type()
                             }
-                            if (effectiveFrom != node.from) ExpressionNode.Convert(node.expression, effectiveFrom, node.to)
-                            else node
-                        }
-                        else -> {
-                            resolveFieldAccessToScalar(node, expandedInfo)
-                                ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
-                                ?: reconstructFromScalars(node, expandedInfo)
-                                ?: resolveFieldAccessOnCallResult(node, methodSigs)
-                                ?: node
+                            node is ExpressionNode.Convert -> {
+                                val effectiveFrom = when (val expr = node.expression) {
+                                    is ExpressionNode.Variable -> {
+                                        val replacement = symbolReplacements[expr.variableSymbol.name]
+                                        replacement?.type ?: expr.type()
+                                    }
+                                    is ExpressionNode.MethodInvocation -> {
+                                        expectedExpressionType(expr, methodSigs)
+                                    }
+                                    else -> expr.type()
+                                }
+                                if (effectiveFrom != node.from) ExpressionNode.Convert(node.expression, effectiveFrom, node.to)
+                                else node
+                            }
+                            else -> {
+                                resolveFieldAccessToScalar(node, expandedInfo)
+                                    ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
+                                    ?: reconstructFromScalars(node, expandedInfo)
+                                    ?: resolveFieldAccessOnCallResult(node, methodSigs)
+                                    ?: node
+                            }
                         }
                     }
                 }
