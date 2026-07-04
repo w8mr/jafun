@@ -34,21 +34,21 @@ object VCBinder {
             // would bail for them regardless; computing pre-R1 is safe.
             val assignedVarNames = collectAssignedVarNames(method.instructions)
 
-            // Read-only scan: compute symbol replacements from methodSigs directly,
-            // without needing expandCallSiteArgs to have run first.
+            // Read-only scan: compute symbol replacements from methodSigs directly.
             val symbolReplacements = computeSymbolReplacements(method.instructions, methodSigs)
+            val unboxedReturnType = unboxSingleFieldVCType(method.returnType)
 
-            // R1 + unified walk: expand CI assignments, then eagerly populate
+            // R1 + unified walk + R5: expand CI assignments, then eagerly populate
             // expandedInfo + R3 + expandCallSiteArgs + R4 + Variable substitution
-            // + R2 + Convert fix.
-            val fixedConverts = method.instructions.flatMap { instruction ->
+            // + R2 + Convert fix, then unbox single-field VC return.
+            val instructions = method.instructions.flatMap { instruction ->
                 val expanded = when (instruction) {
                     is ExpressionNode.ValAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
                     is ExpressionNode.VarAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
                     else -> listOf(instruction)
                 }
                 expanded.map { instr ->
-                    instr.transformTree { node ->
+                    var result = instr.transformTree { node ->
                         eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames)
 
                         when {
@@ -83,24 +83,14 @@ object VCBinder {
                             }
                         }
                     }
+                    if (unboxedReturnType != null) unboxSingleFieldReturnExpr(result, expandedInfo) else result
                 }
-            }
-
-            // Step 3: R5 - unbox single-field VC returns
-            val currentReturnType = method.returnType
-            val unboxedReturnType = unboxSingleFieldVCType(currentReturnType)
-            val withReturnUnboxing = if (unboxedReturnType != null) {
-                fixedConverts.map { instruction ->
-                    unboxSingleFieldReturnExpr(instruction, expandedInfo)
-                }
-            } else {
-                fixedConverts
             }
 
             method.copy(
                 parameters = expandedParams,
-                returnType = unboxedReturnType ?: currentReturnType,
-                instructions = withReturnUnboxing.toMutableList()
+                returnType = unboxedReturnType ?: method.returnType,
+                instructions = instructions.toMutableList()
             )
         }
         return context.copy(methods = updatedMethods.toMutableList())
