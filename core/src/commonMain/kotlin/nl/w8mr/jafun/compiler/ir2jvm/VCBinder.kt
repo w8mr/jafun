@@ -29,10 +29,19 @@ object VCBinder {
 
             val expandedInfo = mutableMapOf<String, Type.ExpandedInfo>()
 
-            // Collect assigned variable names from the original instruction list.
-            // R1-expanded variables have scalar types, so setExpandedFieldsOnSymbol
-            // would bail for them regardless; computing pre-R1 is safe.
-            val assignedVarNames = collectAssignedVarNames(method.instructions)
+            // Collect assigned variable names to distinguish local variables from
+            // parameter references. R1 populates expandedInfo for VC CI targets
+            // as a side effect, so those are covered regardless.
+            val assignedVarNames = mutableSetOf<String>()
+            fun walk(node: ExpressionNode.Phase2_3Expression) {
+                when (node) {
+                    is ExpressionNode.ValAssignment -> assignedVarNames.add(node.variableSymbol.name)
+                    is ExpressionNode.VarAssignment -> assignedVarNames.add(node.variableSymbol.name)
+                    is ExpressionNode.ExpressionList -> node.expressions.forEach { walk(it) }
+                    else -> {}
+                }
+            }
+            method.instructions.forEach { walk(it) }
 
             // Read-only scan: compute symbol replacements from methodSigs directly.
             val symbolReplacements = computeSymbolReplacements(method.instructions, methodSigs)
@@ -61,23 +70,13 @@ object VCBinder {
                                 }
                             }
                             node is ExpressionNode.Convert -> {
-                                val effectiveFrom = when (val expr = node.expression) {
-                                    is ExpressionNode.Variable -> {
-                                        val replacement = symbolReplacements[expr.variableSymbol.name]
-                                        replacement?.type ?: expr.type()
-                                    }
-                                    is ExpressionNode.MethodInvocation -> {
-                                        expectedExpressionType(expr, methodSigs)
-                                    }
-                                    else -> expr.type()
-                                }
+                                val effectiveFrom = expectedExpressionType(node.expression, methodSigs, symbolReplacements)
                                 if (effectiveFrom != node.from) ExpressionNode.Convert(node.expression, effectiveFrom, node.to)
                                 else node
                             }
                             else -> {
                                 resolveFieldAccessToScalar(node, expandedInfo)
                                     ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
-                                    ?: reconstructFromScalars(node, expandedInfo)
                                     ?: resolveFieldAccessOnCallResult(node, methodSigs)
                                     ?: node
                             }
@@ -94,29 +93,6 @@ object VCBinder {
             )
         }
         return context.copy(methods = updatedMethods.toMutableList())
-    }
-
-    // ---- Helpers ----
-
-    /**
-     * Collect the set of variable names that are targets of ValAssignment or VarAssignment
-     * in the given instruction list. Used to distinguish parameter references from local
-     * variables.
-     */
-    internal fun collectAssignedVarNames(
-        instructions: List<ExpressionNode.Phase2_3Expression>
-    ): Set<String> {
-        val names = mutableSetOf<String>()
-        fun walk(node: ExpressionNode.Phase2_3Expression) {
-            when (node) {
-                is ExpressionNode.ValAssignment -> names.add(node.variableSymbol.name)
-                is ExpressionNode.VarAssignment -> names.add(node.variableSymbol.name)
-                is ExpressionNode.ExpressionList -> node.expressions.forEach { walk(it) }
-                else -> {}
-            }
-        }
-        instructions.forEach { walk(it) }
-        return names
     }
 
     // ---- Parameter expansion ----
@@ -532,9 +508,14 @@ object VCBinder {
 
     internal fun expectedExpressionType(
         expr: ExpressionNode.Phase2_3Expression,
-        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>,
+        symbolReplacements: Map<String, Type.JFVariableSymbol> = emptyMap()
     ): OperandType<*> {
         return when (expr) {
+            is ExpressionNode.Variable -> {
+                val replacement = symbolReplacements[expr.variableSymbol.name]
+                replacement?.type ?: expr.type()
+            }
             is ExpressionNode.MethodInvocation -> {
                 val rtnType = methodSigs[expr.methodName]?.third
                 if (rtnType == null) expr.type()
@@ -542,7 +523,15 @@ object VCBinder {
             }
             is ExpressionNode.FieldAccess -> {
                 if (expr.instance is ExpressionNode.MethodInvocation) {
-                    expectedExpressionType(expr.instance, methodSigs)
+                    val mi = expr.instance
+                    val rtnType = methodSigs[mi.methodName]?.third
+                    // Only recurse into the MI when it returns a single-field VC
+                    // that gets unboxed; for multi-field VCs the field's own type applies.
+                    if (rtnType != null && unboxSingleFieldVCType(rtnType) != null) {
+                        expectedExpressionType(mi, methodSigs, symbolReplacements)
+                    } else {
+                        expr.type()
+                    }
                 } else {
                     expr.type()
                 }
