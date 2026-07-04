@@ -67,17 +67,8 @@ object VCBinder {
                 }
             }
 
-    // Step 2c (R2-corrected): R2 must run AFTER variable type corrections (Step 2c)
-    // so that when a Variable's symbol was replaced with its unboxed type,
-    // the original vcClass is still known via methodSigs.
-    val afterR2 = resolved.map { instruction ->
-      instruction.transformTree { node ->
-        resolveFieldAccessOnCallResult(node, methodSigs) ?: node
-      }
-    }
-
     val symbolReplacements = mutableMapOf<String, Type.JFVariableSymbol>()
-    val updatedVarTypes = afterR2.map { instruction ->
+    val updatedVarTypes = resolved.map { instruction ->
                 when (instruction) {
                     is ExpressionNode.ValAssignment -> {
                         val exprType = instruction.expression.type()
@@ -101,32 +92,28 @@ object VCBinder {
                 }
             }
 
-            // Replace all Variable nodes referencing replaced symbols
-            val withReplacedVars = if (symbolReplacements.isNotEmpty()) {
-                updatedVarTypes.map { instruction ->
-                    instruction.transformTree { node ->
-                        if (node is ExpressionNode.Variable) {
-                            val replacement = symbolReplacements[node.variableSymbol.name]
-                            if (replacement != null && replacement !== node.variableSymbol) {
-                                ExpressionNode.Variable(replacement)
-                            } else node
-                        } else node
-                    }
-                }
-            } else {
-                updatedVarTypes
-            }
-
-            // Step 2d+2b: R2 (post-substitution) + Convert fix in one walk.
-            val fixedConverts = withReplacedVars.map { instruction ->
+            // Step 2c+2d+2b: Variable substitution + R2 + Convert fix in one walk.
+            val fixedConverts = updatedVarTypes.map { instruction ->
                 instruction.transformTree { node ->
-                    val r2 = resolveFieldAccessOnCallResult(node, methodSigs)
-                    if (r2 != null) r2
-                    else if (node is ExpressionNode.Convert) {
-                        val actualType = node.expression.type()
-                        if (actualType != node.from) ExpressionNode.Convert(node.expression, actualType, node.to)
-                        else node
-                    } else node
+                    when {
+                        node is ExpressionNode.Variable -> {
+                            val replacement = symbolReplacements[node.variableSymbol.name]
+                            if (replacement != null && replacement !== node.variableSymbol) ExpressionNode.Variable(replacement)
+                            else node
+                        }
+                        node is ExpressionNode.Convert -> {
+                            val effectiveFrom = when (val expr = node.expression) {
+                                is ExpressionNode.Variable -> {
+                                    val replacement = symbolReplacements[expr.variableSymbol.name]
+                                    replacement?.type ?: expr.type()
+                                }
+                                else -> expr.type()
+                            }
+                            if (effectiveFrom != node.from) ExpressionNode.Convert(node.expression, effectiveFrom, node.to)
+                            else node
+                        }
+                        else -> resolveFieldAccessOnCallResult(node, methodSigs) ?: node
+                    }
                 }
             }
 
