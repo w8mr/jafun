@@ -7,7 +7,7 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
     onNode: (ExpressionNode.Phase2_3Expression) -> ExpressionNode.Phase2_3Expression
 ): ExpressionNode.Phase2_3Expression {
     val result = onNode(this)
-    if (result !== this) return result
+    if (result !== this) return result.transformTree(onNode)
 
     return when (this) {
         is ExpressionNode.ValAssignment -> {

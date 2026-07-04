@@ -422,6 +422,9 @@ object VCBinder {
             node.rtnLookup
         }
 
+        // Idempotency guard: if rtnLookup already returns the target type, skip
+        if (returnTypeChanged && node.type() == updatedRtnLookup()) return null
+
         if (paramsUnchanged) {
             return ExpressionNode.MethodInvocation(
                 methodName = node.methodName,
