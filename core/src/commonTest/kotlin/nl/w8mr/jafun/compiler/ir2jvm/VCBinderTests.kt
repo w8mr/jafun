@@ -27,6 +27,12 @@ class VCBinderTests {
     // ---- Test helpers ----
 
     private fun intType() = OperandType.SInt32
+
+    private fun expandedInfoOf(vararg symbols: Type.JFVariableSymbol): MutableMap<String, Type.ExpandedInfo> {
+        val map = mutableMapOf<String, Type.ExpandedInfo>()
+        symbols.forEach { VCBinder.setExpandedFieldsOnSymbol(it, map) }
+        return map
+    }
     private fun stringType() = OperandType.StringType
 
     private fun createVC(name: String, vararg params: Pair<String, OperandType<*>>): Type.JFClass {
@@ -197,7 +203,7 @@ class VCBinderTests {
      * access to the scalar symbol.
      *
      * For Box(topLeft: Point):
-     *   - b.expandedFields = [topLeft] with sourceVCFields=[(x, Int), (y, Int)]
+     *   - b has expandedInfo with sourceVCFields=[(x, Int), (y, Int)] for topLeft
      *   - b.topLeft.x resolves to the scalar symbol for x
      */
     @Test
@@ -207,14 +213,16 @@ class VCBinderTests {
 
         val b = Type.JFVariableSymbol("b", boxVc)
 
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
         // Trigger expand assignment so b has expandedFields populated
         expandAssignmentIfNeeded(
-            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10))))
+            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10)))),
+            info
         )
 
         // b.topLeft.x should resolve to scalar 'b_topLeft_x'
         // First, build a path-map from b's expansion
-        val pathMap: Map<String, Type.JFVariableSymbol> = (b.expandedFieldSymbols ?: emptyMap())
+        val pathMap: Map<String, Type.JFVariableSymbol> = info["b"]?.fieldSymbols ?: emptyMap()
         assertNotNull(pathMap)
 
         val scalarForTopLeftX = pathMap["topLeft_x"]
@@ -242,12 +250,14 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
         expandAssignmentIfNeeded(
-            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10))))
+            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10)))),
+            info
         )
 
         // Sanity: the pathMap holds top-level field paths → actual symbols
-        val flat: Map<String, Type.JFVariableSymbol> = b.expandedFieldSymbols ?: emptyMap()
+        val flat: Map<String, Type.JFVariableSymbol> = info["b"]?.fieldSymbols ?: emptyMap()
 
         // The single top-level field of Box is "topLeft". Its inner fields are
         // "topLeft_x" and "topLeft_y" (because Box is single-field with inner Point
@@ -270,8 +280,10 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
         expandAssignmentIfNeeded(
-            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10))))
+            valAssign(b, ci(boxVc.constructor!!, ci(pointVc.constructor!!, intLiteral(99), intLiteral(10)))),
+            info
         )
 
         // Build `b.topLeft.x` as a chained FieldAccess
@@ -292,7 +304,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
+        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa, info)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
         assertEquals("b_topLeft_x", resolved.variableSymbol.name)
@@ -307,8 +319,10 @@ class VCBinderTests {
     fun R3_resolveFieldAccess_returnsNullForUnknownPath() {
         val boxVc = createVC("Box", "x" to intType())
         val b = Type.JFVariableSymbol("b", boxVc)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
         expandAssignmentIfNeeded(
-            valAssign(b, ci(boxVc.constructor!!, intLiteral(99)))
+            valAssign(b, ci(boxVc.constructor!!, intLiteral(99))),
+            info
         )
         // b.x should resolve to scalar 'b_x' (single-field VC flattens to scalar field name)
         val faOnX = ExpressionNode.FieldAccess(
@@ -318,7 +332,7 @@ class VCBinderTests {
             fieldType = intType(),
             arguments = emptyList()
         )
-        val resolved = VCBinder.resolveFieldAccessToScalar(faOnX)
+        val resolved = VCBinder.resolveFieldAccessToScalar(faOnX, info)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
         assertEquals("b_x", resolved.variableSymbol.name)
@@ -334,14 +348,17 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        assertNull(b.expandedFields)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        assertNull(info["b"])
 
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
-        assertNotNull(b.expandedFields)
-        assertEquals(1, b.expandedFields!!.size)
+        val ei = info["b"]
+        assertNotNull(ei)
+        assertNotNull(ei!!.fields)
+        assertEquals(1, ei.fields!!.size)
 
-        val topLeftField = b.expandedFields!![0]
+        val topLeftField = ei.fields!![0]
         assertEquals("topLeft", topLeftField.name)
         assertEquals(pointVc, topLeftField.type)
         val fields = topLeftField.sourceVCFields
@@ -359,45 +376,46 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
-        assertNotNull(b.expandedFieldSymbols)
-        assertEquals(setOf("topLeft_x", "topLeft_y"), b.expandedFieldSymbols!!.keys)
+        val ei = info["b"] ?: error("expected info for b")
+        val symbols = ei.fieldSymbols ?: error("expected fieldSymbols")
+        assertEquals(setOf("topLeft_x", "topLeft_y"), symbols.keys)
 
-        val symX = b.expandedFieldSymbols!!["topLeft_x"]
+        val symX = symbols["topLeft_x"]
         assertNotNull(symX)
-        assertEquals("b_topLeft_x", symX.name)
+        assertEquals("b_topLeft_x", symX!!.name)
         assertEquals(intType(), symX.type)
 
-        val symY = b.expandedFieldSymbols!!["topLeft_y"]
+        val symY = symbols["topLeft_y"]
         assertNotNull(symY)
-        assertEquals("b_topLeft_y", symY.name)
+        assertEquals("b_topLeft_y", symY!!.name)
         assertEquals(intType(), symY.type)
     }
 
     @Test
     fun setExpandedFields_nonVC_doesNothing() {
         val s = Type.JFVariableSymbol("s", stringType())
-        VCBinder.setExpandedFieldsOnSymbol(s)
-        assertNull(s.expandedFields)
-        assertNull(s.expandedFieldSymbols)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(s, info)
+        assertNull(info["s"])
     }
 
     @Test
     fun setExpandedFields_alreadySet_doesNotOverwrite() {
         val boxVc = createVC("Box", "x" to intType())
         val b = Type.JFVariableSymbol("b", boxVc)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
         // Simulate R1 setting expandedFields
-        expandAssignmentIfNeeded(valAssign(b, ci(boxVc.constructor!!, intLiteral(99))))
+        expandAssignmentIfNeeded(valAssign(b, ci(boxVc.constructor!!, intLiteral(99))), info)
 
-        val existingFields = b.expandedFields
-        val existingSymbols = b.expandedFieldSymbols
+        val existing = info["b"]
 
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
         // Should be the same references (not overwritten)
-        assertTrue(b.expandedFields === existingFields)
-        assertTrue(b.expandedFieldSymbols === existingSymbols)
+        assertTrue(info["b"] === existing)
     }
 
     @Test
@@ -406,12 +424,13 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
         // Box has one constructor param (topLeft: Point).
         // isMultiFieldVC(Point) = true, so sourceVCFields = [(x, Int), (y, Int)]
-        val fields = b.expandedFields
-        assertNotNull(fields)
+        val ei = info["b"] ?: error("expected info for b")
+        val fields = ei.fields ?: error("expected fields")
         val field = fields[0]
         assertEquals("topLeft", field.name)
         val sourceFields = field.sourceVCFields
@@ -425,7 +444,8 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
         // Build b.topLeft.x
         val topLeftFa = ExpressionNode.FieldAccess(
@@ -443,7 +463,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
+        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa, info)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
         assertEquals("b_topLeft_x", resolved.variableSymbol.name)
@@ -455,7 +475,8 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
         // b.topLeft where Point is multi-field — should reconstruct Point(x, y)
         val fieldAccess = ExpressionNode.FieldAccess(
@@ -466,7 +487,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val resolved = VCBinder.resolveFieldAccessToScalar(fieldAccess)
+        val resolved = VCBinder.resolveFieldAccessToScalar(fieldAccess, info)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.ConstructorInvocation)
 
@@ -488,7 +509,8 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val b = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(b)
+        val info = mutableMapOf<String, Type.ExpandedInfo>()
+        VCBinder.setExpandedFieldsOnSymbol(b, info)
 
         val topLevelFa = ExpressionNode.FieldAccess(
             instance = ExpressionNode.Variable(b),
@@ -505,7 +527,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa)
+        val resolved = VCBinder.resolveFieldAccessToScalar(outerFa, info)
         assertNotNull(resolved)
         assertTrue(resolved is ExpressionNode.Variable)
         assertEquals("b_topLeft_x", resolved.variableSymbol.name)
@@ -515,7 +537,6 @@ class VCBinderTests {
     fun resolveFieldAccess_nonExpandedVariable_returnsNull() {
         val pointVc = createVC("Point", "x" to intType(), "y" to intType())
         val p = Type.JFVariableSymbol("p", pointVc)
-        // NOT calling setExpandedFieldsOnSymbol — variable has no expandedFieldSymbols
 
         val fa = ExpressionNode.FieldAccess(
             instance = ExpressionNode.Variable(p),
@@ -525,7 +546,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        assertNull(VCBinder.resolveFieldAccessToScalar(fa))
+        assertNull(VCBinder.resolveFieldAccessToScalar(fa, emptyMap()))
     }
 
     // ================================================================================
@@ -597,11 +618,12 @@ class VCBinderTests {
         val boxVc = createVC("Box", "topLeft" to pointVc)
 
         val myBox = Type.JFVariableSymbol("myBox", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(myBox)
+        val info = expandedInfoOf(myBox)
 
         val expanded = VCBinder.expandArgForCallSite(
             ExpressionNode.Variable(myBox),
-            Parameter(boxVc, "b")
+            Parameter(boxVc, "b"),
+            info
         )
         assertNotNull(expanded)
         assertEquals(2, expanded.size)
@@ -619,7 +641,7 @@ class VCBinderTests {
         val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
         val outerCi = ci(boxVc.constructor!!, innerCi)
 
-        val expanded = VCBinder.expandArgForCallSite(outerCi, Parameter(boxVc, "b"))
+        val expanded = VCBinder.expandArgForCallSite(outerCi, Parameter(boxVc, "b"), emptyMap())
         assertNotNull(expanded)
         assertEquals(2, expanded.size)
         assertEquals(intLiteral(1), expanded[0])
@@ -628,7 +650,7 @@ class VCBinderTests {
 
     @Test
     fun expandArgForCallSite_nonVCParam_returnsNull() {
-        val expanded = VCBinder.expandArgForCallSite(intLiteral(5), Parameter(intType(), "x"))
+        val expanded = VCBinder.expandArgForCallSite(intLiteral(5), Parameter(intType(), "x"), emptyMap())
         assertNull(expanded)
     }
 
@@ -639,7 +661,8 @@ class VCBinderTests {
 
         val expanded = VCBinder.expandArgForCallSite(
             ExpressionNode.Variable(myBox),
-            Parameter(boxVc, "b")
+            Parameter(boxVc, "b"),
+            emptyMap()
         )
         assertNull(expanded)
     }
@@ -658,7 +681,7 @@ class VCBinderTests {
         val methodSigs = mapOf("foo" to Triple(origParams, expandedParams, OperandType.Unit))
 
         val myBox = Type.JFVariableSymbol("myBox", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(myBox)
+        val info = expandedInfoOf(myBox)
 
         val callSite = ExpressionNode.MethodInvocation(
             methodName = "foo",
@@ -669,7 +692,7 @@ class VCBinderTests {
             arguments = listOf(ExpressionNode.Variable(myBox))
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, info)
         assertNotNull(result)
         assertTrue(result is ExpressionNode.MethodInvocation)
 
@@ -701,7 +724,7 @@ class VCBinderTests {
             arguments = listOf(outerCi)
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, emptyMap())
         assertNotNull(result)
         result as ExpressionNode.MethodInvocation
 
@@ -724,13 +747,13 @@ class VCBinderTests {
             arguments = listOf(intLiteral(3))
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, emptyMap())
         assertNull(result)
     }
 
     @Test
     fun expandCallSiteArgs_nonInvocation_returnsNull() {
-        val result = VCBinder.expandCallSiteArgs(intLiteral(42), emptyMap())
+        val result = VCBinder.expandCallSiteArgs(intLiteral(42), emptyMap(), emptyMap())
         assertNull(result)
     }
 
@@ -744,7 +767,7 @@ class VCBinderTests {
             field = null,
             arguments = emptyList()
         )
-        val result = VCBinder.expandCallSiteArgs(callSite, emptyMap())
+        val result = VCBinder.expandCallSiteArgs(callSite, emptyMap(), emptyMap())
         assertNull(result)
     }
 
@@ -758,7 +781,7 @@ class VCBinderTests {
         val methodSigs = mapOf("foo" to Triple(origParams, expandedParams, OperandType.Unit))
 
         val myBox = Type.JFVariableSymbol("myBox", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(myBox)
+        val info = expandedInfoOf(myBox)
 
         val callSite = ExpressionNode.MethodInvocation(
             methodName = "foo",
@@ -769,7 +792,7 @@ class VCBinderTests {
             arguments = listOf(ExpressionNode.Variable(myBox))
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs) as ExpressionNode.MethodInvocation
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, info) as ExpressionNode.MethodInvocation
         assertEquals(2, result.parameters.size)
         assertEquals(intType(), result.parameters[0].type)
         assertEquals(intType(), result.parameters[1].type)
@@ -795,7 +818,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, emptyMap())
         assertNotNull(result)
         assertTrue(result is ExpressionNode.MethodInvocation)
         result as ExpressionNode.MethodInvocation
@@ -820,7 +843,7 @@ class VCBinderTests {
             arguments = emptyList()
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs) as ExpressionNode.MethodInvocation
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, emptyMap()) as ExpressionNode.MethodInvocation
 
         assertEquals(callSite.parameters, result.parameters, "parameters should be preserved when paramsUnchanged")
         assertEquals(callSite.arguments, result.arguments, "arguments should be preserved when paramsUnchanged")
@@ -838,7 +861,7 @@ class VCBinderTests {
         val methodSigs = mapOf("getX" to Triple(origParams, expandedParams, pointVc))
 
         val boxParam = Type.JFVariableSymbol("b", boxVc)
-        VCBinder.setExpandedFieldsOnSymbol(boxParam)
+        val info = expandedInfoOf(boxParam)
 
         // fun getX(b: Box): Point — makeId-like scenario where return type is single-field VC
         val callSite = ExpressionNode.MethodInvocation(
@@ -850,7 +873,7 @@ class VCBinderTests {
             arguments = listOf(ExpressionNode.Variable(boxParam))
         )
 
-        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs)
+        val result = VCBinder.expandCallSiteArgs(callSite, methodSigs, info)
         assertNotNull(result)
         assertTrue(result is ExpressionNode.MethodInvocation)
         result as ExpressionNode.MethodInvocation
@@ -894,7 +917,7 @@ class VCBinderTests {
 
         // Apply transformTree with the same lambda as VCBinder Step 2
         val result = outerMI.transformTree { node ->
-            VCBinder.expandCallSiteArgs(node, methodSigs) ?: node
+            VCBinder.expandCallSiteArgs(node, methodSigs, emptyMap()) ?: node
         }
 
         assertTrue(result is ExpressionNode.MethodInvocation)
@@ -949,7 +972,7 @@ class VCBinderTests {
         val originalIdentity = System.identityHashCode(outerMI)
 
         val result = outerMI.transformTree { node ->
-            VCBinder.expandCallSiteArgs(node, methodSigs) ?: node
+            VCBinder.expandCallSiteArgs(node, methodSigs, emptyMap()) ?: node
         }
 
         assertTrue(result is ExpressionNode.MethodInvocation)
@@ -1079,9 +1102,9 @@ class VCBinderTests {
         val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
 
         val a = Type.JFVariableSymbol("a", addrVc)
-        VCBinder.setExpandedFieldsOnSymbol(a)
+        val info = expandedInfoOf(a)
 
-        val result = VCBinder.reconstructFromScalars(ExpressionNode.Variable(a))
+        val result = VCBinder.reconstructFromScalars(ExpressionNode.Variable(a), info)
         assertNotNull(result)
         assertTrue(result is ExpressionNode.ConstructorInvocation)
 
@@ -1100,14 +1123,13 @@ class VCBinderTests {
     fun reconstructFromScalars_nonExpandedVariable_returnsNull() {
         val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
         val a = Type.JFVariableSymbol("a", addrVc)
-        // No expandedFieldSymbols set
 
-        assertNull(VCBinder.reconstructFromScalars(ExpressionNode.Variable(a)))
+        assertNull(VCBinder.reconstructFromScalars(ExpressionNode.Variable(a), emptyMap()))
     }
 
     @Test
     fun reconstructFromScalars_nonVariable_returnsNull() {
-        assertNull(VCBinder.reconstructFromScalars(intLiteral(42)))
+        assertNull(VCBinder.reconstructFromScalars(intLiteral(42), emptyMap()))
     }
 
     @Test
@@ -1117,7 +1139,7 @@ class VCBinderTests {
         val addrVc = createVC("Address", "street" to stringType(), "number" to intType())
 
         val a = Type.JFVariableSymbol("a", addrVc)
-        VCBinder.setExpandedFieldsOnSymbol(a)
+        val info = expandedInfoOf(a)
 
         // The body: println a → MethodInvocation(println, args=[Variable(a)])
         val printlnMI = ExpressionNode.MethodInvocation(
@@ -1132,7 +1154,7 @@ class VCBinderTests {
         // When processed by transformTree with reconstructFromScalars in the chain,
         // Variable(a) should be replaced by CI(Address, [a_street, a_number])
         val result = printlnMI.transformTree { node ->
-            VCBinder.reconstructFromScalars(node) ?: node
+            VCBinder.reconstructFromScalars(node, info) ?: node
         }
 
         assertTrue(result is ExpressionNode.MethodInvocation)

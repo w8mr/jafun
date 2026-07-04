@@ -27,11 +27,13 @@ object VCBinder {
         val updatedMethods = context.methods.map { method ->
             val (originalParams, expandedParams, _) = methodSigs[method.name]!!
 
+            val expandedInfo = mutableMapOf<String, Type.ExpandedInfo>()
+
             // Step 1: R1 - expand CI assignments
             val expanded = method.instructions.flatMap { instruction ->
                 when (instruction) {
-                    is ExpressionNode.ValAssignment -> expandAssignmentIfNeeded(instruction)
-                    is ExpressionNode.VarAssignment -> expandAssignmentIfNeeded(instruction)
+                    is ExpressionNode.ValAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
+                    is ExpressionNode.VarAssignment -> expandAssignmentIfNeeded(instruction, expandedInfo)
                     else -> listOf(instruction)
                 }
             }
@@ -43,10 +45,10 @@ object VCBinder {
             val withParamFields = expanded.map { instruction ->
                 instruction.transformTree { node ->
                     if (node is ExpressionNode.Variable
-                        && node.variableSymbol.expandedFields == null
+                        && node.variableSymbol.name !in expandedInfo
                         && node.variableSymbol.name !in assignedVarNames
                     ) {
-                        setExpandedFieldsOnSymbol(node.variableSymbol)
+                        setExpandedFieldsOnSymbol(node.variableSymbol, expandedInfo)
                     }
                     node
                 }
@@ -58,9 +60,9 @@ object VCBinder {
             // was expanded to a_street and a_number).
             val resolved = withParamFields.map { instruction ->
                 instruction.transformTree { node ->
-                    resolveFieldAccessToScalar(node)
-                        ?: expandCallSiteArgs(node, methodSigs)
-                        ?: reconstructFromScalars(node)
+                    resolveFieldAccessToScalar(node, expandedInfo)
+                        ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
+                        ?: reconstructFromScalars(node, expandedInfo)
                         ?: node
                 }
             }
@@ -145,7 +147,7 @@ object VCBinder {
             val unboxedReturnType = unboxSingleFieldVCType(currentReturnType)
             val withReturnUnboxing = if (unboxedReturnType != null) {
                 fixedConverts.map { instruction ->
-                    unboxSingleFieldReturnExpr(instruction)
+                    unboxSingleFieldReturnExpr(instruction, expandedInfo)
                 }
             } else {
                 fixedConverts
@@ -204,10 +206,13 @@ object VCBinder {
      * is a VC. This enables resolveFieldAccessToScalar to resolve field chains
      * (e.g., `param.field.subfield`) on parameter references.
      */
-    internal fun setExpandedFieldsOnSymbol(symbol: Type.JFVariableSymbol) {
+    internal fun setExpandedFieldsOnSymbol(
+        symbol: Type.JFVariableSymbol,
+        expandedInfo: MutableMap<String, Type.ExpandedInfo>
+    ) {
         val type = symbol.type
         if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) return
-        if (symbol.expandedFields != null) return
+        if (symbol.name in expandedInfo) return
 
         val cons = type.constructor ?: return
         val flattened = flattenType(type)
@@ -218,7 +223,7 @@ object VCBinder {
             fieldPathToSymbol[flattened[index].path] = expandedVar
         }
 
-        symbol.expandedFields = cons.parameters.map { param ->
+        val fields = cons.parameters.map { param ->
             val paramFlattened = flattened.filter { field ->
                 field.path.startsWith(param.name + "_") || field.path == param.name
             }
@@ -247,13 +252,14 @@ object VCBinder {
                 actualSymbol = actualSymbol
             )
         }
-        symbol.expandedFieldSymbols = fieldPathToSymbol
+        expandedInfo[symbol.name] = Type.ExpandedInfo(fields, fieldPathToSymbol)
     }
 
     // ---- R3: FieldAccess resolution ----
 
     internal fun resolveFieldAccessToScalar(
-        node: ExpressionNode.Phase2_3Expression
+        node: ExpressionNode.Phase2_3Expression,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): ExpressionNode.Phase2_3Expression? {
         if (node !is ExpressionNode.FieldAccess) return null
 
@@ -266,7 +272,8 @@ object VCBinder {
         if (current !is ExpressionNode.Variable) return null
 
         val rootSym = current.variableSymbol
-        val pathMap = rootSym.expandedFieldSymbols ?: return null
+        val info = expandedInfo[rootSym.name] ?: return null
+        val pathMap = info.fieldSymbols ?: return null
         val pathKey = pathFromRoot.joinToString("_")
         val targetScalar = pathMap[pathKey]
         if (targetScalar != null) return ExpressionNode.Variable(targetScalar)
@@ -274,7 +281,7 @@ object VCBinder {
         // Case 2: Multi-field VC reconstruction.
         // When the field access targets a multi-field VC (e.g. `box.topLeft` where
         // Point has 2 fields), reconstruct the VC from its component scalars.
-        val fields = rootSym.expandedFields ?: return null
+        val fields = info.fields ?: return null
         val ef = fields.find { it.name == pathFromRoot.firstOrNull() } ?: return null
         val sourceVC = ef.sourceVC ?: return null
         val scFields = ef.sourceVCFields ?: return null
@@ -348,29 +355,32 @@ object VCBinder {
      * - ExpressionList: unwrap the last expression
      */
     internal fun unboxSingleFieldReturnExpr(
-        expr: ExpressionNode.Phase2_3Expression
+        expr: ExpressionNode.Phase2_3Expression,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): ExpressionNode.Phase2_3Expression {
-        val result = unboxSingleFieldReturnExprImpl(expr)
+        val result = unboxSingleFieldReturnExprImpl(expr, expandedInfo)
         return result ?: expr
     }
 
     private fun unboxSingleFieldReturnExprImpl(
-        expr: ExpressionNode.Phase2_3Expression
+        expr: ExpressionNode.Phase2_3Expression,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): ExpressionNode.Phase2_3Expression? {
         when (expr) {
             is ExpressionNode.ConstructorInvocation -> {
                 val innerType = unboxSingleFieldVCType(expr.type())
                 if (innerType != null && expr.arguments.size == 1) {
-                    val inner = unboxSingleFieldReturnExprImpl(expr.arguments[0])
+                    val inner = unboxSingleFieldReturnExprImpl(expr.arguments[0], expandedInfo)
                     return inner ?: expr.arguments[0]
                 }
             }
             is ExpressionNode.Variable -> {
                 val sym = expr.variableSymbol
                 val innerType = unboxSingleFieldVCType(sym.type)
-                if (innerType != null && sym.expandedFieldSymbols != null) {
-                    if (sym.expandedFieldSymbols!!.size == 1) {
-                        val scalarSym = sym.expandedFieldSymbols!!.values.first()
+                val info = expandedInfo[sym.name]
+                if (innerType != null && info?.fieldSymbols != null) {
+                    if (info.fieldSymbols.size == 1) {
+                        val scalarSym = info.fieldSymbols.values.first()
                         return ExpressionNode.Variable(scalarSym)
                     }
                 }
@@ -378,7 +388,7 @@ object VCBinder {
             is ExpressionNode.ExpressionList -> {
                 val exprs = expr.expressions
                 if (exprs.isNotEmpty()) {
-                    val unwrapped = unboxSingleFieldReturnExprImpl(exprs.last())
+                    val unwrapped = unboxSingleFieldReturnExprImpl(exprs.last(), expandedInfo)
                     if (unwrapped != null) {
                         return ExpressionNode.ExpressionList(exprs.dropLast(1) + unwrapped)
                     }
@@ -392,7 +402,8 @@ object VCBinder {
 
     internal fun expandCallSiteArgs(
         node: ExpressionNode.Phase2_3Expression,
-        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>
+        methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): ExpressionNode.Phase2_3Expression? {
         if (node !is ExpressionNode.MethodInvocation) return null
         val (originalParams, expandedParams, originalReturnType) = methodSigs[node.methodName] ?: return null
@@ -431,7 +442,7 @@ object VCBinder {
             if (expandedForParam.size == 1 && expandedForParam[0].type == origParam.type) {
                 newArgs.add(arg)
             } else {
-                val expanded = expandArgForCallSite(arg, origParam)
+                val expanded = expandArgForCallSite(arg, origParam, expandedInfo)
                 if (expanded == null) return null
                 newArgs.addAll(expanded)
             }
@@ -458,7 +469,8 @@ object VCBinder {
 
     internal fun expandArgForCallSite(
         arg: ExpressionNode.Phase2_3Expression,
-        param: Parameter
+        param: Parameter,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): List<ExpressionNode.Phase2_3Expression>? {
         val type = param.type
         if (type !is Type.JFClass || type.kind != Type.ClassKind.VALUE_CLASS) return null
@@ -468,9 +480,10 @@ object VCBinder {
         when (arg) {
             is ExpressionNode.Variable -> {
                 val sym = arg.variableSymbol
-                if (sym.expandedFieldSymbols != null) {
+                val info = expandedInfo[sym.name]
+                if (info?.fieldSymbols != null) {
                     return flattened.map { field ->
-                        val scalarSym = sym.expandedFieldSymbols!![field.path]
+                        val scalarSym = info.fieldSymbols!![field.path]
                             ?: return null
                         ExpressionNode.Variable(scalarSym)
                     }
@@ -516,15 +529,17 @@ object VCBinder {
      * reconstructable Variable.
      */
     internal fun reconstructFromScalars(
-        node: ExpressionNode.Phase2_3Expression
+        node: ExpressionNode.Phase2_3Expression,
+        expandedInfo: Map<String, Type.ExpandedInfo>
     ): ExpressionNode.Phase2_3Expression? {
         if (node !is ExpressionNode.Variable) return null
         val sym = node.variableSymbol
-        val pathMap = sym.expandedFieldSymbols ?: return null
+        val info = expandedInfo[sym.name] ?: return null
+        val pathMap = info.fieldSymbols ?: return null
         val vcType = sym.type as? Type.JFClass ?: return null
         if (vcType.kind != Type.ClassKind.VALUE_CLASS) return null
         val cons = vcType.constructor ?: return null
-        val fields = sym.expandedFields ?: return null
+        val fields = info.fields ?: return null
 
         val args = cons.parameters.map { param ->
             val scalarSym = pathMap[param.name]

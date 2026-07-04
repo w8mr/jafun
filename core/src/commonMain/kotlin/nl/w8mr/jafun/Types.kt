@@ -97,9 +97,6 @@ interface Type : TypeSymbol {
         val mutable: Boolean = false,
         val initialized: Boolean = true
     ) : Type, InvocationTarget, Printable {
-        var expandedFields: List<ExpandedField>? = null
-        var expandedFieldSymbols: Map<String, JFVariableSymbol>? = null  // Maps field paths to actual symbols
-
         override fun equals(other: Any?): Boolean =
             when (other) {
                 null -> false
@@ -113,6 +110,11 @@ interface Type : TypeSymbol {
             return result
         }
     }
+
+    data class ExpandedInfo(
+        val fields: List<ExpandedField>?,
+        val fieldSymbols: Map<String, JFVariableSymbol>?
+    )
 }
 
 sealed interface OperandType<J> : TypeSymbol {

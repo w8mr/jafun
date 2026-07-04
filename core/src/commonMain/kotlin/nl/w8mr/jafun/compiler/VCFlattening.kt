@@ -220,6 +220,7 @@ fun unboxSingleFieldVCType(type: OperandType<*>): OperandType<*>? {
  */
 fun expandAssignmentIfNeeded(
     assignment: ExpressionNode.Assignment,
+    expandedInfo: MutableMap<String, Type.ExpandedInfo> = mutableMapOf(),
 ): List<ExpressionNode.Phase2_3Expression> {
     val varType = assignment.variableSymbol.type
 
@@ -246,7 +247,7 @@ fun expandAssignmentIfNeeded(
         fieldPathToSymbol[flattened[index].path] = expandedVar
     }
 
-    assignment.variableSymbol.expandedFields = constructorParams.map { param ->
+    val fields = constructorParams.map { param ->
         // Find all flattened fields belonging to this parameter
         val paramFlattened = flattened.filter { field ->
             field.path.startsWith(param.name + "_") || field.path == param.name
@@ -283,8 +284,7 @@ fun expandAssignmentIfNeeded(
         )
     }
 
-    // Also store the expanded symbols mapping in the original variable for nested access
-    assignment.variableSymbol.expandedFieldSymbols = fieldPathToSymbol
+    expandedInfo[assignment.variableSymbol.name] = Type.ExpandedInfo(fields, fieldPathToSymbol)
 
     // For each flattened field, create a nested field access expression
     val expandedArgs = flattened.map { field ->
@@ -314,7 +314,7 @@ fun expandAssignmentIfNeeded(
                 // Resolve through expanded field symbols when the arg is a variable
                 val resolvedFromVariable = if (arg is ExpressionNode.Variable) {
                     val fieldPath = remainingPath.joinToString("_")
-                    arg.variableSymbol.expandedFieldSymbols?.get(fieldPath)
+                    expandedInfo[arg.variableSymbol.name]?.fieldSymbols?.get(fieldPath)
                         ?.let { ExpressionNode.Variable(it) }
                 } else {
                     null
