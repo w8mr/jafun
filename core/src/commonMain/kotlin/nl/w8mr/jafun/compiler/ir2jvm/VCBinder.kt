@@ -180,7 +180,7 @@ object VCBinder {
             val scalarSym = info.fieldSymbols?.get(fullPath) ?: return null
             ExpressionNode.Variable(scalarSym) as ExpressionNode.Phase2_3Expression
         }
-        return ExpressionNode.ConstructorInvocation(cons, args.toMutableList())
+        return ExpressionNode.ConstructorInvocation(cons, sourceVC, args.toMutableList())
     }
 
     // ---- R2: Eliminate FieldAccess on single-field VC call result ----
@@ -433,11 +433,11 @@ object VCBinder {
                     val subSym = pathMap[fullPath] ?: return null
                     ExpressionNode.Variable(subSym) as ExpressionNode.Phase2_3Expression
                 } ?: return null
-                ExpressionNode.ConstructorInvocation(sourceCons, subArgs.toMutableList())
+                ExpressionNode.ConstructorInvocation(sourceCons, ef.sourceVC!!, subArgs.toMutableList())
             }
         }
 
-        return ExpressionNode.ConstructorInvocation(cons, args.toMutableList())
+        return ExpressionNode.ConstructorInvocation(cons, vcType, args.toMutableList())
     }
 
     // ---- Symbol replacement computation (read-only scan) ----

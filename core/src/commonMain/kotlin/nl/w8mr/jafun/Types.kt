@@ -30,10 +30,8 @@ interface Type : TypeSymbol {
 
     enum class ClassKind { NORMAL, VALUE_CLASS }
 
-    data class JFClass(override val name: String, override val parent: ClassParent? = null, val kind: ClassKind = ClassKind.NORMAL) :
-        Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent {
-        var constructor: JFConstructor? = null  // TODO: make val — set at construction instead of mutated after creation
-    }
+    data class JFClass(override val name: String, override val parent: ClassParent? = null, val kind: ClassKind = ClassKind.NORMAL, val constructor: JFConstructor? = null) :
+        Type, OperandType<Any?>, HasParent<ClassParent?>, MethodParent, FieldParent
 
     data class JFPackage(override val name: String, override val parent: PackageParent? = null) :
         Type, HasParent<PackageParent?>, MethodParent, FieldParent, ClassParent, PackageParent

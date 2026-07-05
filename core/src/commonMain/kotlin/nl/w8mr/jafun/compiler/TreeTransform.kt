@@ -24,7 +24,7 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
         }
         is ExpressionNode.ConstructorInvocation -> {
             val newArgs = arguments.map { it.transformTree(onNode) }
-            if (referentialListDiff(newArgs, arguments)) ExpressionNode.ConstructorInvocation(cons, newArgs) else this
+            if (referentialListDiff(newArgs, arguments)) ExpressionNode.ConstructorInvocation(cons, targetClass, newArgs) else this
         }
         is ExpressionNode.FieldAccess -> {
             val newInstance = instance.transformTree(onNode)

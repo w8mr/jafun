@@ -26,11 +26,11 @@ class VCFlatteningTests {
      */
     private fun createVC(name: String, vararg params: Pair<String, OperandType<*>>): Type.JFClass {
         val vc = Type.JFClass(name, kind = Type.ClassKind.VALUE_CLASS)
-        val params = params.map { (paramName, paramType) ->
+        val ps = params.map { (paramName, paramType) ->
             Type.JFVariableSymbol(paramName, paramType)
         }
-        vc.constructor = Type.JFConstructor(params, vc)
-        return vc
+        val cons = Type.JFConstructor(ps, vc)
+        return vc.copy(constructor = cons)
     }
     
     // ============================================================================
@@ -627,7 +627,7 @@ class VCFlatteningTests {
     fun extractExpandedArg_directField_returnsLiteral() {
         val point = createVC("Point", "x" to createIntType(), "y" to createIntType())
         val ci = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(42), ExpressionNode.IntegerLiteral(100))
         )
         val field = FlattenedField("x", createIntType())
@@ -646,11 +646,11 @@ class VCFlatteningTests {
 
         val aVar = ExpressionNode.Variable(a)
         val innerCi = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
         )
         val ci = ExpressionNode.ConstructorInvocation(
-            box.constructor!!,
+            box.constructor!!, box,
             listOf(aVar, innerCi)
         )
 
@@ -667,15 +667,15 @@ class VCFlatteningTests {
         val box = createVC("Box", "topLeft" to point, "bottomRight" to point)
 
         val innerCi1 = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(1), ExpressionNode.IntegerLiteral(2))
         )
         val innerCi2 = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
         )
         val ci = ExpressionNode.ConstructorInvocation(
-            box.constructor!!,
+            box.constructor!!, box,
             listOf(innerCi1, innerCi2)
         )
 
@@ -693,11 +693,11 @@ class VCFlatteningTests {
         val p = Type.JFVariableSymbol("p", point)
         val pVar = ExpressionNode.Variable(p)
         val innerCi = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(3), ExpressionNode.IntegerLiteral(4))
         )
         val ci = ExpressionNode.ConstructorInvocation(
-            box.constructor!!,
+            box.constructor!!, box,
             listOf(pVar, innerCi)
         )
 
@@ -716,7 +716,7 @@ class VCFlatteningTests {
     fun extractExpandedArg_unknownPath_throwsError() {
         val point = createVC("Point", "x" to createIntType())
         val ci = ExpressionNode.ConstructorInvocation(
-            point.constructor!!,
+            point.constructor!!, point,
             listOf(ExpressionNode.IntegerLiteral(42))
         )
         val field = FlattenedField("nonexistent", createIntType())

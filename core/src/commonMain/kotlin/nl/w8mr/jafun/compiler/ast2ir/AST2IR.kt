@@ -82,7 +82,7 @@ fun compileExpressionNode(
         }
         is ExpressionNode.ConstructorInvocation -> {
             val arguments = loadArguments(builder, node.arguments, node.cons.parameters.map(Type.JFVariableSymbol::type))
-            builder.add(ExpressionNode.ConstructorInvocation(node.cons, arguments))
+            builder.add(ExpressionNode.ConstructorInvocation(node.cons, node.cons.parent as Type.JFClass, arguments))
         }
         is ExpressionNode.When -> {
             val subjectVariable =

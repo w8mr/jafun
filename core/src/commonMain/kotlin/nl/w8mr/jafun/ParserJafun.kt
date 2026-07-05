@@ -528,7 +528,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         arguments: List<ExpressionNode.Phase2Expression>,
     ): ExpressionNode.ConstructorInvocation {
             //(method.rtn as? JFClass)?.let { symbolMap.addClassToSymbolMap(it,it.path) }
-            return ExpressionNode.ConstructorInvocation(constructor, arguments)
+            return ExpressionNode.ConstructorInvocation(constructor, constructor.parent as Type.JFClass, arguments)
         }
 
     private fun methodInvocation(

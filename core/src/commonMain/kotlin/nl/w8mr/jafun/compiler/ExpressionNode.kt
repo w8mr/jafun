@@ -110,9 +110,10 @@ sealed interface ExpressionNode: Printable {
 
     data class ConstructorInvocation(
         val cons: Type.JFConstructor,
+        val targetClass: Type.JFClass,
         override val arguments: List<Phase2_3Expression>
     ) : Invocation {
-        override fun type() = (cons.parent as? Type.JFClass) ?: error("Constructor ${cons.parent} is not an instance of Type.JFClass")
+        override fun type() = targetClass
     }
 
 

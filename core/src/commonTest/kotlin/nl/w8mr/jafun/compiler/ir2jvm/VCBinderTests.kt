@@ -38,8 +38,8 @@ class VCBinderTests {
     private fun createVC(name: String, vararg params: Pair<String, OperandType<*>>): Type.JFClass {
         val vc = Type.JFClass(name, kind = Type.ClassKind.VALUE_CLASS)
         val ps = params.map { (pn, pt) -> Type.JFVariableSymbol(pn, pt) }
-        vc.constructor = Type.JFConstructor(ps, vc)
-        return vc
+        val cons = Type.JFConstructor(ps, vc)
+        return vc.copy(constructor = cons)
     }
 
     private fun intLiteral(value: Int): ExpressionNode.IntegerLiteral =
@@ -50,7 +50,7 @@ class VCBinderTests {
 
     private fun ci(cons: Type.JFConstructor, vararg args: ExpressionNode.Phase2_3Expression):
         ExpressionNode.ConstructorInvocation =
-        ExpressionNode.ConstructorInvocation(cons, args.toList())
+        ExpressionNode.ConstructorInvocation(cons, cons.parent as Type.JFClass, args.toList())
 
     private fun variable(name: String, type: OperandType<*>): ExpressionNode.Variable =
         ExpressionNode.Variable(Type.JFVariableSymbol(name, type))

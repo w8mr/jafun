@@ -218,18 +218,18 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val rp = rightParen.bind()
 
         val jfClass = Type.JFClass(name.value, kind = Type.ClassKind.VALUE_CLASS)
-        symbolMapManager.add(name.value, jfClass)
-
         val cons = Type.JFConstructor(parameters, jfClass)
-        jfClass.constructor = cons  // TODO: pass constructor at JFClass creation instead of late mutation
-        symbolMapManager.add(jfClass, cons.name, cons)
+        val finalClass = jfClass.copy(constructor = cons)
+        val finalCons = cons.copy(parent = finalClass)
+        symbolMapManager.add(name.value, finalClass)
+        symbolMapManager.add(finalClass, finalCons.name, finalCons)
 
         for ((index, param) in parameters.withIndex()) {
             val getter = Type.JFMethod(
-                emptyList(), jfClass, param.name, param.type,
+                emptyList(), finalClass, param.name, param.type,
                 static = false, operator = false, associativity = PREFIX, precedence = 10,
             )
-            symbolMapManager.add(jfClass, param.name, getter)
+            symbolMapManager.add(finalClass, param.name, getter)
         }
 
         ExpressionNode.Phase1List(`value`, white1, `class`, white2, name, white3, lp, white4, paramList, rp)
