@@ -3822,6 +3822,45 @@ class CompilerTest {
             }
         }
     }
+
+    @Test
+    fun vcVarNestedCtor() {
+        test {
+            file {
+                code = """
+                    value class Point(x: Int, y: Int)
+                    value class Line(start: Point, end: Point)
+                    fun mid(l: Line): Int { l.start.x + l.end.x }
+                    val p = Point(1, 2)
+                    val q = Point(3, 4)
+                    println mid(Line(p, q))
+                """.trimIndent()
+                expectedOutput = "4\n"
+            }
+        }
+    }
+
+    @Test
+    fun vcGreedyCapToFit() {
+        test {
+            file {
+                code = """
+                    value class Row(c1: Int, c2: Int, c3: Int, c4: Int, c5: Int, c6: Int, c7: Int, c8: Int)
+                    value class Table(r1: Row, r2: Row, r3: Row, r4: Row, r5: Row, r6: Row, r7: Row, r8: Row)
+                    
+                    fun sum(a: Table, b: Table, c: Table, d: Table): Int {
+                        a.r1.c1 + b.r1.c1 + c.r1.c1 + d.r1.c1
+                    }
+                    val r1 = Row(1,1,1,1,1,1,1,1)
+                    val r2 = Row(2,2,2,2,2,2,2,2)
+                    val r3 = Row(3,3,3,3,3,3,3,3)
+                    val r4 = Row(4,4,4,4,4,4,4,4)
+                    println sum(Table(r1,r1,r1,r1,r1,r1,r1,r1),Table(r2,r2,r2,r2,r2,r2,r2,r2),Table(r3,r3,r3,r3,r3,r3,r3,r3),Table(r4,r4,r4,r4,r4,r4,r4,r4))
+                """.trimIndent()
+                expectedOutput = "10\n"
+            }
+        }
+    }
 }
 
 

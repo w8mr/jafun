@@ -3,10 +3,17 @@ package nl.w8mr.jafun.compiler.ir2jvm
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.FieldDecision
 import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.compiler.MethodExpansionPlan
+import nl.w8mr.jafun.compiler.ParamExpansionPlan
 import nl.w8mr.jafun.compiler.Parameter
+import nl.w8mr.jafun.compiler.MAX_EXPANDED_PARAMS
+import nl.w8mr.jafun.compiler.capToFitGreedy
+import nl.w8mr.jafun.compiler.computeParamPlan
 import nl.w8mr.jafun.compiler.expandAssignmentIfNeeded
 import nl.w8mr.jafun.compiler.expandParameterRecursively
+import nl.w8mr.jafun.compiler.unboxSingleFieldVCType
 import nl.w8mr.jafun.compiler.computeExpandedInfo
 import nl.w8mr.jafun.compiler.flattenType
 import nl.w8mr.jafun.compiler.transformTree
@@ -15,11 +22,10 @@ import nl.w8mr.jafun.compiler.unboxSingleFieldVCType
 object VCBinder {
 
     fun handle(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
+        val plans = computeMethodPlans(context)
         val methodSigs = context.methods.associate { method ->
-            val expandedParams = method.parameters.flatMap { param ->
-                expandParameterForVC(param)
-            }
-            method.name to Triple(method.parameters, expandedParams, method.returnType)
+            val plan = plans[method.name]!!
+            method.name to Triple(plan.originalParams, plan.expandedParams, plan.returnType)
         }
 
         val updatedMethods = context.methods.map { method ->
@@ -41,6 +47,13 @@ object VCBinder {
             }
             method.instructions.forEach { walk(it) }
 
+            // Determine which parameter symbols were kept boxed by capToFitGreedy.
+            val plan = plans[method.name]!!
+            val boxedParamNames = plan.paramPlans
+                .filter { it.decision == FieldDecision.Keep }
+                .mapNotNull { it.paramName?.substringAfter('.') }
+                .toSet()
+
             // Read-only scan: compute symbol replacements from methodSigs directly.
             val symbolReplacements = computeSymbolReplacements(method.instructions, methodSigs)
             val unboxedReturnType = unboxSingleFieldVCType(method.returnType)
@@ -58,7 +71,7 @@ object VCBinder {
                 }
                 expanded.map { instr ->
                     var result = instr.transformTree { node ->
-                        eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames)
+                        eagerlyExpandVariableIfNeeded(node, expandedInfo, assignedVarNames, boxedParamNames)
 
                         when {
                             node is ExpressionNode.Variable -> {
@@ -76,7 +89,7 @@ object VCBinder {
                             }
                             else -> {
                                 resolveFieldAccessToScalar(node, expandedInfo)
-                                    ?: expandCallSiteArgs(node, methodSigs, expandedInfo)
+                                    ?: expandCallSiteArgs(node, methodSigs, expandedInfo, plans)
                                     ?: resolveFieldAccessOnCallResult(node, methodSigs)
                                     ?: node
                             }
@@ -93,6 +106,30 @@ object VCBinder {
             )
         }
         return context.copy(methods = updatedMethods.toMutableList())
+    }
+
+    // ---- Expansion plan computation ----
+
+    private fun computeMethodPlans(context: IRBuilder.ClassContext): Map<String, MethodExpansionPlan> {
+        return context.methods.associate { method ->
+            method.name to computeMethodPlan(method)
+        }
+    }
+
+    private fun computeMethodPlan(method: IRBuilder.MethodContext): MethodExpansionPlan {
+        val rawPlans = method.parameters.map { param ->
+            computeParamPlan(param.varName, param.type)
+        }
+        val total = rawPlans.sumOf { it.expandedParams.size }
+        val adjusted = if (total > MAX_EXPANDED_PARAMS) capToFitGreedy(rawPlans) else rawPlans
+        return MethodExpansionPlan(
+            methodName = method.name,
+            returnType = method.returnType,
+            originalParams = method.parameters,
+            expandedParams = adjusted.flatMap { it.expandedParams },
+            expandedReturnType = unboxSingleFieldVCType(method.returnType),
+            paramPlans = adjusted,
+        )
     }
 
     // ---- Parameter expansion ----
@@ -278,7 +315,8 @@ object VCBinder {
     internal fun expandCallSiteArgs(
         node: ExpressionNode.Phase2_3Expression,
         methodSigs: Map<String, Triple<List<Parameter>, List<Parameter>, OperandType<*>>>,
-        expandedInfo: Map<String, Type.ExpandedInfo>
+        expandedInfo: Map<String, Type.ExpandedInfo>,
+        plans: Map<String, MethodExpansionPlan> = emptyMap(),
     ): ExpressionNode.Phase2_3Expression? {
         if (node !is ExpressionNode.MethodInvocation) return null
         val (originalParams, expandedParams, originalReturnType) = methodSigs[node.methodName] ?: return null
@@ -313,10 +351,12 @@ object VCBinder {
 
         val newArgs = mutableListOf<ExpressionNode.Phase2_3Expression>()
         var argIdx = 0
-        for (origParam in originalParams) {
+        val methodPlan = plans[node.methodName]
+        for ((paramIdx, origParam) in originalParams.withIndex()) {
             if (argIdx >= node.arguments.size) break
             val arg = node.arguments[argIdx]
-            val expandedForParam = expandParameterForVC(origParam)
+            val expandedForParam = methodPlan?.paramPlans?.getOrNull(paramIdx)?.expandedParams
+                ?: expandParameterForVC(origParam)
             if (expandedForParam.size == 1 && expandedForParam[0].type == origParam.type) {
                 newArgs.add(arg)
             } else {
@@ -369,19 +409,31 @@ object VCBinder {
                 return null
             }
             is ExpressionNode.ConstructorInvocation -> {
-                return flattenCIArgs(arg)
+                return flattenCIArgs(arg, expandedInfo)
             }
         }
         return null
     }
 
-    internal fun flattenCIArgs(ci: ExpressionNode.ConstructorInvocation): List<ExpressionNode.Phase2_3Expression>? {
+    internal fun flattenCIArgs(
+        ci: ExpressionNode.ConstructorInvocation,
+        expandedInfo: Map<String, Type.ExpandedInfo>,
+    ): List<ExpressionNode.Phase2_3Expression>? {
         val result = mutableListOf<ExpressionNode.Phase2_3Expression>()
         for ((param, arg) in ci.cons.parameters.zip(ci.arguments)) {
             if (param.type is Type.JFClass && param.type.kind == Type.ClassKind.VALUE_CLASS) {
                 if (arg is ExpressionNode.ConstructorInvocation) {
-                    val inner = flattenCIArgs(arg) ?: return null
+                    val inner = flattenCIArgs(arg, expandedInfo) ?: return null
                     result.addAll(inner)
+                } else if (arg is ExpressionNode.Variable) {
+                    val info = expandedInfo[arg.variableSymbol.name] ?: return null
+                    val fieldSymbols = info.fieldSymbols ?: return null
+                    val argFlattened = flattenType(param.type)
+                    val scalars = argFlattened.map { field ->
+                        val scalarSym = fieldSymbols[field.path] ?: return null
+                        ExpressionNode.Variable(scalarSym)
+                    }
+                    result.addAll(scalars)
                 } else {
                     return null
                 }
@@ -510,24 +562,25 @@ object VCBinder {
     internal fun eagerlyExpandVariableIfNeeded(
         node: ExpressionNode.Phase2_3Expression,
         expandedInfo: MutableMap<String, Type.ExpandedInfo>,
-        assignedVarNames: Set<String>
+        assignedVarNames: Set<String>,
+        boxedParamNames: Set<String> = emptySet(),
     ) {
         when (node) {
             is ExpressionNode.Variable -> {
-                maybeExpandField(node.variableSymbol, expandedInfo, assignedVarNames)
+                maybeExpandField(node.variableSymbol, expandedInfo, assignedVarNames, boxedParamNames)
             }
             is ExpressionNode.FieldAccess -> {
                 val (_, root) = walkUpFieldAccessChain(node) ?: return
-                maybeExpandField(root.variableSymbol, expandedInfo, assignedVarNames)
+                maybeExpandField(root.variableSymbol, expandedInfo, assignedVarNames, boxedParamNames)
             }
             is ExpressionNode.MethodInvocation -> {
                 for (arg in node.arguments) {
-                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames)
+                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames, boxedParamNames)
                 }
             }
             is ExpressionNode.ConstructorInvocation -> {
                 for (arg in node.arguments) {
-                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames)
+                    eagerlyExpandVariableIfNeeded(arg, expandedInfo, assignedVarNames, boxedParamNames)
                 }
             }
             else -> {}
@@ -537,8 +590,10 @@ object VCBinder {
     private fun maybeExpandField(
         sym: Type.JFVariableSymbol,
         expandedInfo: MutableMap<String, Type.ExpandedInfo>,
-        assignedVarNames: Set<String>
+        assignedVarNames: Set<String>,
+        boxedParamNames: Set<String> = emptySet(),
     ) {
+        if (sym.name in boxedParamNames) return
         if (sym.name !in expandedInfo && sym.name !in assignedVarNames) {
             setExpandedFieldsOnSymbol(sym, expandedInfo)
         }

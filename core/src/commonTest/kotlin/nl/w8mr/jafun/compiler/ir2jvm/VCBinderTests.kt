@@ -558,7 +558,7 @@ class VCBinderTests {
         val pointVc = createVC("Point", "x" to intType(), "y" to intType())
         val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
 
-        val flattened = VCBinder.flattenCIArgs(innerCi)
+        val flattened = VCBinder.flattenCIArgs(innerCi, emptyMap())
         assertNotNull(flattened)
         assertEquals(2, flattened.size)
         assertEquals(intLiteral(1), flattened[0])
@@ -570,7 +570,7 @@ class VCBinderTests {
         val boxVc = createVC("Box", "x" to intType())
         val ci = ci(boxVc.constructor!!, intLiteral(42))
 
-        val flattened = VCBinder.flattenCIArgs(ci)
+        val flattened = VCBinder.flattenCIArgs(ci, emptyMap())
         assertNotNull(flattened)
         assertEquals(1, flattened.size)
         assertEquals(intLiteral(42), flattened[0])
@@ -584,7 +584,7 @@ class VCBinderTests {
         val innerCi = ci(pointVc.constructor!!, intLiteral(1), intLiteral(2))
         val outerCi = ci(boxVc.constructor!!, innerCi)
 
-        val flattened = VCBinder.flattenCIArgs(outerCi)
+        val flattened = VCBinder.flattenCIArgs(outerCi, emptyMap())
         assertNotNull(flattened)
         assertEquals(2, flattened.size)
         assertEquals(intLiteral(1), flattened[0])
@@ -601,7 +601,7 @@ class VCBinderTests {
         val midCi = ci(boxVc.constructor!!, innerCi)
         val outerCi = ci(wrapperVc.constructor!!, midCi)
 
-        val flattened = VCBinder.flattenCIArgs(outerCi)
+        val flattened = VCBinder.flattenCIArgs(outerCi, emptyMap())
         assertNotNull(flattened)
         assertEquals(2, flattened.size)
         assertEquals(intLiteral(1), flattened[0])
