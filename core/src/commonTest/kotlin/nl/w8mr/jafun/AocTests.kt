@@ -1,6 +1,6 @@
 package nl.w8mr.jafun
 
-import nl.w8mr.jafun.nl.w8mr.jafun.CompilerTest.Companion.test
+import nl.w8mr.jafun.nl.w8mr.jafun.test
 import kotlin.test.Test
 
 class AocTests {
