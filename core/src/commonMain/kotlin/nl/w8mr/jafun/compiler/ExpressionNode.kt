@@ -166,7 +166,11 @@ sealed interface ExpressionNode: Printable {
         override fun type() = variableSymbol.type
     }
 
-    data class Function(val symbol: Type.JFMethod, val block: List<Phase2_3Expression>) : Phase2Expression {
+    data class Function(
+        val symbol: Type.JFMethod,
+        val block: List<Phase2_3Expression>,
+        val inline: Boolean = false,
+    ) : Phase2Expression {
         override fun type() = OperandType.Unit
     }
 

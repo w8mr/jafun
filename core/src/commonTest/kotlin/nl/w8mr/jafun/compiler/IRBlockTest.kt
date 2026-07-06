@@ -144,3 +144,40 @@ class IRBlockTest {
         }
     }
 }
+
+class InlineFunctionTest {
+
+    @Test
+    fun `inline function with ir body`() {
+        test {
+            file {
+                code = """
+                    inline fun double(x: Int): Int {
+                        ir(x, x) { add }
+                    }
+                    println double(5)"""
+                expectedOutput = "10\n"
+                jvmIr("Script") {
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        loadConstant(5)
+                        loadConstant(5)
+                        iadd()
+                        invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        `return`()
+                    }
+                    method {
+                        name = "double"
+                        signature = "(I)I"
+                        iload("x")
+                        iload("x")
+                        iadd()
+                        ireturn()
+                    }
+                }
+            }
+        }
+    }
+}

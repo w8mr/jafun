@@ -57,6 +57,11 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
 
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
+                val inlineFunctions = parsed?.filterIsInstance<ExpressionNode.Function>()
+                    ?.filter { it.inline } ?: emptyList()
+                if (inlineFunctions.isNotEmpty()) {
+                    registerPlugin(Phase3, Inliner(inlineFunctions))
+                }
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
                 val vcFieldMap = extractValueClassFields(symbolMap)

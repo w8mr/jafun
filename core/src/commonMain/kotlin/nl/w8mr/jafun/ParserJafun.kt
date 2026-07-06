@@ -269,8 +269,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         }
 
     val funTerm = token<ExpressionNode.Keyword>().filter { it.value == "fun" }.asLiteral() and wsnl
+    val inlineTerm = token<ExpressionNode.Keyword>().filter { it.value == "inline" }
+
     val function =
         combi {
+            val isInline = optional(inlineTerm and wsnl).bind() != null
             -funTerm
             val name = identifier.bind()
             -owsnl
@@ -299,6 +302,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             static = true,
                             operator = name.operator,
                             associativity = PREFIX,
+                            inline = isInline,
                         )
                     symbolMapManager.replaceType(name.value, symbol)
 
@@ -311,7 +315,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val symbolWithReturnType = symbol.copy(rtn = block.expressions .lastOrNull()?.type() ?: OperandType.Unit)
             symbolMapManager.replaceType(name.value, symbolWithReturnType)
 
-            ExpressionNode.Function(symbolWithReturnType, block.expressions)
+            ExpressionNode.Function(symbolWithReturnType, block.expressions, inline = isInline)
         }
 
     fun prattParser(
@@ -625,6 +629,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         val bodyTokens: List<ExpressionNode.Phase1Token>,
         val symbolMap: SymbolMap,
         val returnType: OperandType<*>,
+        val inline: Boolean = false,
     )
 
     data class StructureResult(
@@ -655,6 +660,53 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     }
                     i++
                 }
+            } else if (token is ExpressionNode.Keyword && token.value == "inline") {
+                i++
+                // skip whitespace before "fun"
+                while (i < tokens.size && tokens[i] is ExpressionNode.Whitespace) i++
+                if (i >= tokens.size || tokens[i] !is ExpressionNode.Keyword || (tokens[i] as ExpressionNode.Keyword).value != "fun") {
+                    error("Expected 'fun' after 'inline'")
+                }
+                i++ // skip "fun"
+                while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
+                if (i >= tokens.size) error("Expected function name")
+                val name = (tokens[i] as ExpressionNode.Identifier).value
+                i++
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.LeftParen) i++
+                if (i >= tokens.size) error("Expected '(' for function '$name'")
+                val leftParenIdx = i
+                i++
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.RightParen) i++
+                if (i >= tokens.size) error("Expected ')' for function '$name'")
+                val rightParenIdx = i
+                val parameters = parseParameters(tokens.subList(leftParenIdx + 1, rightParenIdx))
+
+                i++
+                val returnType = extractReturnType(tokens, i)
+
+                while (i < tokens.size && tokens[i] !is ExpressionNode.CurlyBlock) i++
+                if (i >= tokens.size) error("Expected body for function '$name'")
+                val curlyBlock = tokens[i] as ExpressionNode.CurlyBlock
+
+                val jfm = JFMethod(
+                    parameters,
+                    JFClass("Script"),
+                    name,
+                    returnType,
+                    static = true,
+                    operator = false,
+                    associativity = PREFIX,
+                    inline = true,
+                )
+                symbolMapManager.replaceType(name, jfm)
+
+                symbolMapManager.override(curlyBlock.symbolMap) {
+                    structurePass(curlyBlock.tokens)
+                }
+
+                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, inline = true))
             } else if (token is ExpressionNode.Keyword && token.value == "fun") {
                 i++
                 while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
@@ -796,7 +848,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val symbol = symbolMapManager.override(fn.descriptor.symbolMap) {
                 symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
             } ?: error("Symbol for ${fn.descriptor.name} not found")
-            ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList())
+            ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList(), inline = fn.descriptor.inline)
         }
         return functionNodes + mainResult
     }

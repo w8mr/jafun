@@ -144,6 +144,15 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType)
     }
 
+    val inlineDeclaration = combi {
+        val rawInline = string("inline").bind()
+        val nextChar = (letter or digit or char { it == '_' }).bindAsResult()
+        if (nextChar is Parser.Success) {
+            fail("'inline' is followed by identifier character")
+        }
+        ExpressionNode.Keyword(rawInline)
+    }
+
     val funDeclaration = combi {
         val rawFun = string("fun").bind()
         // Check that 'fun' is not part of a longer identifier
@@ -243,6 +252,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         valueClassDeclaration,
         valDeclaration,
         varDeclaration,
+        inlineDeclaration,
         funDeclaration,
         equals,
         comma,

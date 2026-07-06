@@ -48,6 +48,7 @@ interface Type : TypeSymbol {
         val operator: Boolean = false,
         val associativity: Associativity = Associativity.PREFIX,
         val precedence: Int = 10,
+        val inline: Boolean = false,
     ) : Type, HasParent<MethodParent>
 
     data class JFConstructor(
