@@ -116,12 +116,15 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
     }
 
     private fun findCalleeFunction(node: ExpressionNode.MethodInvocation): ExpressionNode.Function? {
-        return inlineFunctions.firstOrNull { fn ->
+        val matched = inlineFunctions.firstOrNull { fn ->
             fn.symbol.name == node.methodName &&
                 fn.symbol.parentPath == node.parentPath &&
                 fn.symbol.parameters.size == node.parameters.size &&
                 fn.symbol.parameters.zip(node.parameters).all { (a, b) -> a.type == b.type }
         }
+        if (matched != null) println("INLINER: matched ${node.methodName} at ${node.parentPath}")
+        else if (node.methodName == "+" || node.methodName == "*" || node.methodName == "-") println("INLINER: no match for ${node.methodName} at ${node.parentPath} vs candidates: ${inlineFunctions.map { "${it.symbol.name}@${it.symbol.parentPath}:${it.symbol.parameters.map { p -> p.type }}" }}")
+        return matched
     }
 
     private fun substituteArguments(
