@@ -23,7 +23,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("stdlib-common"))
                 implementation("nl.w8mr.parsek:core:0.2.12")
-                implementation("nl.w8mr.kasmine:core:0.1.2")
+                implementation("nl.w8mr.kasmine:core:0.1.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }

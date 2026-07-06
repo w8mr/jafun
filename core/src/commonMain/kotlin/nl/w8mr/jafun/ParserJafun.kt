@@ -220,6 +220,38 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             ExpressionNode.When(subject, matches)
         }
 
+    val irExpression =
+        combi {
+            val irToken = identifier.filter { it.value == "ir" }.bind()
+            -owsnl
+            val params = optional(
+                seq(lParenTerm, owsnl, identifier sepByAllowEmpty commaTerm, owsnl, rParenTerm) { _, _, ids, _, _ -> ids }
+            ).bind() ?: emptyList()
+            -owsnl
+            val block = token<ExpressionNode.CurlyBlock>().bind()
+            val opTokens = block.tokens.drop(1).dropLast(1)
+            val opName = opTokens.filterIsInstance<ExpressionNode.Identifier>().firstOrNull()?.value
+                ?: error("Expected IR operation in ir block, got: ${opTokens.map { it::class.simpleName }}")
+            val paramExprs = params.map { id ->
+                val sym = symbolMapManager.findSingleOrNull(id.value) as? JFVariableSymbol
+                    ?: error("Variable '${id.value}' not found for ir parameter")
+                ExpressionNode.Variable(sym)
+            }
+            val operation = when (opName) {
+                "mul" -> ExpressionNode.Mul(paramExprs[0], paramExprs[1])
+                "add" -> ExpressionNode.Add(paramExprs[0], paramExprs[1])
+                "sub" -> ExpressionNode.Sub(paramExprs[0], paramExprs[1])
+                "div" -> ExpressionNode.Div(paramExprs[0], paramExprs[1])
+                "cmpeq" -> ExpressionNode.CmpEq(paramExprs[0], paramExprs[1])
+                "cmplt" -> ExpressionNode.CmpLt(paramExprs[0], paramExprs[1])
+                "cmple" -> ExpressionNode.CmpLe(paramExprs[0], paramExprs[1])
+                "cmpgt" -> ExpressionNode.CmpGt(paramExprs[0], paramExprs[1])
+                "cmpge" -> ExpressionNode.CmpGe(paramExprs[0], paramExprs[1])
+                else -> error("Unknown IR operation: $opName")
+            }
+            ExpressionNode.IRBlock(paramExprs, operation)
+        }
+
     val whileTerm = token<ExpressionNode.Identifier>().filter { it.value == "while" }.asLiteral() and owsnl
     val whileExpression =
         combi {
@@ -301,6 +333,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         varAssignment,
                         whenExpression,
                         whileExpression,
+                        irExpression,
                         betweenParentheses,
                         methodLhs(minPrecedence),
                         curlyBlock,

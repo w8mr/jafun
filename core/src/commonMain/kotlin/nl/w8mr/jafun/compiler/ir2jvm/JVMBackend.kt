@@ -170,6 +170,120 @@ class JVMBackend {
                         after { }
                     }
 
+                    is ExpressionNode.IRBlock -> {
+                        compile(instruction.operation, asStatement)
+                    }
+
+                    is ExpressionNode.Mul -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> imul()
+                            else -> error("Mul not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.Add -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> iadd()
+                            else -> error("Add not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.Sub -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> isub()
+                            else -> error("Sub not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.Div -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> idiv()
+                            else -> error("Div not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.CmpEq -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                if_icmpeq(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            else -> error("CmpEq not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.CmpLt -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                if_icmplt(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            else -> error("CmpLt not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.CmpLe -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                if_icmple(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            else -> error("CmpLe not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.CmpGt -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                if_icmpgt(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            else -> error("CmpGt not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
+                    is ExpressionNode.CmpGe -> {
+                        compile(instruction.left)
+                        compile(instruction.right)
+                        when (instruction.left.type()) {
+                            is OperandType.SInt32 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                if_icmpge(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            else -> error("CmpGe not supported for ${instruction.left.type()}")
+                        }
+                        if (asStatement) pop()
+                    }
+
                     is ExpressionNode.Convert -> {
                         compile(instruction.expression)
                         conversion(instruction.from, instruction.to)

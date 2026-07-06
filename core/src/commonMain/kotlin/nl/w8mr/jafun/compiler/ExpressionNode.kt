@@ -178,6 +178,78 @@ sealed interface ExpressionNode: Printable {
         override fun type(): OperandType<*> = to
     }
 
+    // ── IR operation nodes (type-polymorphic, one per concept) ──
+
+    data class Mul(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = left.type()
+    }
+
+    data class Add(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = left.type()
+    }
+
+    data class Sub(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = left.type()
+    }
+
+    data class Div(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = left.type()
+    }
+
+    data class CmpEq(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = OperandType.UInt1
+    }
+
+    data class CmpLt(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = OperandType.UInt1
+    }
+
+    data class CmpLe(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = OperandType.UInt1
+    }
+
+    data class CmpGt(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = OperandType.UInt1
+    }
+
+    data class CmpGe(
+        val left: Phase2_3Expression,
+        val right: Phase2_3Expression,
+    ) : Phase3Expression {
+        override fun type() = OperandType.UInt1
+    }
+
+    data class IRBlock(
+        val parameters: List<Phase2_3Expression>,
+        val operation: Phase3Expression,
+    ) : Phase2Expression {
+        override fun type() = operation.type()
+    }
+
     interface Expression : ExpressionNode {
         fun type(): OperandType<*>
     }

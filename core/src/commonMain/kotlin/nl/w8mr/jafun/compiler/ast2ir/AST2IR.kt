@@ -179,6 +179,10 @@ fun compileExpressionNode(
                 arguments = emptyList(),
             ))
         }
+        is ExpressionNode.IRBlock -> {
+            val parameters = node.parameters.map { compileAsCodeBlock(builder, it) }
+            builder.add(ExpressionNode.IRBlock(parameters, node.operation))
+        }
         is ExpressionNode.Variable -> {
             builder.add(node)
         }
@@ -215,11 +219,33 @@ private fun findParamSymbolMap(
          is ExpressionNode.Function -> {
              findParamSymbolMap(ExpressionNode.ExpressionList(expr.block), paramNames)
          }
-         is ExpressionNode.WhilePhase3 -> {
-             findParamSymbolMap(expr.expressions, paramNames)
-                 ?: findParamSymbolMap(expr.condition, paramNames)
-         }
-          else -> null
+          is ExpressionNode.WhilePhase3 -> {
+              findParamSymbolMap(expr.expressions, paramNames)
+                  ?: findParamSymbolMap(expr.condition, paramNames)
+          }
+          is ExpressionNode.IRBlock -> {
+              expr.parameters.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
+                  ?: findParamSymbolMap(expr.operation, paramNames)
+          }
+          is ExpressionNode.Mul -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.Add -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.Sub -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.Div -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.CmpEq -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.CmpLt -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.CmpLe -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.CmpGt -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+          is ExpressionNode.CmpGe -> findParamSymbolMap(expr.left, paramNames)
+              ?: findParamSymbolMap(expr.right, paramNames)
+           else -> null
       }
   }
 

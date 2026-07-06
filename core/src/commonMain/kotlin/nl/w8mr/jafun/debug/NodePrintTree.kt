@@ -265,6 +265,27 @@ private fun Indenter.print(element: Printable) {
         is ExpressionNode.LeftCurly -> +"{"
         is ExpressionNode.RightCurly -> +"}"
 
+        is ExpressionNode.IRBlock -> {
+            -"ir("
+            -element.parameters.joinToString(", ") { (it as? ExpressionNode.Variable)?.variableSymbol?.name ?: "?" }
+            -")"
+            +" {"
+            indent {
+                print(element.operation)
+            }
+            +"}"
+        }
+
+        is ExpressionNode.Mul -> -"mul"
+        is ExpressionNode.Add -> -"add"
+        is ExpressionNode.Sub -> -"sub"
+        is ExpressionNode.Div -> -"div"
+        is ExpressionNode.CmpEq -> -"cmpeq"
+        is ExpressionNode.CmpLt -> -"cmplt"
+        is ExpressionNode.CmpLe -> -"cmple"
+        is ExpressionNode.CmpGt -> -"cmpgt"
+        is ExpressionNode.CmpGe -> -"cmpge"
+
         // Handle non-Expression GenericNode types if necessary, using default toString
         else -> TODO("Create printable implementation for ${element::class.simpleName}") // +"${element::class.simpleName}(...)" // Generic fallback
     }
