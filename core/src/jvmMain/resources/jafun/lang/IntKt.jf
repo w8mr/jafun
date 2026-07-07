@@ -1,0 +1,15 @@
+inline fun +(a: Int, b: Int): Int {
+    ir(a, b) { add }
+}
+
+inline fun -(a: Int, b: Int): Int {
+    ir(a, b) { sub }
+}
+
+inline fun *(a: Int, b: Int): Int {
+    ir(a, b) { mul }
+}
+
+inline fun /(a: Int, b: Int): Int {
+    ir(a, b) { div }
+}
