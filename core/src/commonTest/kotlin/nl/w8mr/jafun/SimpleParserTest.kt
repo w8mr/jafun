@@ -258,22 +258,6 @@ class SimpleParserTest {
 
     @Test
     fun `string interpolation expression`() {
-        IdentifierCache.replaceType(
-            OperandType.SInt32, "+",
-            Type.JFMethod(
-                listOf(
-                    JFVariableSymbol("a", OperandType.SInt32, IdentifierCache),
-                    JFVariableSymbol("b", OperandType.SInt32, IdentifierCache),
-                ),
-                Type.JFClass("jafun.lang.IntKt"),
-                "+",
-                OperandType.SInt32,
-                true,
-                operator = true,
-                associativity = Associativity.INFIXL,
-                precedence = 100,
-            ),
-        )
         testSingleParser(
             ParserJafun().stringLiteral_term,
             "\"abc\${21 + 21}\"",
