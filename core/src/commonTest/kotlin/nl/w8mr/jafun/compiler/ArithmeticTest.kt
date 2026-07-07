@@ -17,7 +17,7 @@ class ArithmeticTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(1)
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         pop()
                         `return`()
                     }
@@ -40,8 +40,8 @@ class ArithmeticTest {
                         loadConstant(1)
                         loadConstant(2)
                         loadConstant(3)
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        imul()
+                        iadd()
                         pop()
                         `return`()
                     }
@@ -69,7 +69,7 @@ class ArithmeticTest {
                         istore("j")
                         iload("i")
                         iload("j")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -93,12 +93,12 @@ class ArithmeticTest {
                         loadConstant(4)
                         loadConstant(3)
                         loadConstant(5)
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        imul()
+                        iadd()
                         loadConstant(6)
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                        idiv()
+                        isub()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -123,12 +123,12 @@ class ArithmeticTest {
                         loadConstant(4)
                         loadConstant(3)
                         loadConstant(5)
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        imul()
+                        iadd()
                         loadConstant(6)
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "∕", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "-", "(II)I")
+                        idiv()
+                        isub()
                         istore("a")
                         iload("a")
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -153,11 +153,11 @@ class ArithmeticTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(4)
                         loadConstant(3)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         loadConstant(6)
                         loadConstant(4)
-                        invokeStatic("jafun/lang/IntKt", "-", "(II)I")
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                        isub()
+                        imul()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -186,7 +186,7 @@ class ArithmeticTest {
                         istore("def")
                         iload("abc")
                         iload("def")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -211,7 +211,7 @@ class ArithmeticTest {
                         loadConstant(5)
                         invokeStatic("jafun/lang/IntKt", "**", "(II)I")
                         loadConstant(3)
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                        imul()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -234,13 +234,9 @@ class ArithmeticTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(10)
                         loadConstant(4)
-                        invokeStatic(
-                            "jafun/lang/IntKt", "-", "(II)I"
-                        )
+                        isub()
                         loadConstant(2)
-                        invokeStatic(
-                            "jafun/lang/IntKt", "-", "(II)I"
-                        )
+                        isub()
                         invokeStatic(
                             "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;"
                         )
@@ -326,9 +322,7 @@ class ArithmeticTest {
                         invokeStatic(
                             "jafun/test/TestKt", "cent", "(I)I"
                         )
-                        invokeStatic(
-                            "jafun/lang/IntKt", "+", "(II)I"
-                        )
+                        iadd()
                         invokeStatic(
                             "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;"
                         )

@@ -52,6 +52,57 @@ fun ExpressionNode.Phase2_3Expression.transformTree(
             val newExpr = expression.transformTree(onNode)
             if (newExpr !== expression) ExpressionNode.Convert(newExpr, from, to) else this
         }
+        is ExpressionNode.IRBlock -> {
+            val newParams = parameters.map { it.transformTree(onNode) }
+            val newOp = operation.transformTree(onNode) as ExpressionNode.Phase3Expression
+            if (referentialListDiff(newParams, parameters) || newOp !== operation)
+                ExpressionNode.IRBlock(newParams, newOp) else this
+        }
+        is ExpressionNode.Add -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.Add(newLeft, newRight) else this
+        }
+        is ExpressionNode.Sub -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.Sub(newLeft, newRight) else this
+        }
+        is ExpressionNode.Mul -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.Mul(newLeft, newRight) else this
+        }
+        is ExpressionNode.Div -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.Div(newLeft, newRight) else this
+        }
+        is ExpressionNode.CmpEq -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.CmpEq(newLeft, newRight) else this
+        }
+        is ExpressionNode.CmpLt -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.CmpLt(newLeft, newRight) else this
+        }
+        is ExpressionNode.CmpLe -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.CmpLe(newLeft, newRight) else this
+        }
+        is ExpressionNode.CmpGt -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.CmpGt(newLeft, newRight) else this
+        }
+        is ExpressionNode.CmpGe -> {
+            val newLeft = left.transformTree(onNode)
+            val newRight = right.transformTree(onNode)
+            if (newLeft !== left || newRight !== right) ExpressionNode.CmpGe(newLeft, newRight) else this
+        }
         else -> this
     }
 }

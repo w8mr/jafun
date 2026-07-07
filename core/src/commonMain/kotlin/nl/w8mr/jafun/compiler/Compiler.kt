@@ -47,6 +47,7 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
     fun compile(code: String, className: String, methodName: String): Map<String, ByteArray> {
         val symbolMap = SymbolMapManager()
         symbolMap.reset()
+        val stdlibInlineFunctions = StdlibLoader.load(symbolMap)
         val phase1 = Phase1Parser(symbolMap).parse(code).first ?: error("Phase 1 parsing failed")
         val parseResult = ParserJafun(symbolMap).parse(phase1)
         return when (parseResult.second) {
@@ -57,10 +58,11 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
 
             is Parser.Success<*> -> {
                 val parsed = parseResult.first
-                val inlineFunctions = parsed?.filterIsInstance<ExpressionNode.Function>()
+                val userInlineFunctions = parsed?.filterIsInstance<ExpressionNode.Function>()
                     ?.filter { it.inline } ?: emptyList()
-                if (inlineFunctions.isNotEmpty()) {
-                    registerPlugin(Phase3, Inliner(inlineFunctions))
+                val allInlineFunctions = userInlineFunctions + stdlibInlineFunctions
+                if (allInlineFunctions.isNotEmpty()) {
+                    registerPlugin(Phase3, Inliner(allInlineFunctions))
                 }
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 

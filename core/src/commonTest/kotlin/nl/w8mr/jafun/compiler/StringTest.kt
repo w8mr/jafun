@@ -59,7 +59,7 @@ class StringTest {
                         invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
                         iload("num")
                         iload("num2")
-                        invokeStatic("jafun/lang/IntKt" , "+", "(II)I")
+                        iadd()
                         invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
                         invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
                         loadConstant(".")

@@ -129,7 +129,7 @@ class FunctionTest {
                         signature = "(I)V"
                         loadConstant(2)
                         iload("a")
-                        invokeStatic("jafun/lang/IntKt", "*", "(II)I")
+                        imul()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()
@@ -382,7 +382,7 @@ class FunctionTest {
                         signature = "()I"
                         invokeStatic("Script", "b", "()I")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         ireturn()
                     }
                     method {
@@ -595,7 +595,7 @@ class FunctionTest {
                         (1..12).forEach {
                             loadConstant(1)
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                            iadd()
                             pop()
                         }
                         `return`()
@@ -645,12 +645,12 @@ class FunctionTest {
                         (1..9).forEach {
                             loadConstant(1)
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                            iadd()
                             pop()
                         }
                         loadConstant(1)
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         `ireturn`()
                     }
 
@@ -725,7 +725,7 @@ class FunctionTest {
                         signature = "(I)I"
                         iload("a")
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         ireturn()
                     }
                 }
@@ -766,7 +766,7 @@ class FunctionTest {
                         signature = "()V"
                         loadConstant(1)
                         loadConstant(2)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                         invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
                         `return`()

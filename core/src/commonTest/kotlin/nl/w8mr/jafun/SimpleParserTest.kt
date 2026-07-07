@@ -3,6 +3,7 @@ package nl.w8mr.jafun.nl.w8mr.jafun
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
+import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.Type.JFField
 import nl.w8mr.jafun.Type.JFFieldMethod
@@ -257,6 +258,22 @@ class SimpleParserTest {
 
     @Test
     fun `string interpolation expression`() {
+        IdentifierCache.replaceType(
+            OperandType.SInt32, "+",
+            Type.JFMethod(
+                listOf(
+                    JFVariableSymbol("a", OperandType.SInt32, IdentifierCache),
+                    JFVariableSymbol("b", OperandType.SInt32, IdentifierCache),
+                ),
+                Type.JFClass("jafun.lang.IntKt"),
+                "+",
+                OperandType.SInt32,
+                true,
+                operator = true,
+                associativity = Associativity.INFIXL,
+                precedence = 100,
+            ),
+        )
         testSingleParser(
             ParserJafun().stringLiteral_term,
             "\"abc\${21 + 21}\"",
@@ -266,8 +283,8 @@ class SimpleParserTest {
                     methodName = "+",
                     parentPath = "jafun.lang.IntKt",
                     parameters = listOf(
-                        JFVariableSymbol("param1", OperandType.SInt32, IdentifierCache),
-                        JFVariableSymbol("param2", OperandType.SInt32, IdentifierCache),
+                        JFVariableSymbol("a", OperandType.SInt32, IdentifierCache),
+                        JFVariableSymbol("b", OperandType.SInt32, IdentifierCache),
                     ),
                     rtnLookup = { OperandType.SInt32 },
                     field = null,

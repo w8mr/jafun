@@ -176,7 +176,7 @@ class AssignmentTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(2)
                         loadConstant(3)
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         istore("i")
                         iload("i")
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")

@@ -62,6 +62,9 @@ actual fun IdentifierCache.findConstructorsInClass(
     return  constructors
 }
 
+actual fun readStdlibResource(path: String): String? =
+    object {}.javaClass.classLoader.getResourceAsStream(path)?.bufferedReader()?.readText()
+
 actual fun findClassInPackage(name: String, parent: Type.JFPackage): List<TypeSymbol> {
     try {
         val clazz = Class.forName("${parent.path}.${name}")

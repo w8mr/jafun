@@ -429,7 +429,7 @@ class ValueClassTest {
                         dup()
                         iload("address_number")
                         iload("increment")
-                        invokeStatic("jafun/lang/IntKt", "+", "(II)I")
+                        iadd()
                         aload("address_street")
                         invokeSpecial("Address", "<init>", "(ILjava/lang/String;)V")
                         areturn()

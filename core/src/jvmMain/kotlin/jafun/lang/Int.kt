@@ -50,39 +50,6 @@ fun `﹥=`(
 ) = a >= b
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(100)
-@FunctionAssociativity(Associativity.INFIXL)
-fun `+`(
-    a: Int,
-    b: Int,
-) = a + b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(100)
-@FunctionAssociativity(Associativity.INFIXL)
-fun `-`(
-    a: Int,
-    b: Int,
-) = a - b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(110)
-@FunctionAssociativity(Associativity.INFIXL)
-fun `*`(
-    a: Int,
-    b: Int,
-) = a * b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(110)
-@FunctionAssociativity(Associativity.INFIXL)
-@FunctionName("/")
-fun `∕`(
-    a: Int,
-    b: Int,
-) = a / b
-
-@Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(115)
 @FunctionAssociativity(Associativity.INFIXR)
 fun `**`(

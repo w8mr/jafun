@@ -108,6 +108,12 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
         is ExpressionNode.Convert -> node.copy(
             expression = inlineCall(node.expression, currentMethod),
         )
+        is ExpressionNode.StringTemplate -> node.copy(
+            expressions = node.expressions.map { inlineCall(it, currentMethod) as ExpressionNode.Phase2Expression }
+        )
+        is ExpressionNode.ConstructorInvocation -> node.copy(
+            arguments = node.arguments.map { inlineCall(it, currentMethod) }
+        )
         is ExpressionNode.FieldAccess -> node.copy(
             instance = inlineCall(node.instance, currentMethod),
             arguments = node.arguments.map { inlineCall(it, currentMethod) },
@@ -122,8 +128,6 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
                 fn.symbol.parameters.size == node.parameters.size &&
                 fn.symbol.parameters.zip(node.parameters).all { (a, b) -> a.type == b.type }
         }
-        if (matched != null) println("INLINER: matched ${node.methodName} at ${node.parentPath}")
-        else if (node.methodName == "+" || node.methodName == "*" || node.methodName == "-") println("INLINER: no match for ${node.methodName} at ${node.parentPath} vs candidates: ${inlineFunctions.map { "${it.symbol.name}@${it.symbol.parentPath}:${it.symbol.parameters.map { p -> p.type }}" }}")
         return matched
     }
 
@@ -232,6 +236,12 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
         )
         is ExpressionNode.Convert -> node.copy(
             expression = substituteVariable(node.expression, paramToArg),
+        )
+        is ExpressionNode.StringTemplate -> node.copy(
+            expressions = node.expressions.map { substituteVariable(it, paramToArg) as ExpressionNode.Phase2Expression }
+        )
+        is ExpressionNode.ConstructorInvocation -> node.copy(
+            arguments = node.arguments.map { substituteVariable(it, paramToArg) }
         )
         is ExpressionNode.FieldAccess -> node.copy(
             instance = substituteVariable(node.instance, paramToArg),
