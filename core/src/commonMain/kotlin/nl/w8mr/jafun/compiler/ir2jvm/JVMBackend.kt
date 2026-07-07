@@ -335,6 +335,18 @@ class JVMBackend {
                         if (asStatement) pop()
                     }
 
+                    is ExpressionNode.InvokeStatic -> {
+                        instruction.arguments.forEach { compile(it) }
+                        invokeStatic(instruction.className, instruction.methodName, instruction.signature)
+                        if (asStatement && !instruction.signature.endsWith(")V")) pop()
+                    }
+
+                    is ExpressionNode.InvokeVirtual -> {
+                        instruction.arguments.forEach { compile(it) }
+                        invokeVirtual(instruction.className, instruction.methodName, instruction.signature)
+                        if (asStatement && !instruction.signature.endsWith(")V")) pop()
+                    }
+
                     is ExpressionNode.Convert -> {
                         compile(instruction.expression)
                         conversion(instruction.from, instruction.to)

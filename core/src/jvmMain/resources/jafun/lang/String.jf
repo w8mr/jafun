@@ -1,0 +1,7 @@
+inline fun charAt(str: String, index: Int): Char {
+    invokevirtual("java/lang/String", "charAt", "(I)C", str, index)
+}
+
+inline fun length(str: String): Int {
+    invokevirtual("java/lang/String", "length", "()I", str)
+}

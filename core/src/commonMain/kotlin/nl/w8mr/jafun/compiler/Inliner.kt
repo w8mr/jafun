@@ -29,9 +29,12 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
             val newArgs = node.arguments.map { inlineCall(it, currentMethod) }
             val callee = findCalleeFunction(node)
             if (callee != null && callee.symbol.inline && callee.symbol.name != currentMethod) {
+                val actualArgs = if (node.field is Type.JFVariableSymbol) {
+                    listOf(ExpressionNode.Variable(node.field as Type.JFVariableSymbol)) + newArgs
+                } else newArgs
                 val localSymbols = collectLocalSymbols(callee.block)
                 val suffix = ++inlineCounter
-                val result = substituteArguments(callee.block, callee.symbol.parameters, newArgs)
+                val result = substituteArguments(callee.block, callee.symbol.parameters, actualArgs)
                 val renamed = if (localSymbols.isNotEmpty()) {
                     renameLocalSymbols(result, localSymbols, suffix)
                 } else result
@@ -116,6 +119,12 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
         )
         is ExpressionNode.IRBlock -> node.copy(
             operation = inlineCall(node.operation, currentMethod) as ExpressionNode.Phase3Expression,
+        )
+        is ExpressionNode.InvokeStatic -> node.copy(
+            arguments = node.arguments.map { inlineCall(it, currentMethod) },
+        )
+        is ExpressionNode.InvokeVirtual -> node.copy(
+            arguments = node.arguments.map { inlineCall(it, currentMethod) },
         )
         is ExpressionNode.Convert -> node.copy(
             expression = inlineCall(node.expression, currentMethod),
@@ -247,6 +256,12 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
         is ExpressionNode.IRBlock -> node.copy(
             operation = substituteVariable(node.operation, paramToArg) as ExpressionNode.Phase3Expression,
         )
+        is ExpressionNode.InvokeStatic -> node.copy(
+            arguments = node.arguments.map { substituteVariable(it, paramToArg) },
+        )
+        is ExpressionNode.InvokeVirtual -> node.copy(
+            arguments = node.arguments.map { substituteVariable(it, paramToArg) },
+        )
         is ExpressionNode.Convert -> node.copy(
             expression = substituteVariable(node.expression, paramToArg),
         )
@@ -310,6 +325,8 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
                 is ExpressionNode.ConstructorInvocation -> node.arguments.forEach { walk(it) }
                 is ExpressionNode.FieldAccess -> { walk(node.instance); node.arguments.forEach { walk(it) } }
                 is ExpressionNode.Function -> node.block.forEach { walk(it) }
+                is ExpressionNode.InvokeStatic -> node.arguments.forEach { walk(it) }
+                is ExpressionNode.InvokeVirtual -> node.arguments.forEach { walk(it) }
                 is ExpressionNode.MethodInvocation -> {}
                 is ExpressionNode.Variable -> {}
                 else -> {}
@@ -374,6 +391,8 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
             is ExpressionNode.Convert -> node.copy(expression = replace(node.expression))
             is ExpressionNode.StringTemplate -> node.copy(expressions = node.expressions.map { replace(it) as ExpressionNode.Phase2Expression })
             is ExpressionNode.ConstructorInvocation -> node.copy(arguments = node.arguments.map { replace(it) })
+            is ExpressionNode.InvokeStatic -> node.copy(arguments = node.arguments.map { replace(it) })
+            is ExpressionNode.InvokeVirtual -> node.copy(arguments = node.arguments.map { replace(it) })
             is ExpressionNode.FieldAccess -> node.copy(instance = replace(node.instance), arguments = node.arguments.map { replace(it) })
             is ExpressionNode.Function -> node.copy(block = node.block.map { replace(it) })
             else -> node

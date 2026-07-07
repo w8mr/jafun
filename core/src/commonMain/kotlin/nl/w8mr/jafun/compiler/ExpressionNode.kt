@@ -254,6 +254,24 @@ sealed interface ExpressionNode: Printable {
         override fun type() = operation.type()
     }
 
+    data class InvokeStatic(
+        val className: String,
+        val methodName: String,
+        val signature: String,
+        val arguments: List<Phase2_3Expression>,
+    ) : Phase2Expression {
+        override fun type() = returnTypeFromSignature(signature)
+    }
+
+    data class InvokeVirtual(
+        val className: String,
+        val methodName: String,
+        val signature: String,
+        val arguments: List<Phase2_3Expression>,
+    ) : Phase2Expression {
+        override fun type() = returnTypeFromSignature(signature)
+    }
+
     interface Expression : ExpressionNode {
         fun type(): OperandType<*>
     }
@@ -268,5 +286,20 @@ sealed interface ExpressionNode: Printable {
     interface Phase2 : ExpressionNode // AST
 
     interface Phase3 : ExpressionNode // TreeIR
+}
+
+private fun returnTypeFromSignature(signature: String): OperandType<*> {
+    val returnDesc = signature.substringAfter(')')
+    return when {
+        returnDesc == "V" -> OperandType.Unit
+        returnDesc == "I" -> OperandType.SInt32
+        returnDesc == "C" -> OperandType.CharType
+        returnDesc == "Z" -> OperandType.UInt1
+        returnDesc == "J" -> OperandType.Unknown // SInt64 not yet supported
+        returnDesc == "D" -> OperandType.Unknown // SDouble not yet supported
+        returnDesc == "F" -> OperandType.Unknown // SFloat not yet supported
+        returnDesc.startsWith("L") -> OperandType.StringType
+        else -> OperandType.Unknown
+    }
 }
 

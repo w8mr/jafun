@@ -9,7 +9,7 @@ import nl.w8mr.jafun.TypeSymbol
 expect fun readStdlibResource(path: String): String?
 
 object StdlibLoader {
-    private val stdlibResources = listOf("jafun/lang/IntKt.jf", "jafun/lang/Char.jf", "jafun/test/Test.jf")
+    private val stdlibResources = listOf("jafun/lang/IntKt.jf", "jafun/lang/Char.jf", "jafun/lang/String.jf", "jafun/test/Test.jf")
 
     private val defaultOperatorMetadata = mapOf(
         "+" to Triple(Associativity.INFIXL, 100, true),
@@ -75,6 +75,12 @@ object StdlibLoader {
                 }
 
                 IdentifierCache.replaceType(registerTarget, fn.symbol.name, mergedSymbol)
+                if (registerTarget == null && mergedSymbol.parameters.isNotEmpty()) {
+                    val paramType = mergedSymbol.parameters[0].type
+                    if (paramType != OperandType.Unit) {
+                        IdentifierCache.replaceType(paramType as TypeSymbol, fn.symbol.name, mergedSymbol)
+                    }
+                }
                 allFunctions.add(fn.copy(symbol = mergedSymbol))
             }
         }

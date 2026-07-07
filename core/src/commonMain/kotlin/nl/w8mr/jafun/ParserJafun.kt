@@ -254,6 +254,29 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             ExpressionNode.IRBlock(paramExprs, operation)
         }
 
+    val invokeExpression =
+        combi {
+            val keyword = identifier.filter { it.value == "invokevirtual" || it.value == "invokestatic" }.bind()
+            -owsnl
+            -lParenTerm
+            -owsnl
+            val args = (expressionUntilComma sepByAllowEmpty commaTerm).bind()
+            -owsnl
+            -rParenTerm
+            if (args.size < 3) error("${keyword.value} requires at least 3 arguments (className, methodName, signature)")
+            val className = (args[0] as? ExpressionNode.StringLiteral)?.value
+                ?: error("First argument to ${keyword.value} must be a string literal (className)")
+            val methodName = (args[1] as? ExpressionNode.StringLiteral)?.value
+                ?: error("Second argument to ${keyword.value} must be a string literal (methodName)")
+            val signature = (args[2] as? ExpressionNode.StringLiteral)?.value
+                ?: error("Third argument to ${keyword.value} must be a string literal (signature)")
+            val callArgs = args.drop(3)
+            if (keyword.value == "invokestatic")
+                ExpressionNode.InvokeStatic(className, methodName, signature, callArgs)
+            else
+                ExpressionNode.InvokeVirtual(className, methodName, signature, callArgs)
+        }
+
     val whileTerm = token<ExpressionNode.Identifier>().filter { it.value == "while" }.asLiteral() and owsnl
     val whileExpression =
         combi {
@@ -347,6 +370,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                         whenExpression,
                         whileExpression,
                         irExpression,
+                        invokeExpression,
                         betweenParentheses,
                         methodLhs(minPrecedence),
                         curlyBlock,
