@@ -5,6 +5,8 @@ import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 
 class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Compiler.Phase3Plugin {
 
+    private var inlineCounter = 0
+
     override fun handle(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
         var current = context
         repeat(10) {
@@ -27,8 +29,13 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
             val newArgs = node.arguments.map { inlineCall(it, currentMethod) }
             val callee = findCalleeFunction(node)
             if (callee != null && callee.symbol.inline && callee.symbol.name != currentMethod) {
-                substituteArguments(callee.block, callee.symbol.parameters, newArgs)
-                    .let { if (it.size == 1) it[0] else ExpressionNode.ExpressionList(it) }
+                val localSymbols = collectLocalSymbols(callee.block)
+                val suffix = ++inlineCounter
+                val result = substituteArguments(callee.block, callee.symbol.parameters, newArgs)
+                val renamed = if (localSymbols.isNotEmpty()) {
+                    renameLocalSymbols(result, localSymbols, suffix)
+                } else result
+                renamed.let { if (it.size == 1) it[0] else ExpressionNode.ExpressionList(it) }
             } else if (referentialListDiff(newArgs, node.arguments)) {
                 ExpressionNode.MethodInvocation(
                     node.methodName, node.parentPath, node.parameters,
@@ -264,4 +271,113 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
 
     private fun deepCopy(node: ExpressionNode.Phase2_3Expression): ExpressionNode.Phase2_3Expression =
         substituteVariable(node, emptyMap<Type.JFVariableSymbol, ExpressionNode.Phase2_3Expression>())
+
+    private fun collectLocalSymbols(exprs: List<ExpressionNode.Phase2_3Expression>): Set<Type.JFVariableSymbol> {
+        val symbols = mutableSetOf<Type.JFVariableSymbol>()
+        fun walk(node: ExpressionNode.Phase2_3Expression) {
+            when (node) {
+                is ExpressionNode.VarAssignment -> {
+                    symbols.add(node.variableSymbol)
+                    walk(node.expression)
+                }
+                is ExpressionNode.ValAssignment -> {
+                    symbols.add(node.variableSymbol)
+                    walk(node.expression)
+                }
+                is ExpressionNode.ExpressionList -> node.expressions.forEach { walk(it) }
+                is ExpressionNode.While -> { walk(node.condition); walk(node.expressions) }
+                is ExpressionNode.WhilePhase3 -> { walk(node.condition); walk(node.expressions) }
+                is ExpressionNode.DoWhile -> { walk(node.condition); walk(node.expressions) }
+                is ExpressionNode.When -> {
+                    node.subject?.let { walk(it) }
+                    node.matches.forEach { (c, b) -> walk(c); walk(b) }
+                }
+                is ExpressionNode.WhenPhase3 -> {
+                    node.matches.forEach { (c, b) -> walk(c); walk(b) }
+                }
+                is ExpressionNode.Mul -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.Add -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.Sub -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.Div -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.CmpEq -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.CmpLt -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.CmpLe -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.CmpGt -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.CmpGe -> { walk(node.left); walk(node.right) }
+                is ExpressionNode.IRBlock -> walk(node.operation)
+                is ExpressionNode.Convert -> walk(node.expression)
+                is ExpressionNode.StringTemplate -> node.expressions.forEach { walk(it) }
+                is ExpressionNode.ConstructorInvocation -> node.arguments.forEach { walk(it) }
+                is ExpressionNode.FieldAccess -> { walk(node.instance); node.arguments.forEach { walk(it) } }
+                is ExpressionNode.Function -> node.block.forEach { walk(it) }
+                is ExpressionNode.MethodInvocation -> {}
+                is ExpressionNode.Variable -> {}
+                else -> {}
+            }
+        }
+        exprs.forEach { walk(it) }
+        return symbols
+    }
+
+    private fun renameLocalSymbols(
+        exprs: List<ExpressionNode.Phase2_3Expression>,
+        symbols: Set<Type.JFVariableSymbol>,
+        suffix: Int,
+    ): List<ExpressionNode.Phase2_3Expression> {
+        val oldToNew = mutableMapOf<Type.JFVariableSymbol, Type.JFVariableSymbol>()
+        for (sym in symbols) {
+            oldToNew[sym] = Type.JFVariableSymbol(
+                name = "${sym.name}_$suffix", type = sym.type,
+                symbolMap = sym.symbolMap, mutable = sym.mutable, initialized = sym.initialized,
+            )
+        }
+        fun replace(node: ExpressionNode.Phase2_3Expression): ExpressionNode.Phase2_3Expression = when (node) {
+            is ExpressionNode.Variable -> {
+                oldToNew[node.variableSymbol]?.let { ExpressionNode.Variable(it) } ?: node
+            }
+            is ExpressionNode.VarAssignment -> {
+                val newSym = oldToNew[node.variableSymbol] ?: node.variableSymbol
+                node.copy(variableSymbol = newSym, expression = replace(node.expression))
+            }
+            is ExpressionNode.ValAssignment -> {
+                val newSym = oldToNew[node.variableSymbol] ?: node.variableSymbol
+                node.copy(variableSymbol = newSym, expression = replace(node.expression))
+            }
+            is ExpressionNode.ExpressionList -> node.copy(expressions = node.expressions.map { replace(it) })
+            is ExpressionNode.MethodInvocation -> {
+                val newArgs = node.arguments.map { replace(it) }
+                ExpressionNode.MethodInvocation(
+                    node.methodName, node.parentPath, node.parameters,
+                    node.rtnLookup, node.field, newArgs
+                )
+            }
+            is ExpressionNode.While -> node.copy(condition = replace(node.condition), expressions = replace(node.expressions))
+            is ExpressionNode.WhilePhase3 -> node.copy(condition = replace(node.condition), expressions = replace(node.expressions))
+            is ExpressionNode.DoWhile -> node.copy(condition = replace(node.condition), expressions = replace(node.expressions))
+            is ExpressionNode.When -> node.copy(
+                subject = node.subject?.let { replace(it) },
+                matches = node.matches.map { (c, b) -> replace(c) to replace(b) }
+            )
+            is ExpressionNode.WhenPhase3 -> node.copy(
+                matches = node.matches.map { (c, b) -> replace(c) to replace(b) }
+            )
+            is ExpressionNode.Mul -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.Add -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.Sub -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.Div -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.CmpEq -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.CmpLt -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.CmpLe -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.CmpGt -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.CmpGe -> node.copy(left = replace(node.left), right = replace(node.right))
+            is ExpressionNode.IRBlock -> node.copy(operation = replace(node.operation) as ExpressionNode.Phase3Expression)
+            is ExpressionNode.Convert -> node.copy(expression = replace(node.expression))
+            is ExpressionNode.StringTemplate -> node.copy(expressions = node.expressions.map { replace(it) as ExpressionNode.Phase2Expression })
+            is ExpressionNode.ConstructorInvocation -> node.copy(arguments = node.arguments.map { replace(it) })
+            is ExpressionNode.FieldAccess -> node.copy(instance = replace(node.instance), arguments = node.arguments.map { replace(it) })
+            is ExpressionNode.Function -> node.copy(block = node.block.map { replace(it) })
+            else -> node
+        }
+        return exprs.map { replace(it) }
+    }
 }
