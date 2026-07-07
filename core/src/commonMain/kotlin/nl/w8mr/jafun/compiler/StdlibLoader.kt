@@ -9,7 +9,7 @@ import nl.w8mr.jafun.TypeSymbol
 expect fun readStdlibResource(path: String): String?
 
 object StdlibLoader {
-    private val stdlibResources = listOf("jafun/lang/IntKt.jf", "jafun/test/Test.jf")
+    private val stdlibResources = listOf("jafun/lang/IntKt.jf", "jafun/lang/Char.jf", "jafun/test/Test.jf")
 
     private val defaultOperatorMetadata = mapOf(
         "+" to Triple(Associativity.INFIXL, 100, true),

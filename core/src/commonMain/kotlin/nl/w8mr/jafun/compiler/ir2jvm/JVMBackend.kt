@@ -269,7 +269,7 @@ class JVMBackend {
                         compile(instruction.left)
                         compile(instruction.right)
                         when (instruction.left.type()) {
-                            is OperandType.SInt32 -> {
+                            is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmpeq(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
@@ -283,7 +283,7 @@ class JVMBackend {
                         compile(instruction.left)
                         compile(instruction.right)
                         when (instruction.left.type()) {
-                            is OperandType.SInt32 -> {
+                            is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmplt(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
@@ -297,7 +297,7 @@ class JVMBackend {
                         compile(instruction.left)
                         compile(instruction.right)
                         when (instruction.left.type()) {
-                            is OperandType.SInt32 -> {
+                            is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmple(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
@@ -311,7 +311,7 @@ class JVMBackend {
                         compile(instruction.left)
                         compile(instruction.right)
                         when (instruction.left.type()) {
-                            is OperandType.SInt32 -> {
+                            is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmpgt(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
@@ -325,7 +325,7 @@ class JVMBackend {
                         compile(instruction.left)
                         compile(instruction.right)
                         when (instruction.left.type()) {
-                            is OperandType.SInt32 -> {
+                            is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmpge(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}

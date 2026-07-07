@@ -210,7 +210,14 @@ class ControlFlowTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant('a')
                         loadConstant('a')
-                        invokeStatic("jafun/lang/CharKt", "==", "(CC)Z")
+                        val trueLabel = label()
+                        val endLabel = label()
+                        if_icmpeq(trueLabel)
+                        loadConstant(0)
+                        goto(endLabel)
+                        trueLabel {}
+                        loadConstant(1)
+                        endLabel {}
                         pop()
                         `return`()
                     }

@@ -141,6 +141,7 @@ interface ClassInfo
 
             add(null, "Int", OperandType.SInt32)
             add(null, "String", OperandType.StringType)
+            add(null, "Char", OperandType.CharType)
 
             null.addPackage("jafun").apply {
                 addPackage("lang").apply {
@@ -221,7 +222,7 @@ interface ClassInfo
                 "out",
                 Type.JFField("out", findClass("java.lang.System"), findClass("java.io.PrintStream")),
             )
-            listOf("jafun.lang.IntKt", "jafun.lang.CharKt"/*, "jafun.lang.StringKt"*/, "jafun.io.ConsoleKt", "jafun.test.TestKt").forEach { className ->
+            listOf("jafun.lang.IntKt"/*, "jafun.lang.StringKt"*/, "jafun.io.ConsoleKt", "jafun.test.TestKt").forEach { className ->
                 addClassToSymbolMap(null, className) //import into direct scope
             }
     //        addClassToSymbolMap(OperandType.StringType, "java.lang.String")

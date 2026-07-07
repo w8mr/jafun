@@ -1,0 +1,3 @@
+inline fun ==(a: Char, b: Char): Boolean {
+    ir(a, b) { cmpeq }
+}
