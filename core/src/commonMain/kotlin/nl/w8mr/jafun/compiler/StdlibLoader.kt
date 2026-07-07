@@ -16,6 +16,11 @@ object StdlibLoader {
         "-" to Triple(Associativity.INFIXL, 100, true),
         "*" to Triple(Associativity.INFIXL, 110, true),
         "/" to Triple(Associativity.INFIXL, 110, true),
+        "==" to Triple(Associativity.INFIXL, 40, true),
+        "<" to Triple(Associativity.INFIXL, 50, true),
+        "<=" to Triple(Associativity.INFIXL, 50, true),
+        ">" to Triple(Associativity.INFIXL, 50, true),
+        ">=" to Triple(Associativity.INFIXL, 50, true),
     )
 
     fun load(symbolMap: SymbolMapManager): List<ExpressionNode.Function> {

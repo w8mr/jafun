@@ -6,50 +6,6 @@ import nl.w8mr.jafun.compiler.FunctionName
 import nl.w8mr.jafun.compiler.FunctionPrecedence
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(40)
-@FunctionAssociativity(Associativity.INFIXL)
-fun `==`(
-    a: Int,
-    b: Int,
-) = a == b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(50)
-@FunctionAssociativity(Associativity.INFIXL)
-@FunctionName("<=")
-fun `﹤=`(
-    a: Int,
-    b: Int,
-) = a <= b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(50)
-@FunctionAssociativity(Associativity.INFIXL)
-@FunctionName("<")
-fun `﹤`(
-    a: Int,
-    b: Int,
-) = a < b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(50)
-@FunctionAssociativity(Associativity.INFIXL)
-@FunctionName(">")
-fun `﹥`(
-    a: Int,
-    b: Int,
-) = a > b
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(50)
-@FunctionAssociativity(Associativity.INFIXL)
-@FunctionName(">=")
-fun `﹥=`(
-    a: Int,
-    b: Int,
-) = a >= b
-
-@Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(115)
 @FunctionAssociativity(Associativity.INFIXR)
 fun `**`(

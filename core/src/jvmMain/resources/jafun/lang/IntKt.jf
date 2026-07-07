@@ -13,3 +13,23 @@ inline fun *(a: Int, b: Int): Int {
 inline fun /(a: Int, b: Int): Int {
     ir(a, b) { div }
 }
+
+inline fun ==(a: Int, b: Int): Boolean {
+    ir(a, b) { cmpeq }
+}
+
+inline fun <(a: Int, b: Int): Boolean {
+    ir(a, b) { cmplt }
+}
+
+inline fun <=(a: Int, b: Int): Boolean {
+    ir(a, b) { cmple }
+}
+
+inline fun >(a: Int, b: Int): Boolean {
+    ir(a, b) { cmpgt }
+}
+
+inline fun >=(a: Int, b: Int): Boolean {
+    ir(a, b) { cmpge }
+}

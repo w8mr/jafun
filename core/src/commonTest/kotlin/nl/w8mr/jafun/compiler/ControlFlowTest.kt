@@ -143,7 +143,13 @@ class ControlFlowTest {
                         val after = label()
                         loadConstant(1)
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp = label()
+                        val endCmp = label()
+                        if_icmpeq(trueCmp)
+                        loadConstant(0)
+                        goto(endCmp)
+                        trueCmp { loadConstant(1) }
+                        endCmp {}
                         val next = label()
                         ifequal(next)
                         loadConstant("One")
@@ -176,7 +182,13 @@ class ControlFlowTest {
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(1)
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp = label()
+                        val endCmp = label()
+                        if_icmpeq(trueCmp)
+                        loadConstant(0)
+                        goto(endCmp)
+                        trueCmp { loadConstant(1) }
+                        endCmp {}
                         pop()
                         `return`()
                     }
@@ -229,7 +241,13 @@ class ControlFlowTest {
                         istore("a")
                         iload("a")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp1 = label()
+                        val endCmp1 = label()
+                        if_icmpeq(trueCmp1)
+                        loadConstant(0)
+                        goto(endCmp1)
+                        trueCmp1 { loadConstant(1) }
+                        endCmp1 {}
                         val next1 = label()
                         val next2 = label()
                         val next3 = label()
@@ -239,7 +257,13 @@ class ControlFlowTest {
                         next1 {
                             iload("a")
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmpeq(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
@@ -247,7 +271,13 @@ class ControlFlowTest {
                         next2 {
                             iload("a")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp3 = label()
+                            val endCmp3 = label()
+                            if_icmpeq(trueCmp3)
+                            loadConstant(0)
+                            goto(endCmp3)
+                            trueCmp3 { loadConstant(1) }
+                            endCmp3 {}
                             ifequal(next3)
                             loadConstant("Three")
                             goto(after)
@@ -290,14 +320,26 @@ class ControlFlowTest {
                         istore("a")
                         iload("a")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp1 = label()
+                        val endCmp1 = label()
+                        if_icmpeq(trueCmp1)
+                        loadConstant(0)
+                        goto(endCmp1)
+                        trueCmp1 { loadConstant(1) }
+                        endCmp1 {}
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
                         next1 {
                             iload("a")
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmpeq(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
@@ -305,7 +347,13 @@ class ControlFlowTest {
                         next2 {
                             iload("a")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp3 = label()
+                            val endCmp3 = label()
+                            if_icmpeq(trueCmp3)
+                            loadConstant(0)
+                            goto(endCmp3)
+                            trueCmp3 { loadConstant(1) }
+                            endCmp3 {}
                             ifequal(next3)
                             loadConstant("Three")
                             goto(after)
@@ -349,14 +397,26 @@ class ControlFlowTest {
                         istore("tmp")
                         iload("tmp")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp1 = label()
+                        val endCmp1 = label()
+                        if_icmpeq(trueCmp1)
+                        loadConstant(0)
+                        goto(endCmp1)
+                        trueCmp1 { loadConstant(1) }
+                        endCmp1 {}
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
                         next1 {
                             iload("tmp")
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmpeq(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
@@ -364,7 +424,13 @@ class ControlFlowTest {
                         next2 {
                             iload("tmp")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp3 = label()
+                            val endCmp3 = label()
+                            if_icmpeq(trueCmp3)
+                            loadConstant(0)
+                            goto(endCmp3)
+                            trueCmp3 { loadConstant(1) }
+                            endCmp3 {}
                             ifequal(next3)
                             loadConstant("Three")
                             goto(after)
@@ -423,14 +489,26 @@ class ControlFlowTest {
                         istore("a")
                         iload("a")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp1 = label()
+                        val endCmp1 = label()
+                        if_icmpeq(trueCmp1)
+                        loadConstant(0)
+                        goto(endCmp1)
+                        trueCmp1 { loadConstant(1) }
+                        endCmp1 {}
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
                         next1 {
                             iload("a")
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmpeq(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(next2)
                             loadConstant("Two")
                             goto(after)
@@ -438,7 +516,13 @@ class ControlFlowTest {
                         next2 {
                             iload("a")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp3 = label()
+                            val endCmp3 = label()
+                            if_icmpeq(trueCmp3)
+                            loadConstant(0)
+                            goto(endCmp3)
+                            trueCmp3 { loadConstant(1) }
+                            endCmp3 {}
                             ifequal(next3)
                             loadConstant("Three")
                             goto(after)
@@ -498,14 +582,26 @@ class ControlFlowTest {
                         istore("a")
                         iload("a")
                         loadConstant(1)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp1 = label()
+                        val endCmp1 = label()
+                        if_icmpeq(trueCmp1)
+                        loadConstant(0)
+                        goto(endCmp1)
+                        trueCmp1 { loadConstant(1) }
+                        endCmp1 {}
                         ifequal(next1)
                         loadConstant("One")
                         goto(after)
                         next1 {
                             iload("a")
                             loadConstant(2)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmpeq(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(next2)
                             `new`("java/lang/StringBuilder")
                             dup()
@@ -521,7 +617,13 @@ class ControlFlowTest {
                         next2 {
                             iload("a")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                            val trueCmp3 = label()
+                            val endCmp3 = label()
+                            if_icmpeq(trueCmp3)
+                            loadConstant(0)
+                            goto(endCmp3)
+                            trueCmp3 { loadConstant(1) }
+                            endCmp3 {}
                             ifequal(next3)
                             loadConstant("Three")
                             goto(after)
@@ -567,7 +669,13 @@ class ControlFlowTest {
                         signature = "(I)I"
                         iload("param1")
                         loadConstant(0)
-                        invokeStatic("jafun/lang/IntKt", "==", "(II)Z")
+                        val trueCmp = label()
+                        val endCmp = label()
+                        if_icmpeq(trueCmp)
+                        loadConstant(0)
+                        goto(endCmp)
+                        trueCmp { loadConstant(1) }
+                        endCmp {}
                         val next = label()
                         ifequal(next)
                         loadConstant(1)
@@ -651,7 +759,13 @@ class ControlFlowTest {
                         body {
                             iload("i")
                             loadConstant(3)
-                            invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                            val trueCmp = label()
+                            val endCmp = label()
+                            if_icmplt(trueCmp)
+                            loadConstant(0)
+                            goto(endCmp)
+                            trueCmp { loadConstant(1) }
+                            endCmp {}
                             ifequal(after)
                             iload("i")
                             invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -705,7 +819,13 @@ class ControlFlowTest {
                         outerBody {
                             iload("i")
                             loadConstant(4)
-                            invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                            val trueCmp1 = label()
+                            val endCmp1 = label()
+                            if_icmplt(trueCmp1)
+                            loadConstant(0)
+                            goto(endCmp1)
+                            trueCmp1 { loadConstant(1) }
+                            endCmp1 {}
                             ifequal(outerAfter)
                             loadConstant(1)
                             istore("j")
@@ -713,7 +833,13 @@ class ControlFlowTest {
                         innerBody {
                             iload("j")
                             loadConstant(4)
-                            invokeStatic("jafun/lang/IntKt", "﹤", "(II)Z")
+                            val trueCmp2 = label()
+                            val endCmp2 = label()
+                            if_icmplt(trueCmp2)
+                            loadConstant(0)
+                            goto(endCmp2)
+                            trueCmp2 { loadConstant(1) }
+                            endCmp2 {}
                             ifequal(innerAfter)
                             iload("i")
                             iload("j")
