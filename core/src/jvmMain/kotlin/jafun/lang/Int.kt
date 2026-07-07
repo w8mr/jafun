@@ -6,18 +6,6 @@ import nl.w8mr.jafun.compiler.FunctionName
 import nl.w8mr.jafun.compiler.FunctionPrecedence
 
 @Suppress("ktlint:standard:function-naming")
-@FunctionPrecedence(115)
-@FunctionAssociativity(Associativity.INFIXR)
-fun `**`(
-    a: Int,
-    b: Int,
-): Int =
-    when (b) {
-        0 -> 1
-        else -> a * `**`(a, b - 1)
-    }
-
-@Suppress("ktlint:standard:function-naming")
 @FunctionPrecedence(140)
 @FunctionAssociativity(Associativity.POSTFIX)
 fun `++`(a: Int): Int = a + 1

@@ -6,13 +6,17 @@ import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Compiler.Phase3Plugin {
 
     override fun handle(context: IRBuilder.ClassContext): IRBuilder.ClassContext {
-        return context.copy(
-            methods = context.methods.map { method ->
-                method.copy(
-                    instructions = method.instructions.map { inlineCall(it, method.name) }.toMutableList()
-                )
-            }.toMutableList()
-        )
+        var current = context
+        repeat(10) {
+            current = current.copy(
+                methods = current.methods.map { method ->
+                    method.copy(
+                        instructions = method.instructions.map { inlineCall(it, method.name) }.toMutableList()
+                    )
+                }.toMutableList()
+            )
+        }
+        return current
     }
 
     private fun inlineCall(
@@ -42,6 +46,7 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
             expression = inlineCall(node.expression, currentMethod)
         )
         is ExpressionNode.When -> node.copy(
+            subject = node.subject?.let { inlineCall(it, currentMethod) },
             matches = node.matches.map { (cond, body) ->
                 inlineCall(cond, currentMethod) to inlineCall(body, currentMethod)
             }
@@ -124,9 +129,9 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
     private fun findCalleeFunction(node: ExpressionNode.MethodInvocation): ExpressionNode.Function? {
         val matched = inlineFunctions.firstOrNull { fn ->
             fn.symbol.name == node.methodName &&
-                fn.symbol.parentPath == node.parentPath &&
                 fn.symbol.parameters.size == node.parameters.size &&
-                fn.symbol.parameters.zip(node.parameters).all { (a, b) -> a.type == b.type }
+                fn.symbol.parameters.zip(node.parameters).all { (a, b) -> a.type == b.type } &&
+                (fn.symbol.parentPath == node.parentPath || fn.symbol.inline)
         }
         return matched
     }
@@ -174,6 +179,7 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
             expression = substituteVariable(node.expression, paramToArg)
         )
         is ExpressionNode.When -> node.copy(
+            subject = node.subject?.let { substituteVariable(it, paramToArg) },
             matches = node.matches.map { (cond, body) ->
                 substituteVariable(cond, paramToArg) to substituteVariable(body, paramToArg)
             }

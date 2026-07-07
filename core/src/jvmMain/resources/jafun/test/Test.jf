@@ -1,0 +1,11 @@
+inline fun euro(a: Int): Int {
+    a * 100
+}
+
+inline fun cent(a: Int): Int {
+    a
+}
+
+inline fun <=>(a: Int): Int {
+    1
+}

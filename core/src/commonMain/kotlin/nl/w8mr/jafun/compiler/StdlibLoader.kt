@@ -9,7 +9,7 @@ import nl.w8mr.jafun.TypeSymbol
 expect fun readStdlibResource(path: String): String?
 
 object StdlibLoader {
-    private val stdlibResources = listOf("jafun/lang/IntKt.jf")
+    private val stdlibResources = listOf("jafun/lang/IntKt.jf", "jafun/test/Test.jf")
 
     private val defaultOperatorMetadata = mapOf(
         "+" to Triple(Associativity.INFIXL, 100, true),
@@ -21,6 +21,10 @@ object StdlibLoader {
         "<=" to Triple(Associativity.INFIXL, 50, true),
         ">" to Triple(Associativity.INFIXL, 50, true),
         ">=" to Triple(Associativity.INFIXL, 50, true),
+        "**" to Triple(Associativity.INFIXR, 115, true),
+        "euro" to Triple(Associativity.POSTFIX, 40, true),
+        "cent" to Triple(Associativity.POSTFIX, 40, true),
+        "<=>" to Triple(Associativity.PREFIX, 10, true),
     )
 
     fun load(symbolMap: SymbolMapManager): List<ExpressionNode.Function> {
@@ -28,6 +32,7 @@ object StdlibLoader {
 
         for (resource in stdlibResources) {
             val content = readStdlibResource(resource) ?: continue
+
             val phase1 = Phase1Parser(symbolMap).parse(content).first ?: continue
             val parsed = ParserJafun(symbolMap).parse(phase1).first ?: continue
             val functions = parsed.filterIsInstance<ExpressionNode.Function>()

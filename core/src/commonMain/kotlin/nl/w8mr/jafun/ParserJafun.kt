@@ -7,11 +7,13 @@ import nl.w8mr.jafun.Type.JFMethod
 import nl.w8mr.jafun.Type.JFPackage
 import nl.w8mr.jafun.Type.JFVariableMethod
 import nl.w8mr.jafun.Type.JFVariableSymbol
+import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.Associativity.INFIXL
 import nl.w8mr.jafun.compiler.Associativity.INFIXR
 import nl.w8mr.jafun.compiler.Associativity.POSTFIX
 import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
@@ -293,7 +295,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             false,
                             )
                     }
-                    val symbol =
+                            val symbol =
                         JFMethod(
                             arguments,
                             JFClass("Script"),
@@ -301,10 +303,17 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             returnType?.value?.let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unit,
                             static = true,
                             operator = name.operator,
-                            associativity = PREFIX,
+                            associativity = when {
+                                name.operator && arguments.size == 2 -> Associativity.INFIXL
+                                name.operator && arguments.size == 1 -> Associativity.PREFIX
+                                else -> PREFIX
+                            },
                             inline = isInline,
                         )
                     symbolMapManager.replaceType(name.value, symbol)
+                    if (name.operator && symbol.parameters.isNotEmpty()) {
+                        IdentifierCache.replaceType(symbol.parameters[0].type, name.value, symbol)
+                    }
 
                     val block = ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
 
@@ -449,6 +458,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         combi {
             val identifier = (identifier and owsnl).bind()
             val symbols = symbolMapManager.find(lhsExpression.type(), identifier.value)
+                .ifEmpty { symbolMapManager.find(null, identifier.value) }
             val result =
                 symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                     (combi<ExpressionNode.Phase1Token, ExpressionNode.MethodInvocation?> {
@@ -458,6 +468,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                                 INFIXL, INFIXR -> {
                                     if (symbol.precedence <= minPrecedence) fail("Lower precedence")
                                     methodArguments(symbol, minPrecedence, lhsExpression)
+                                }
+
+                                PREFIX -> if (symbol.parameters.size == 2) {
+                                    if (symbol.precedence <= minPrecedence) fail("Lower precedence")
+                                    listOf(lhsExpression, prattParser(minPrecedence = symbol.precedence).bind())
+                                } else {
+                                    fail("Method (${identifier.value}) does not have the right associativity")
                                 }
 
                                 else -> fail("Method (${identifier.value}) does not have the right associativity")

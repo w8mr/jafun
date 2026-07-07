@@ -12,6 +12,7 @@ import nl.w8mr.jafun.Type.JFPackage
 import nl.w8mr.jafun.Type.JFVariableSymbol
 import nl.w8mr.jafun.compiler.Associativity
 import nl.w8mr.jafun.compiler.ExpressionNode
+import nl.w8mr.jafun.compiler.StdlibLoader
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.parsek.ListContext
@@ -24,17 +25,23 @@ import kotlin.test.fail
 class SimpleParserTest {
     @Test
     fun `Spaceship`() {
-        // TODO: should be operator (not sure if it matters)
+        val loaded = StdlibLoader.load(SymbolMapManager())
+        val powerFn = loaded.firstOrNull { it.symbol.name == "**" }
+        val block = powerFn!!.block
+        println("** block size: ${block.size}, types: ${block.map { it::class.simpleName }}")
+        StdlibLoader.load(SymbolMapManager())
         testSingleParser(
             ParserJafun().complexIdentifier,
             "<=>4",
             listOf(
                 JFMethod(
-                    listOf(JFVariableSymbol("param1", OperandType.SInt32)),
-                    IdentifierCache.findClass("jafun.test.TestKt"),
+                    listOf(JFVariableSymbol("a", OperandType.SInt32)),
+                    parent = JFClass("Script"),
                     "<=>",
                     OperandType.SInt32,
-                    true,
+                    static = true,
+                    operator = true,
+                    inline = true,
                 ),
             ),
             1,
@@ -286,6 +293,7 @@ class SimpleParserTest {
         afterIndex: Int = 1,
     ) {
         val symbolMap = SymbolMapManager().apply { reset() }
+        StdlibLoader.load(SymbolMapManager())
         val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
         val source = ListContext(phase1)
         val (parsed, afterContext) = parser.apply(source)
@@ -300,6 +308,67 @@ class SimpleParserTest {
         assertEquals(afterIndex, (afterContext as? ListContext)?.idx)
     }
 
+    private fun dumpExpr(expr: ExpressionNode.Phase2_3Expression, indent: String) {
+        println("$indent${expr::class.simpleName}: $expr")
+        when (expr) {
+            is ExpressionNode.VarAssignment -> {
+                println("$indent  var ${expr.variableSymbol.name} =")
+                dumpExpr(expr.expression, "$indent    ")
+            }
+            is ExpressionNode.ValAssignment -> {
+                println("$indent  val ${expr.variableSymbol.name} =")
+                dumpExpr(expr.expression, "$indent    ")
+            }
+            is ExpressionNode.Variable -> {
+                println("$indent  var: ${expr.variableSymbol.name}")
+            }
+            is ExpressionNode.While -> {
+                println("$indent  while (")
+                dumpExpr(expr.condition, "$indent    ")
+                println("$indent  ) {")
+                dumpExpr(expr.expressions, "$indent    ")
+                println("$indent  }")
+            }
+            is ExpressionNode.ExpressionList -> {
+                for (e in expr.expressions) {
+                    dumpExpr(e, indent)
+                }
+            }
+            is ExpressionNode.IntegerLiteral -> println("$indent  int: ${expr.value}")
+            is ExpressionNode.MethodInvocation -> {
+                println("$indent  call ${expr.methodName} (parent=${expr.parentPath})")
+                for (arg in expr.arguments) {
+                    dumpExpr(arg, "$indent    ")
+                }
+            }
+            is ExpressionNode.IRBlock -> {
+                println("$indent  ir:")
+                dumpExpr(expr.operation, "$indent    ")
+            }
+            is ExpressionNode.Mul -> {
+                println("$indent  mul:")
+                dumpExpr(expr.left, "$indent    ")
+                dumpExpr(expr.right, "$indent    ")
+            }
+            is ExpressionNode.Add -> {
+                println("$indent  add:")
+                dumpExpr(expr.left, "$indent    ")
+                dumpExpr(expr.right, "$indent    ")
+            }
+            is ExpressionNode.Sub -> {
+                println("$indent  sub:")
+                dumpExpr(expr.left, "$indent    ")
+                dumpExpr(expr.right, "$indent    ")
+            }
+            is ExpressionNode.CmpLt -> {
+                println("$indent  lt:")
+                dumpExpr(expr.left, "$indent    ")
+                dumpExpr(expr.right, "$indent    ")
+            }
+            else -> println("$indent  (unsupported)")
+        }
+    }
+
     private fun <R> testSingleParserFailed(
         parser: Parser<ExpressionNode.Phase1Token, R>,
         input: String,
@@ -307,6 +376,7 @@ class SimpleParserTest {
         afterIndex: Int = 1,
     ) {
         val symbolMap = SymbolMapManager().apply { reset() }
+        StdlibLoader.load(SymbolMapManager())
         val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
         val source = ListContext(phase1)
 

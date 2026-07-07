@@ -104,10 +104,11 @@ interface ClassInfo
             path: String,
             typeSig: Type,
         ) {
-            val list = identifierMap.get(type)?.get(path) ?: mutableListOf()
+            val map = identifierMap.getOrPut(type) { mutableMapOf() }
+            val list = map.get(path) ?: mutableListOf()
             val removed = list.filter { it !is Type.JFVariableSymbol || it.name != typeSig.name }.toMutableList()
             removed.add(typeSig)
-            identifierMap.get(type)?.put(path, removed.toMutableSet())
+            map.put(path, removed.toMutableSet())
         }
 
         override fun incSymbolMapCount(): Int {

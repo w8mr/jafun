@@ -207,9 +207,35 @@ class ArithmeticTest {
                     method {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
-                        loadConstant(2)
+                        loadConstant(1)
+                        istore("result")
+                        loadConstant(0)
+                        istore("i")
+                        val _6 = label()
+                        _6 {}
+                        iload("i")
                         loadConstant(5)
-                        invokeStatic("jafun/lang/IntKt", "**", "(II)I")
+                        val _16 = label()
+                        val _17 = label()
+                        if_icmplt(_16)
+                        loadConstant(0)
+                        goto(_17)
+                        _16 {}
+                        loadConstant(1)
+                        _17 {}
+                        val _35 = label()
+                        ifequal(_35)
+                        iload("result")
+                        loadConstant(2)
+                        imul()
+                        istore("result")
+                        iload("i")
+                        loadConstant(1)
+                        iadd()
+                        istore("i")
+                        goto(_6)
+                        _35 {}
+                        iload("result")
                         loadConstant(3)
                         imul()
                         invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
@@ -315,13 +341,9 @@ class ArithmeticTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(5)
-                        invokeStatic(
-                            "jafun/test/TestKt", "euro", "(I)I"
-                        )
+                        loadConstant(100)
+                        imul()
                         loadConstant(20)
-                        invokeStatic(
-                            "jafun/test/TestKt", "cent", "(I)I"
-                        )
                         iadd()
                         invokeStatic(
                             "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;"

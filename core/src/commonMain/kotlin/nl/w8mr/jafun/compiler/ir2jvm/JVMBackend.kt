@@ -113,6 +113,45 @@ class JVMBackend {
                         loadVariable(instruction)
                     }
 
+                    is ExpressionNode.When -> {
+                        val after = label()
+                        val matches = instruction.matches.iterator()
+
+                        fun processMatches() {
+                            if (!matches.hasNext()) return
+                            val match = matches.next()
+                            when (match.first) {
+                                ExpressionNode.BooleanLiteral(true) -> {
+                                    compile(match.second, asStatement)
+                                }
+
+                                else -> {
+                                    if (instruction.subject != null) {
+                                        compile(instruction.subject!!)
+                                        compile(match.first)
+                                        val trueCmp = label()
+                                        val endCmp = label()
+                                        if_icmpeq(trueCmp)
+                                        loadConstant(0)
+                                        goto(endCmp)
+                                        trueCmp { loadConstant(1) }
+                                        endCmp {}
+                                    } else {
+                                        compile(match.first)
+                                    }
+                                    val next = label()
+                                    ifequal(next)
+                                    compile(match.second, asStatement)
+                                    goto(after)
+                                    next { processMatches() }
+                                }
+                            }
+                        }
+
+                        processMatches()
+                        after { }
+                    }
+
                     is ExpressionNode.WhenPhase3 -> {
                         val after = label()
                         val matches = instruction.matches.iterator()
@@ -156,6 +195,18 @@ class JVMBackend {
                             compile(instruction.condition)
                             ifnotequal(body)
                         }
+                    }
+
+                    is ExpressionNode.While -> {
+                        val after = label()
+                        val body = label()
+                        body {
+                            compile(instruction.condition)
+                            ifequal(after)
+                            compile(instruction.expressions, true)
+                            goto(body)
+                        }
+                        after { }
                     }
 
                     is ExpressionNode.WhilePhase3 -> {

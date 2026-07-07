@@ -1,10 +1,5 @@
 package jafun.test
 
-import nl.w8mr.jafun.compiler.Associativity
-import nl.w8mr.jafun.compiler.FunctionAssociativity
-import nl.w8mr.jafun.compiler.FunctionName
-import nl.w8mr.jafun.compiler.FunctionPrecedence
-
 fun join(
     str1: String,
     str2: String,
@@ -13,22 +8,6 @@ fun join(
 fun reverse(str: String) = str.reversed()
 
 fun first(strings: Array<String>) = strings.first()
-
-@FunctionPrecedence(40)
-@FunctionAssociativity(Associativity.POSTFIX)
-fun euro(n: Int) = n * 100
-
-@FunctionPrecedence(40)
-@FunctionAssociativity(Associativity.POSTFIX)
-fun cent(n: Int) = n
-
-// @FunctionPrecedence(10)
-// @FunctionAssociativity(Associativity.SOLO)
-// fun test() = 5
-
-@Suppress("ktlint:standard:function-naming")
-@FunctionName("<=>")
-fun `﹤=﹥`(n: Int) = 1
 
 data class SimpleObject(val a: Int) {
     fun fetchA(): Int = a

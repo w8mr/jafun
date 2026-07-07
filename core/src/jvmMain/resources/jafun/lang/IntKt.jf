@@ -33,3 +33,13 @@ inline fun >(a: Int, b: Int): Boolean {
 inline fun >=(a: Int, b: Int): Boolean {
     ir(a, b) { cmpge }
 }
+
+inline fun **(a: Int, b: Int): Int {
+    var result = 1
+    var i = 0
+    while (i < b) {
+        result = result * a
+        i = i + 1
+    }
+    result
+}
