@@ -43,3 +43,11 @@ inline fun **(a: Int, b: Int): Int {
     }
     result
 }
+
+inline fun ++(a: Int): Int {
+    a + 1
+}
+
+inline fun --(a: Int): Int {
+    a - 1
+}

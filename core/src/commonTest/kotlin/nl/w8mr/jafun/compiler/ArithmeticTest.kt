@@ -365,9 +365,8 @@ class ArithmeticTest {
                         name = "main"
                         signature = "([Ljava/lang/String;)V"
                         loadConstant(5)
-                        invokeStatic(
-                            "jafun/lang/IntKt", "++", "(I)I"
-                        )
+                        loadConstant(1)
+                        iadd()
                         invokeStatic(
                             "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;"
                         )

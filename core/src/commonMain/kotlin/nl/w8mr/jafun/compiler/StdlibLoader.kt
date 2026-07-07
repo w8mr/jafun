@@ -22,6 +22,8 @@ object StdlibLoader {
         ">" to Triple(Associativity.INFIXL, 50, true),
         ">=" to Triple(Associativity.INFIXL, 50, true),
         "**" to Triple(Associativity.INFIXR, 115, true),
+        "++" to Triple(Associativity.POSTFIX, 140, true),
+        "--" to Triple(Associativity.POSTFIX, 140, true),
         "euro" to Triple(Associativity.POSTFIX, 40, true),
         "cent" to Triple(Associativity.POSTFIX, 40, true),
         "<=>" to Triple(Associativity.PREFIX, 10, true),
