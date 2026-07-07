@@ -123,6 +123,7 @@ interface ClassInfo
                 "boolean" to OperandType.UInt1,
                 "void" to OperandType.Unit,
                 "char" to OperandType.CharType,
+                "long" to OperandType.SInt64,
                 "java.lang.String" to OperandType.StringType,
                 "Ljava.lang.String;" to OperandType.StringType,
             )
@@ -140,6 +141,7 @@ interface ClassInfo
 
 
             add(null, "Int", OperandType.SInt32)
+            add(null, "Long", OperandType.SInt64)
             add(null, "String", OperandType.StringType)
             add(null, "Char", OperandType.CharType)
 
@@ -173,6 +175,15 @@ interface ClassInfo
                             "valueOf",
                             listOf(Type.JFVariableSymbol("param1", OperandType.SInt32)),
                             Type.JFClass("java.lang.Integer"),
+                            null,
+                            true,
+                        )
+                    }
+                    addClass("Long").apply {
+                        addMethod(
+                            "valueOf",
+                            listOf(Type.JFVariableSymbol("param1", OperandType.SInt64)),
+                            Type.JFClass("java.lang.Long"),
                             null,
                             true,
                         )

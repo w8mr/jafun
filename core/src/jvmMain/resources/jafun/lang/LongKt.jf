@@ -1,0 +1,53 @@
+inline fun +(a: Long, b: Long): Long {
+    ir(a, b) { add }
+}
+
+inline fun -(a: Long, b: Long): Long {
+    ir(a, b) { sub }
+}
+
+inline fun *(a: Long, b: Long): Long {
+    ir(a, b) { mul }
+}
+
+inline fun /(a: Long, b: Long): Long {
+    ir(a, b) { div }
+}
+
+inline fun ==(a: Long, b: Long): Boolean {
+    ir(a, b) { cmpeq }
+}
+
+inline fun <(a: Long, b: Long): Boolean {
+    ir(a, b) { cmplt }
+}
+
+inline fun <=(a: Long, b: Long): Boolean {
+    ir(a, b) { cmple }
+}
+
+inline fun >(a: Long, b: Long): Boolean {
+    ir(a, b) { cmpgt }
+}
+
+inline fun >=(a: Long, b: Long): Boolean {
+    ir(a, b) { cmpge }
+}
+
+inline fun **(a: Long, b: Long): Long {
+    var result = 1
+    var i = 0
+    while (i < b) {
+        result = result * a
+        i = i + 1
+    }
+    result
+}
+
+inline fun ++(a: Long): Long {
+    a + 1
+}
+
+inline fun --(a: Long): Long {
+    a - 1
+}

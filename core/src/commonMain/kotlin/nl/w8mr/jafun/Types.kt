@@ -129,6 +129,10 @@ sealed interface OperandType<J> : TypeSymbol {
         override fun toString() = "Int32Type"
     }
 
+    object SInt64 : OperandType<Long> {
+        override fun toString() = "Int64Type"
+    }
+
     object UInt1 : OperandType<Boolean> {
         override fun toString() = "BooleanType"
     }

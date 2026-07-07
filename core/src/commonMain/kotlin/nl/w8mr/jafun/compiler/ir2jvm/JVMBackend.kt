@@ -59,6 +59,7 @@ class JVMBackend {
                                     "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
                                 when (instruction.field.type) {
                                     is OperandType.SInt32 -> iload(variableName)
+                                    is OperandType.SInt64 -> lload(variableName)
                                     is OperandType.StringType -> aload(variableName)
                                     is OperandType.UInt1 -> iload(variableName)
                                     is OperandType.CharType -> iload(variableName)
@@ -230,6 +231,7 @@ class JVMBackend {
                         compile(instruction.right)
                         when (instruction.left.type()) {
                             is OperandType.SInt32 -> imul()
+                            is OperandType.SInt64 -> lmul()
                             else -> error("Mul not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -240,6 +242,7 @@ class JVMBackend {
                         compile(instruction.right)
                         when (instruction.left.type()) {
                             is OperandType.SInt32 -> iadd()
+                            is OperandType.SInt64 -> ladd()
                             else -> error("Add not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -250,6 +253,7 @@ class JVMBackend {
                         compile(instruction.right)
                         when (instruction.left.type()) {
                             is OperandType.SInt32 -> isub()
+                            is OperandType.SInt64 -> lsub()
                             else -> error("Sub not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -260,6 +264,7 @@ class JVMBackend {
                         compile(instruction.right)
                         when (instruction.left.type()) {
                             is OperandType.SInt32 -> idiv()
+                            is OperandType.SInt64 -> ldiv()
                             else -> error("Div not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -272,6 +277,11 @@ class JVMBackend {
                             is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmpeq(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            is OperandType.SInt64 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                lcmp(); loadConstant(0); if_icmpeq(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
                             }
                             else -> error("CmpEq not supported for ${instruction.left.type()}")
@@ -288,6 +298,11 @@ class JVMBackend {
                                 if_icmplt(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
                             }
+                            is OperandType.SInt64 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                lcmp(); loadConstant(0); if_icmplt(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
                             else -> error("CmpLt not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -300,6 +315,11 @@ class JVMBackend {
                             is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmple(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            is OperandType.SInt64 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                lcmp(); loadConstant(0); if_icmple(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
                             }
                             else -> error("CmpLe not supported for ${instruction.left.type()}")
@@ -316,6 +336,11 @@ class JVMBackend {
                                 if_icmpgt(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
                             }
+                            is OperandType.SInt64 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                lcmp(); loadConstant(0); if_icmpgt(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
                             else -> error("CmpGt not supported for ${instruction.left.type()}")
                         }
                         if (asStatement) pop()
@@ -328,6 +353,11 @@ class JVMBackend {
                             is OperandType.SInt32, is OperandType.CharType -> {
                                 val trueLabel = label(); val endLabel = label()
                                 if_icmpge(trueLabel); loadConstant(0); goto(endLabel)
+                                trueLabel { loadConstant(1) }; endLabel {}
+                            }
+                            is OperandType.SInt64 -> {
+                                val trueLabel = label(); val endLabel = label()
+                                lcmp(); loadConstant(0); if_icmpge(trueLabel); loadConstant(0); goto(endLabel)
                                 trueLabel { loadConstant(1) }; endLabel {}
                             }
                             else -> error("CmpGe not supported for ${instruction.left.type()}")
@@ -372,6 +402,7 @@ class JVMBackend {
                 "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
             when (instruction.expression.type()) {
                 is OperandType.SInt32 -> istore(variableName)
+                is OperandType.SInt64 -> lstore(variableName)
                 is OperandType.StringType -> astore(variableName)
                 is OperandType.UInt1 -> istore(variableName)
                 is OperandType.CharType -> istore(variableName)
@@ -392,6 +423,11 @@ class JVMBackend {
                     is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(I)Ljava/lang/String;")
                     is Type.JFClass -> invokeStatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;")
                     else -> TODO("Conversion not defined for SInt32 -> $to")
+                }
+                is OperandType.SInt64 -> when (to) {
+                    is OperandType.StringType -> invokeStatic("java/lang/String", "valueOf", "(J)Ljava/lang/String;")
+                    is Type.JFClass -> invokeStatic("java/lang/Long", "valueOf", "(J)Ljava/lang/Long;")
+                    else -> TODO("Conversion not defined for SInt64 -> $to")
                 }
                 is OperandType.UInt1 -> when (to) {
                     is Type.JFClass -> invokeStatic("java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;")
@@ -417,6 +453,7 @@ class JVMBackend {
             val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
             when (instruction.variableSymbol.type) {
                 is OperandType.SInt32 -> iload(variableName)
+                is OperandType.SInt64 -> lload(variableName)
                 is OperandType.StringType -> aload(variableName)
                 is OperandType.UInt1 -> iload(variableName)
                 is OperandType.CharType -> iload(variableName)
@@ -481,6 +518,7 @@ fun buildClass(
                     aload("thisRef")
                     when (fieldType) {
                         is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> iload("p_$fieldName")
+                        is OperandType.SInt64 -> lload("p_$fieldName")
                         else -> aload("p_$fieldName")
                     }
                     putField(className, fieldName, signature(fieldType))
@@ -578,6 +616,8 @@ fun buildClass(
                             invokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
                         is OperandType.SInt32 ->
                             invokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+                        is OperandType.SInt64 ->
+                            invokeVirtual("java/lang/StringBuilder", "append", "(J)Ljava/lang/StringBuilder;")
                         is OperandType.UInt1 ->
                             invokeVirtual("java/lang/StringBuilder", "append", "(Z)Ljava/lang/StringBuilder;")
                         is OperandType.CharType ->
@@ -609,12 +649,13 @@ fun buildClass(
                         if ((m.instructions.lastOrNull()?.type()?: OperandType.Unit) != m.returnType) pop()
                         `return`()
                     }
-                    is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType,
+                    is OperandType.SInt32, is OperandType.SInt64, is OperandType.UInt1, is OperandType.CharType,
                     is OperandType.StringType, is Type.JFClass -> {
                         val lastType = m.instructions.last().type()
                         if (lastType != m.returnType) error("Type issue: $lastType vs ${m.returnType}")
                         when (m.returnType) {
                             is OperandType.SInt32, is OperandType.UInt1, is OperandType.CharType -> ireturn()
+                            is OperandType.SInt64 -> lreturn()
                             is OperandType.StringType, is Type.JFClass -> areturn()
                             else -> error("Unreachable")
                         }
@@ -631,6 +672,7 @@ fun signature(type: OperandType<*>): String =
         is OperandType.Unit -> "V"
         is OperandType.StringType -> "Ljava/lang/String;"
         is OperandType.SInt32 -> "I"
+        is OperandType.SInt64 -> "J"
         is OperandType.CharType -> "C"
         is OperandType.Unknown -> "Ljava/lang/Object;" // Default to Object for Unknown type
         is OperandType.UInt1 -> "Z"

@@ -28,6 +28,7 @@ private fun Indenter.print(element: Printable) {
             is OperandType.Array -> "Array<${operandType.genericTypes[0]}>"
             is OperandType.Generic -> TODO()
             OperandType.SInt32 -> "Int32"
+            OperandType.SInt64 -> "Int64"
             OperandType.StringType -> "String"
             OperandType.UInt1 -> "Boolean"
             OperandType.CharType -> "Char"

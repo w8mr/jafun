@@ -295,7 +295,7 @@ private fun returnTypeFromSignature(signature: String): OperandType<*> {
         returnDesc == "I" -> OperandType.SInt32
         returnDesc == "C" -> OperandType.CharType
         returnDesc == "Z" -> OperandType.UInt1
-        returnDesc == "J" -> OperandType.Unknown // SInt64 not yet supported
+        returnDesc == "J" -> OperandType.SInt64
         returnDesc == "D" -> OperandType.Unknown // SDouble not yet supported
         returnDesc == "F" -> OperandType.Unknown // SFloat not yet supported
         returnDesc.startsWith("L") -> OperandType.StringType
