@@ -892,6 +892,48 @@ class ControlFlowTest {
                     }"""
                 expectedOutput = "T\ne\ns\nt\n"
                 params("Test")
+                jvmIr("Script") {
+                    method {
+                        name = "main"
+                        signature = "([Ljava/lang/String;)V"
+                        aload("arguments")
+                        invokeStatic("jafun/test/TestKt", "first", "([Ljava/lang/String;)Ljava/lang/String;")
+                        astore("input")
+                        loadConstant(0)
+                        istore("i")
+                        aload("input")
+                        invokeVirtual("java/lang/String", "length", "()I")
+                        istore("l")
+                        val whileCond = label()
+                        whileCond {}
+                        iload("i")
+                        iload("l")
+                        val whileTrue = label()
+                        val whileFalse = label()
+                        if_icmplt(whileTrue)
+                        loadConstant(0)
+                        goto(whileFalse)
+                        whileTrue {}
+                        loadConstant(1)
+                        whileFalse {}
+                        val whileExit = label()
+                        ifequal(whileExit)
+                        aload("input")
+                        iload("i")
+                        invokeVirtual("java/lang/String", "charAt", "(I)C")
+                        istore("c")
+                        iload("c")
+                        invokeStatic("java/lang/Character", "valueOf", "(C)Ljava/lang/Character;")
+                        invokeStatic("jafun/io/ConsoleKt", "println", "(Ljava/lang/Object;)V")
+                        iload("i")
+                        loadConstant(1)
+                        iadd()
+                        istore("i")
+                        goto(whileCond)
+                        whileExit {}
+                        `return`()
+                    }
+                }
             }
         }
     }
