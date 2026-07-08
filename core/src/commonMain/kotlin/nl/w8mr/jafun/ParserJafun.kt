@@ -505,8 +505,17 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         // TODO: Cache parsers
         combi {
             val identifier = (identifier and owsnl).bind()
-            val symbols = symbolMapManager.find(lhsExpression.type(), identifier.value)
+            val lhsType = lhsExpression.type()
+            val oldSymbols = symbolMapManager.find(lhsType, identifier.value)
                 .ifEmpty { symbolMapManager.find(null, identifier.value) }
+            val symbolTableMethods = if (oldSymbols.isEmpty()) {
+                symbolTable.lookupMethods(identifier.value)?.values
+                    ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == lhsType }
+                    ?.map { it.toJFMethod() } ?: emptyList()
+            } else {
+                emptyList()
+            }
+            val symbols = oldSymbols + symbolTableMethods
             val result =
                 symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                     (combi<ExpressionNode.Phase1Token, ExpressionNode.MethodInvocation?> {
