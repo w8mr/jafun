@@ -1,19 +1,20 @@
 package nl.w8mr.jafun.compiler
 
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
+import nl.w8mr.jafun.compiler.ir2jvm.compileAll
 import nl.w8mr.jafun.OperandType
-import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Phase1Parser
+import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
-import nl.w8mr.jafun.compiler.ir2jvm.buildClass
-import nl.w8mr.jafun.compiler.ir2jvm.compileAll
-import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase2
+import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
 import nl.w8mr.jafun.compiler.ir2jvm.VCBinder
+import nl.w8mr.jafun.symboltable.SymbolTable
+import nl.w8mr.jafun.symboltable.VariableDef
 import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.parsek.Parser
 
@@ -45,11 +46,12 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         getPlugins(this)?.fold(input) { context, plugin -> plugin.handle(context) } ?: input
 
     fun compile(code: String, className: String, methodName: String): Map<String, ByteArray> {
+        val symbolTable = SymbolTable()
         val symbolMap = SymbolMapManager()
         symbolMap.reset()
-        val stdlibInlineFunctions = StdlibLoader.load(symbolMap)
-        val phase1 = Phase1Parser(symbolMap).parse(code).first ?: error("Phase 1 parsing failed")
-        val parseResult = ParserJafun(symbolMap).parse(phase1)
+        val stdlibInlineFunctions = StdlibLoader.load(symbolMap, symbolTable)
+        val phase1 = Phase1Parser(symbolMap, symbolTable).parse(code).first ?: error("Phase 1 parsing failed")
+        val parseResult = ParserJafun(symbolMap, symbolTable).parse(phase1)
         return when (parseResult.second) {
             is Parser.Failure -> {
                 println(parseResult.second)

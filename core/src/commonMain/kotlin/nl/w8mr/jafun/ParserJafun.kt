@@ -17,6 +17,8 @@ import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
+import nl.w8mr.jafun.symboltable.SymbolTable
+import nl.w8mr.jafun.symboltable.VariableDef
 import nl.w8mr.parsek.CombinatorDSL
 import nl.w8mr.parsek.ListContext
 import nl.w8mr.parsek.Parser
@@ -39,7 +41,7 @@ import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 import nl.w8mr.parsek.invoke
 
-data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
+data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }, val symbolTable: SymbolTable = SymbolTable()) {
     inline fun <reified R: ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
@@ -312,11 +314,16 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val (symbol, block) = token<ExpressionNode.CurlyBlock>().map {
                 symbolMapManager.override(it.symbolMap) {
                     val arguments = parameters.map { (identifier, type) ->
-                        symbolMapManager.replaceVariableSymbol(
+                        val variableSymbol = symbolMapManager.replaceVariableSymbol(
                             identifier.value,
                             type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
                             false,
                             )
+                        symbolTable.replaceVariable(
+                            identifier.value,
+                            VariableDef(identifier.value, type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type")),
+                        )
+                        variableSymbol
                     }
                             val symbol =
                         JFMethod(

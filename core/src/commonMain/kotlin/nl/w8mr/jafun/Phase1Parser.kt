@@ -6,6 +6,8 @@ import nl.w8mr.jafun.compiler.Associativity.PREFIX
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.ExpressionNode.Identifier
 import nl.w8mr.jafun.compiler.SymbolMapManager
+import nl.w8mr.jafun.symboltable.SymbolTable
+import nl.w8mr.jafun.symboltable.VariableDef
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.and
 import nl.w8mr.parsek.asLiteral
@@ -35,7 +37,7 @@ import nl.w8mr.parsek.text.string
 import nl.w8mr.parsek.text.value
 import nl.w8mr.parsek.zeroOrMore
 
-data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }) {
+data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }, val symbolTable: SymbolTable = SymbolTable()) {
     companion object {
         val operatorSymbols = listOf('!', '#', '$', '%', '*', '+', '<', '>', '?', '\\', '/', '^', '|', '-', '~', '=')
     }
@@ -77,10 +79,11 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
 
     val betweenParentheses1 = seq(leftParen, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightParen) { l, b, r -> ExpressionNode.Phase1List(l,b,r) }
     val betweenCurly1 = seq(
-        leftCurly.map { symbolMapManager.push(); it }, // push new symbolMap before parsing block
+        leftCurly.map { symbolMapManager.push(); symbolTable.pushScope(); it }, // push new symbolMap before parsing block
         ref(::phase1Tokens) map ExpressionNode::Phase1List,
         rightCurly) { l, b, r ->
         val current = symbolMapManager.pop() // pop symbolmap and add it to CurlyBlock
+        symbolTable.popScope() // keep SymbolTable scope in sync
         ExpressionNode.CurlyBlock(current, listOf(l) + b.flatten() + listOf(r))
     }
 
@@ -123,6 +126,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
         symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, false, false)
+        symbolTable.addVariable(identifier.value, VariableDef(identifier.value, OperandType.Unknown, mutable = false, initialized = false))
         ExpressionNode.Phase1List(`val`, whitespace1, identifier, whitespace2, optionalType/*, equals, whitespace3*/)
     }
 
@@ -141,6 +145,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
         symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, true, false)
+        symbolTable.addVariable(identifier.value, VariableDef(identifier.value, OperandType.Unknown, mutable = true, initialized = false))
         ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType)
     }
 
@@ -165,6 +170,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val name = identifier.bind()
         val whitespace2 = owsnl.bind()
         symbolMapManager.push()
+        symbolTable.pushScope()
         val lp = leftParen.bind()
         val whitespace3 = owsnl.bind()
         val arguments = mutableListOf<Type.JFVariableSymbol>()
@@ -174,6 +180,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
                 .tokens.singleOrNull() as? Identifier ?: error("Type not simple") ).value
                 .let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown
             arguments += symbolMapManager.newVariableSymbol(identifier.value, type, false)
+            symbolTable.addVariable(identifier.value, VariableDef(identifier.value, type, mutable = false))
             it
         } map ExpressionNode::Phase1List ) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(
             ExpressionNode.Comma) }.dropLast(1)) }).bind()
@@ -194,6 +201,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
                 associativity = PREFIX,
             )
         symbolMapManager.pop()
+        symbolTable.popScope()
         symbolMapManager.add(name.value, symbol)
         ExpressionNode.Phase1List(`fun`, whitespace1, name, whitespace2, lp, whitespace3, parameters, rp, optionalType, whitespace4, body)
     }

@@ -5,6 +5,7 @@ import nl.w8mr.jafun.Phase1Parser
 import nl.w8mr.jafun.ParserJafun
 import nl.w8mr.jafun.Type
 import nl.w8mr.jafun.TypeSymbol
+import nl.w8mr.jafun.symboltable.SymbolTable
 
 expect fun readStdlibResource(path: String): String?
 
@@ -29,14 +30,14 @@ object StdlibLoader {
         "<=>" to Triple(Associativity.PREFIX, 10, true),
     )
 
-    fun load(symbolMap: SymbolMapManager): List<ExpressionNode.Function> {
+    fun load(symbolMap: SymbolMapManager, symbolTable: SymbolTable = SymbolTable()): List<ExpressionNode.Function> {
         val allFunctions = mutableListOf<ExpressionNode.Function>()
 
         for (resource in stdlibResources) {
             val content = readStdlibResource(resource) ?: continue
 
-            val phase1 = Phase1Parser(symbolMap).parse(content).first ?: continue
-            val parsed = ParserJafun(symbolMap).parse(phase1).first ?: continue
+            val phase1 = Phase1Parser(symbolMap, symbolTable).parse(content).first ?: continue
+            val parsed = ParserJafun(symbolMap, symbolTable).parse(phase1).first ?: continue
             val functions = parsed.filterIsInstance<ExpressionNode.Function>()
 
             for (fn in functions) {
