@@ -369,9 +369,6 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             inline = isInline,
                         )
                     symbolMapManager.replaceType(name.value, symbol)
-                    if (name.operator && symbol.parameters.isNotEmpty()) {
-                        IdentifierCache.replaceType(symbol.parameters[0].type, name.value, symbol)
-                    }
                     registerFunctionInSymbolTable(symbol)
 
                     val block = ExpressionNode.ExpressionList(expressions(cb.tokens.drop(1).dropLast(1)))
@@ -524,14 +521,12 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val lhsType = lhsExpression.type()
             val oldSymbols = symbolMapManager.find(lhsType, identifier.value)
                 .ifEmpty { symbolMapManager.find(null, identifier.value) }
-            val symbolTableMethods = if (oldSymbols.isEmpty()) {
-                symbolTable.lookupMethods(identifier.value)?.values
-                    ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == lhsType }
-                    ?.map { it.toJFMethod() } ?: emptyList()
-            } else {
-                emptyList()
-            }
-            val symbols = oldSymbols + symbolTableMethods
+            val symbolTableMethods = symbolTable.lookupMethods(identifier.value)?.values
+                ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == lhsType }
+                ?.map { it.toJFMethod() } ?: emptyList()
+            val stNames = symbolTableMethods.map { it.name }.toSet()
+            val symbols = symbolTableMethods +
+                oldSymbols.filterNot { (it as? JFMethod)?.name in stNames }
             val result =
                 symbols.filterIsInstance<JFMethod>().mapNotNull { symbol ->
                     (combi<ExpressionNode.Phase1Token, ExpressionNode.MethodInvocation?> {
