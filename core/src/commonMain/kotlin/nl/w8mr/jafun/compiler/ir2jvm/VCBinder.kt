@@ -368,11 +368,10 @@ object VCBinder {
         }
 
         val newParams = expandedParams.map { param ->
-            Type.JFVariableSymbol(
-                name = param.varName ?: "",
-                type = param.type,
-                symbolMap = IdentifierCache
-            )
+                Type.JFVariableSymbol(
+                    name = param.varName ?: "",
+                    type = param.type,
+                )
         }
 
         return ExpressionNode.MethodInvocation(

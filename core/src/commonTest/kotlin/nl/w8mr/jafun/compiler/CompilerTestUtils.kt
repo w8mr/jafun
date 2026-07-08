@@ -292,7 +292,7 @@ class Phase2Builder {
         operator: Boolean = false,
     ) = Type.JFMethod(
         parameters.toList()
-            .mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type, IdentifierCache) },
+            .mapIndexed { i, type -> Type.JFVariableSymbol("param${i + 1}", type) },
         parent,
         name,
         returnType,
@@ -348,7 +348,7 @@ class Phase2Builder {
         expression: ExpressionNode.Phase2_3Expression,
     ) = ValAssignment(variable, expression)
 
-    fun symbol(name: String, type: OperandType<*>) = Type.JFVariableSymbol(name, type, IdentifierCache)
+    fun symbol(name: String, type: OperandType<*>) = Type.JFVariableSymbol(name, type)
     fun variable(symbol: Type.JFVariableSymbol) = ExpressionNode.Variable(symbol)
 
     fun `when`(vararg matches: Pair<ExpressionNode.Phase2_3Expression, ExpressionNode.Phase2_3Expression>) =

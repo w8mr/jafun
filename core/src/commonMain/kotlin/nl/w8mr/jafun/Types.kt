@@ -1,8 +1,6 @@
 package nl.w8mr.jafun
 
 import nl.w8mr.jafun.compiler.Associativity
-import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.debug.Printable
 
 interface TypeSymbol
@@ -92,7 +90,6 @@ interface Type : TypeSymbol {
     data class JFVariableSymbol(
         override val name: String,
         val type: OperandType<*>,
-        val symbolMap: SymbolMap = IdentifierCache,
         val mutable: Boolean = false,
         val initialized: Boolean = true,
         val scopeId: Int = 0,

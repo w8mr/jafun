@@ -142,7 +142,7 @@ class SimpleParserTest {
         testSingleParser(
             ParserJafun(symbolMap).initValAssignment,
             """|val abc=5""".trimMargin(),
-            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
+            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, false), ExpressionNode.IntegerLiteral(5)),
             5,
         )
     }
@@ -157,7 +157,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, false), ExpressionNode.IntegerLiteral(5)),
+            ExpressionNode.ValAssignment(JFVariableSymbol("abc", OperandType.SInt32, false), ExpressionNode.IntegerLiteral(5)),
             9,
         )
     }
@@ -172,7 +172,7 @@ class SimpleParserTest {
                |abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
+            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, true), ExpressionNode.IntegerLiteral(5)),
             9,
         )
     }
@@ -186,7 +186,7 @@ class SimpleParserTest {
             """|abc = 
                |5
             """.trimMargin(),
-            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, IdentifierCache, true), ExpressionNode.IntegerLiteral(5)),
+            ExpressionNode.VarAssignment(JFVariableSymbol("abc", OperandType.SInt32, true), ExpressionNode.IntegerLiteral(5)),
             6,
         )
     }
@@ -274,8 +274,8 @@ class SimpleParserTest {
                     methodName = "+",
                     parentPath = "jafun.lang.Int",
                     parameters = listOf(
-                        JFVariableSymbol("a", OperandType.SInt32, IdentifierCache),
-                        JFVariableSymbol("b", OperandType.SInt32, IdentifierCache),
+                        JFVariableSymbol("a", OperandType.SInt32),
+                        JFVariableSymbol("b", OperandType.SInt32),
                     ),
                     rtnLookup = { OperandType.SInt32 },
                     field = null,

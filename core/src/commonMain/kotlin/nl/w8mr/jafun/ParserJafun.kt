@@ -189,7 +189,9 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             -owsnl
             val expression = expressionUntilNewline.bind()
             val uninitialisedSymbol =  symbolMapManager.find(null, identifier.value).singleOrNull() as? JFVariableSymbol ?: error("Variable not found")
-            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true).apply { this.symbolMap.replaceType(null, identifier.value, this) }
+            val updatedSymbol = uninitialisedSymbol.copy(type = expression.type(), initialized = true)
+            symbolMapManager.replaceType(identifier.value, updatedSymbol)
+            symbolTable.replaceVariable(identifier.value, VariableDef(identifier.value, expression.type(), mutable = false, initialized = true))
             ExpressionNode.ValAssignment(updatedSymbol, expression)
         }
 
@@ -921,7 +923,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             ?: OperandType.Unknown
 
     private fun MethodDef.toJFMethod(): JFMethod = JFMethod(
-        parameters = parameters.map { JFVariableSymbol(it.name, it.type, IdentifierCache) },
+        parameters = parameters.map { JFVariableSymbol(it.name, it.type) },
         parent = parentFqdn?.let { JFClass(it.value) } ?: JFClass("Script"),
         name = name,
         rtn = rtn,

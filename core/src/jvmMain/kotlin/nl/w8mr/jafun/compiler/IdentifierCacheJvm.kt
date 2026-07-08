@@ -26,7 +26,7 @@ actual fun IdentifierCache.findMethodsInClass(
 
         val method =
             Type.JFMethod(
-                params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t, IdentifierCache) },
+                params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t) },
                 jfClass,
                 functionName,
                 rtn,
@@ -51,7 +51,7 @@ actual fun IdentifierCache.findConstructorsInClass(
 
         val constructor =
             Type.JFConstructor(
-                params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t, IdentifierCache) },
+                params.mapIndexed { i, t -> Type.JFVariableSymbol("param${i + 1}", t) },
                 jfClass,
             )
         constructor

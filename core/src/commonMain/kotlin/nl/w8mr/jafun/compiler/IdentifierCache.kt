@@ -62,9 +62,8 @@ interface ClassInfo
         private fun arguments(parameterTypes: Array<out OperandType<*>>): List<Type.JFVariableSymbol> =
             parameterTypes.mapIndexed { index, param ->
                 Type.JFVariableSymbol(
-                    "param${index + 1}",
-                    param,
-                    IdentifierCache,
+                    name = "param${index + 1}",
+                    type = param,
                 )
             }
 

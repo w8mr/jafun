@@ -3,12 +3,10 @@ package nl.w8mr.jafun.compiler.ast2ir
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
-import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.compileMethod
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
-import nl.w8mr.jafun.compiler.LocalSymbolMap
 
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
@@ -107,7 +105,6 @@ fun compileExpressionNode(
                                 Type.JFVariableSymbol(
                                     "tmp",
                                     subj.type(),
-                                    LocalSymbolMap(IdentifierCache), // TODO: Need to check how to get the right scope here
                                 )
                             // Compile the assignment to the temporary variable
                             compileExpressionNode(ExpressionNode.ValAssignment(tmpVariable, subj), builder)
@@ -200,10 +197,7 @@ private fun findParamSymbolMap(
 ): Int? {
     return when (expr) {
         is ExpressionNode.Variable -> {
-            if (expr.variableSymbol.name in paramNames) {
-                if (expr.variableSymbol.scopeId != 0) expr.variableSymbol.scopeId
-                else expr.variableSymbol.symbolMap.symbolMapId
-            } else null
+            if (expr.variableSymbol.name in paramNames) expr.variableSymbol.scopeId else null
         }
         is ExpressionNode.MethodInvocation -> {
             expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
