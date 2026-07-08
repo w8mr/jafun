@@ -17,6 +17,9 @@ import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
+import nl.w8mr.jafun.symboltable.FQDN
+import nl.w8mr.jafun.symboltable.MethodDef
+import nl.w8mr.jafun.symboltable.Parameter
 import nl.w8mr.jafun.symboltable.SymbolTable
 import nl.w8mr.jafun.symboltable.VariableDef
 import nl.w8mr.parsek.CombinatorDSL
@@ -42,7 +45,7 @@ import nl.w8mr.parsek.zeroOrMore
 import nl.w8mr.parsek.invoke
 
 data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }, val symbolTable: SymbolTable = SymbolTable()) {
-    inline fun <reified R: ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
+    inline fun <reified R : ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
     val ows = zeroOrMore(whitespace).asLiteral()
@@ -118,7 +121,10 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 }
 
             val id = identifier.bind()
-            val currents = symbolMapManager.find(null, id.value)
+            val oldSymbols = symbolMapManager.find(null, id.value)
+            val symbolTableMethods = symbolTable.lookupMethods(id.value)?.values?.map { it.toJFMethod() } ?: emptyList()
+            val oldNames = oldSymbols.mapNotNull { (it as? JFMethod)?.let { "${it.parentPath}.${it.name}" } }.toSet()
+            val currents = oldSymbols + symbolTableMethods.filterNot { "${it.parentPath}.${it.name}" in oldNames }
             currents.flatMap { handleSubIndentifiers(it) }
         }
 
@@ -344,6 +350,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     if (name.operator && symbol.parameters.isNotEmpty()) {
                         IdentifierCache.replaceType(symbol.parameters[0].type, name.value, symbol)
                     }
+                    registerFunctionInSymbolTable(symbol)
 
                     val block = ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
 
@@ -353,6 +360,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
             val symbolWithReturnType = symbol.copy(rtn = block.expressions .lastOrNull()?.type() ?: OperandType.Unit)
             symbolMapManager.replaceType(name.value, symbolWithReturnType)
+            symbolTable.setInferredReturnType(FQDN("Script.${name.value}"), symbolWithReturnType.rtn)
 
             ExpressionNode.Function(symbolWithReturnType, block.expressions, inline = isInline)
         }
@@ -632,8 +640,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     parentPath = method.parentPath,
                     parameters = method.parameters,
                     rtnLookup = {
-                        val current = symbolMapManager.findSingleOrNull(method.name) as? JFMethod
-                        current?.rtn ?: method.rtn
+                        val methodFqdn = if (method.parentPath.isNotEmpty())
+                            FQDN("${method.parentPath}.${method.name}")
+                        else
+                            FQDN("Script.${method.name}")
+                        val methodDef = symbolTable.lookupMethodById(methodFqdn)
+                        methodDef?.let { symbolTable.actualReturnType(it) }
+                            ?: symbolMapManager.findSingleOrNull(method.name)?.let { (it as? JFMethod)?.rtn }
+                            ?: method.rtn
                     },
                     field = null,
                     arguments = arguments,
@@ -653,8 +667,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 parentPath = method.parentPath,
                 parameters = method.parameters,
                 rtnLookup = {
-                    val current = symbolMapManager.findSingleOrNull(method.name) as? JFMethod
-                    current?.rtn ?: method.rtn
+                    val methodFqdn = if (method.parentPath.isNotEmpty())
+                        FQDN("${method.parentPath}.${method.name}")
+                    else
+                        FQDN("Script.${method.name}")
+                    val methodDef = symbolTable.lookupMethodById(methodFqdn)
+                    methodDef?.let { symbolTable.actualReturnType(it) }
+                        ?: symbolMapManager.findSingleOrNull(method.name)?.let { (it as? JFMethod)?.rtn }
+                        ?: method.rtn
                 },
                 field = field,
                 arguments = arguments,
@@ -749,6 +769,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     inline = true,
                 )
                 symbolMapManager.replaceType(name, jfm)
+                registerFunctionInSymbolTable(jfm)
 
                 symbolMapManager.override(curlyBlock.symbolMap) {
                     structurePass(curlyBlock.tokens)
@@ -789,6 +810,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     associativity = PREFIX,
                 )
                 symbolMapManager.replaceType(name, jfm)
+                registerFunctionInSymbolTable(jfm)
 
                 symbolMapManager.override(curlyBlock.symbolMap) {
                     structurePass(curlyBlock.tokens)
@@ -853,6 +875,39 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             ?: symbolMapManager.findSingleOrNull(typeName) as? OperandType<*>
             ?: OperandType.Unknown
 
+    private fun MethodDef.toJFMethod(): JFMethod = JFMethod(
+        parameters = parameters.map { JFVariableSymbol(it.name, it.type, IdentifierCache) },
+        parent = parentFqdn?.let { JFClass(it.simpleName) } ?: JFClass("Script"),
+        name = name,
+        rtn = rtn,
+        static = static,
+        operator = operator,
+        associativity = associativity,
+        precedence = precedence,
+        inline = inline,
+    )
+
+    private fun registerFunctionInSymbolTable(method: JFMethod) {
+        val parentFqdn = FQDN("Script")
+        val methodId = parentFqdn + method.name
+        symbolTable.registerMethod(
+            MethodDef(
+                id = methodId,
+                name = method.name,
+                parentFqdn = parentFqdn,
+                parameters = method.parameters.map { Parameter(it.name, it.type) },
+                rtn = method.rtn,
+                static = method.static,
+                operator = method.operator,
+                associativity = method.associativity,
+                precedence = method.precedence,
+                inline = method.inline,
+            )
+        )
+        val pkgParts = parentFqdn.packageName.split(".").filter { it.isNotEmpty() }
+        symbolTable.findOrCreatePackage(*pkgParts.toTypedArray()).addFunction(method.name, methodId)
+    }
+
     private fun parseBodies(
         functions: List<FunDescriptor>,
         mainResult: List<ExpressionNode.Phase2Expression>,
@@ -881,6 +936,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             symbolMapManager.override(fn.descriptor.symbolMap) {
                                 symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
                             }
+                            symbolTable.setInferredReturnType(FQDN("Script.${fn.descriptor.name}"), inferredType)
                         }
                     }
                 }

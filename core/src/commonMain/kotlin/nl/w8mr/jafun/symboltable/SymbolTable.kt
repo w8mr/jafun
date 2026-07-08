@@ -84,8 +84,10 @@ class SymbolTable {
     fun getInferredReturnType(id: FQDN): OperandType<*>? = inferredReturnTypes[id]
 
     fun actualReturnType(methodDef: MethodDef): OperandType<*> =
-        if (methodDef.rtn != OperandType.Unknown) methodDef.rtn
-        else inferredReturnTypes[methodDef.id] ?: OperandType.Unknown
+        if (methodDef.rtn == OperandType.Unit || methodDef.rtn == OperandType.Unknown)
+            inferredReturnTypes[methodDef.id] ?: methodDef.rtn
+        else
+            methodDef.rtn
 
     // --- Package tree ---
 
