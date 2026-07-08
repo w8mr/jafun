@@ -54,6 +54,14 @@ class SymbolTable {
         methodById[def.id] = def
     }
 
+    fun registerMethodByFqdn(def: MethodDef) {
+        methodById[def.id] = def
+        val pkgParts = def.parentFqdn?.packageName?.split(".")?.filter { it.isNotEmpty() } ?: return
+        if (pkgParts.isNotEmpty()) {
+            findOrCreatePackage(*pkgParts.toTypedArray()).addFunction(def.name, def.id)
+        }
+    }
+
     fun lookupMethods(name: String): Map<FQDN, MethodDef>? =
         methodRegistry[name]
 
@@ -143,6 +151,18 @@ class SymbolTable {
                 val overloads = methodRegistry[shortName] ?: continue
                 val def = overloads[id] ?: continue
                 result[id] = def
+            }
+        }
+        return result
+    }
+
+    fun findMethodsByShortNameViaImports(shortName: String): List<MethodDef> {
+        val result = mutableListOf<MethodDef>()
+        for (import in imports) {
+            val pkg = findPackage(*import.value.split('.').filter { it.isNotEmpty() }.toTypedArray()) ?: continue
+            for (id in pkg.findFunctionIds(shortName)) {
+                val def = methodById[id] ?: continue
+                result.add(def)
             }
         }
         return result

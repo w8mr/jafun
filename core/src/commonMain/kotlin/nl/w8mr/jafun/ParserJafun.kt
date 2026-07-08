@@ -122,9 +122,15 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
             val id = identifier.bind()
             val symbolTableMethods = symbolTable.lookupMethods(id.value)?.values?.map { it.toJFMethod() } ?: emptyList()
-            val stMethodNames = symbolTableMethods.map { it.name }.toSet()
+            val symbolTableImportMethods = if (symbolTableMethods.isEmpty()) {
+                symbolTable.findMethodsByShortNameViaImports(id.value).map { it.toJFMethod() }
+            } else {
+                emptyList()
+            }
+            val allStMethods = symbolTableMethods + symbolTableImportMethods
+            val stMethodNames = allStMethods.map { it.name }.toSet()
             val oldSymbols = symbolMapManager.find(null, id.value)
-            val currents = symbolTableMethods +
+            val currents = allStMethods +
                 oldSymbols.filterNot {
                     (it as? JFMethod)?.name in stMethodNames
                 }
@@ -880,7 +886,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
 
     private fun MethodDef.toJFMethod(): JFMethod = JFMethod(
         parameters = parameters.map { JFVariableSymbol(it.name, it.type, IdentifierCache) },
-        parent = parentFqdn?.let { JFClass(it.simpleName) } ?: JFClass("Script"),
+        parent = parentFqdn?.let { JFClass(it.value) } ?: JFClass("Script"),
         name = name,
         rtn = rtn,
         static = static,

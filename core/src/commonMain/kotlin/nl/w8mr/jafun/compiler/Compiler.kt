@@ -15,6 +15,8 @@ import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
 import nl.w8mr.jafun.compiler.ir2jvm.VCBinder
 import nl.w8mr.jafun.symboltable.SymbolTable
 import nl.w8mr.jafun.symboltable.VariableDef
+import nl.w8mr.jafun.symboltable.FQDN
+import nl.w8mr.jafun.symboltable.MethodDef
 import nl.w8mr.kasmine.ClassDef
 import nl.w8mr.parsek.Parser
 
@@ -50,6 +52,25 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
         val symbolMap = SymbolMapManager()
         symbolMap.reset()
         val stdlibInlineFunctions = StdlibLoader.load(symbolMap, symbolTable)
+        for (jvmClass in listOf("jafun.io.ConsoleKt", "jafun.test.TestKt")) {
+            for (jfm in IdentifierCache.findMethodsInClass(jvmClass)) {
+                val parentFqdn = FQDN(jfm.parent.path)
+                symbolTable.registerMethodByFqdn(
+                    MethodDef(
+                        id = parentFqdn + jfm.name,
+                        name = jfm.name,
+                        parentFqdn = parentFqdn,
+                        parameters = jfm.parameters.map { nl.w8mr.jafun.symboltable.Parameter(it.name, it.type) },
+                        rtn = jfm.rtn,
+                        static = jfm.static,
+                        operator = jfm.operator,
+                        associativity = jfm.associativity,
+                        precedence = jfm.precedence,
+                        inline = jfm.inline,
+                    )
+                )
+            }
+        }
         val phase1 = Phase1Parser(symbolMap, symbolTable).parse(code).first ?: error("Phase 1 parsing failed")
         val parseResult = ParserJafun(symbolMap, symbolTable).parse(phase1)
         return when (parseResult.second) {
