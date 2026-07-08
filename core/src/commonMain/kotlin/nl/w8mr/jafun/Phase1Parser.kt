@@ -178,7 +178,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
             val identifier = it.getOrNull(0) as? ExpressionNode.Identifier ?: error("Identifier not found")
             val type = ((it.getOrNull(4) as? ExpressionNode.Phase1List ?: error("Type not found"))
                 .tokens.singleOrNull() as? Identifier ?: error("Type not simple") ).value
-                .let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown
+                .let { resolveTypeName(it) }
             arguments += symbolMapManager.newVariableSymbol(identifier.value, type, false)
             symbolTable.addVariable(identifier.value, VariableDef(identifier.value, type, mutable = false))
             it
@@ -195,7 +195,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
                 arguments,
                 JFClass("Script"),
                 name.value,
-                (optionalType.tokens.firstOrNull() as? Identifier)?.value?.let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown,
+                (optionalType.tokens.firstOrNull() as? Identifier)?.value?.let { resolveTypeName(it) } ?: OperandType.Unknown,
                 static = true,
                 operator = name.operator,
                 associativity = PREFIX,
@@ -227,7 +227,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
             val id = it.getOrNull(0) as? ExpressionNode.Identifier ?: error("Identifier not found")
             val type = ((it.getOrNull(4) as? ExpressionNode.Phase1List ?: error("Type not found"))
                 .tokens.singleOrNull() as? Identifier ?: error("Type not simple")).value
-                .let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unknown
+                .let { resolveTypeName(it) }
             parameters += Type.JFVariableSymbol(id.value, type)
             it
         } map ExpressionNode::Phase1List) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(ExpressionNode.Comma) }.dropLast(1)) }).bind()
@@ -278,5 +278,10 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val source = CharSequenceContext(input)
         return phase1.parse(source)
     }
+
+    private fun resolveTypeName(typeName: String): OperandType<*> =
+        symbolTable.resolveTypeByShortName(typeName)?.operandType
+            ?: symbolMapManager.findSingleOrNull(typeName) as? OperandType<*>
+            ?: OperandType.Unknown
 
 }

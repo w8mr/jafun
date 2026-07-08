@@ -330,7 +330,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             arguments,
                             JFClass("Script"),
                             name.value,
-                            returnType?.value?.let { symbolMapManager.findSingleOrNull(it) as? OperandType<*> } ?: OperandType.Unit,
+                            returnType?.value?.let { resolveTypeName(it) } ?: OperandType.Unit,
                             static = true,
                             operator = name.operator,
                             associativity = when {
@@ -820,7 +820,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 ?: error("Expected identifier before colon")
             val typeName = (nonWhitespace.getOrNull(colonIdx + 1) as? ExpressionNode.Identifier)?.value
                 ?: error("Expected type after colon")
-            val type = symbolMapManager.findSingleOrNull(typeName) as? OperandType<*> ?: OperandType.Unknown
+            val type = resolveTypeName(typeName)
             params.add(JFVariableSymbol(name, type))
         }
         return params
@@ -837,7 +837,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             while (j < tokens.size && (tokens[j] is ExpressionNode.Whitespace || tokens[j] is ExpressionNode.Newline)) j++
             val typeName = (tokens.getOrNull(j) as? ExpressionNode.Identifier)?.value
             if (typeName != null) {
-                return symbolMapManager.findSingleOrNull(typeName) as? OperandType<*> ?: OperandType.Unknown
+                return resolveTypeName(typeName)
             }
         }
         return OperandType.Unknown
@@ -847,6 +847,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         val descriptor: FunDescriptor,
         var parsedBody: List<ExpressionNode.Phase2Expression>? = null,
     )
+
+    private fun resolveTypeName(typeName: String): OperandType<*> =
+        symbolTable.resolveTypeByShortName(typeName)?.operandType
+            ?: symbolMapManager.findSingleOrNull(typeName) as? OperandType<*>
+            ?: OperandType.Unknown
 
     private fun parseBodies(
         functions: List<FunDescriptor>,
