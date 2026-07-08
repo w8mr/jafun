@@ -18,6 +18,7 @@ import nl.w8mr.jafun.compiler.LocalSymbolMap
 import nl.w8mr.jafun.compiler.SymbolMap
 import nl.w8mr.jafun.compiler.SymbolMapManager
 import nl.w8mr.jafun.symboltable.FQDN
+import nl.w8mr.jafun.symboltable.LocalScope
 import nl.w8mr.jafun.symboltable.MethodDef
 import nl.w8mr.jafun.symboltable.Parameter
 import nl.w8mr.jafun.symboltable.SymbolTable
@@ -716,6 +717,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         val symbolMap: SymbolMap,
         val returnType: OperandType<*>,
         val inline: Boolean = false,
+        val scopeCapture: Any? = null,
     )
 
     data class StructureResult(
@@ -793,7 +795,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     structurePass(curlyBlock.tokens)
                 }
 
-                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, inline = true))
+                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, inline = true, scopeCapture = curlyBlock.scopeCapture))
             } else if (token is ExpressionNode.Keyword && token.value == "fun") {
                 i++
                 while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
@@ -834,7 +836,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     structurePass(curlyBlock.tokens)
                 }
 
-                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType))
+                functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, scopeCapture = curlyBlock.scopeCapture))
             } else {
                 mainTokens.add(token)
             }
@@ -926,6 +928,16 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         symbolTable.findOrCreatePackage(*pkgParts.toTypedArray()).addFunction(method.name, methodId)
     }
 
+    private fun <T> withRestoredScope(fn: FunDescriptor, block: () -> T): T {
+        val saved = symbolTable.captureScope()
+        (fn.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
+        try {
+            return block()
+        } finally {
+            symbolTable.restoreScope(saved)
+        }
+    }
+
     private fun parseBodies(
         functions: List<FunDescriptor>,
         mainResult: List<ExpressionNode.Phase2Expression>,
@@ -938,8 +950,10 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         while (changed) {
             changed = false
             for (fn in pending.filter { it.parsedBody == null }) {
-                val body = symbolMapManager.override(fn.descriptor.symbolMap) {
-                    expressions(fn.descriptor.bodyTokens)
+                val body = withRestoredScope(fn.descriptor) {
+                    symbolMapManager.override(fn.descriptor.symbolMap) {
+                        expressions(fn.descriptor.bodyTokens)
+                    }
                 }
                 val inferredType = body.lastOrNull()?.type() ?: OperandType.Unit
                 val currentType = rtnCache[fn.descriptor.name] ?: OperandType.Unknown
@@ -948,12 +962,16 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     changed = true
                     if (inferredType != OperandType.Unknown) {
                         symbolTable.setInferredReturnType(FQDN("Script.${fn.descriptor.name}"), inferredType)
-                        val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
-                            symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                        val currentSymbol = withRestoredScope(fn.descriptor) {
+                            symbolMapManager.override(fn.descriptor.symbolMap) {
+                                symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                            }
                         }
                         if (currentSymbol != null) {
-                            symbolMapManager.override(fn.descriptor.symbolMap) {
-                                symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+                            withRestoredScope(fn.descriptor) {
+                                symbolMapManager.override(fn.descriptor.symbolMap) {
+                                    symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
+                                }
                             }
                         }
                     }
@@ -964,16 +982,20 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             }
             if (!changed && pending.any { it.parsedBody == null }) {
                 for (fn in pending.filter { it.parsedBody == null }) {
-                    fn.parsedBody = symbolMapManager.override(fn.descriptor.symbolMap) {
-                        expressions(fn.descriptor.bodyTokens)
+                    fn.parsedBody = withRestoredScope(fn.descriptor) {
+                        symbolMapManager.override(fn.descriptor.symbolMap) {
+                            expressions(fn.descriptor.bodyTokens)
+                        }
                     }
                 }
             }
         }
 
         val functionNodes = pending.map { fn ->
-            val symbol = symbolMapManager.override(fn.descriptor.symbolMap) {
-                symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+            val symbol = withRestoredScope(fn.descriptor) {
+                symbolMapManager.override(fn.descriptor.symbolMap) {
+                    symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
+                }
             } ?: symbolTable.lookupMethodById(FQDN("Script.${fn.descriptor.name}"))?.toJFMethod()
                 ?: error("Symbol for ${fn.descriptor.name} not found")
             ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList(), inline = fn.descriptor.inline)
