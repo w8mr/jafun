@@ -236,7 +236,7 @@ class Phase2Builder {
             OperandType.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 100,
-            parent = IdentifierCache.findClass("jafun.lang.IntKt"),
+            parent = IdentifierCache.findClass("jafun.lang.Int"),
             operator = true,
         )
 
@@ -248,7 +248,7 @@ class Phase2Builder {
             OperandType.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 110,
-            parent = IdentifierCache.findClass("jafun.lang.IntKt"),
+            parent = IdentifierCache.findClass("jafun.lang.Int"),
             operator = true,
         )
     val equals =
@@ -259,7 +259,7 @@ class Phase2Builder {
             OperandType.SInt32,
             associativity = Associativity.INFIXL,
             precedence = 40,
-            parent = IdentifierCache.findClass("jafun.lang.IntKt"),
+            parent = IdentifierCache.findClass("jafun.lang.Int"),
             operator = true,
         )
 

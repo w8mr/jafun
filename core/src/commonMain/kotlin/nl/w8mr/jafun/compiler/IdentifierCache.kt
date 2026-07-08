@@ -147,9 +147,10 @@ interface ClassInfo
 
             null.addPackage("jafun").apply {
                 addPackage("lang").apply {
-                    addClass("IntKt")
-                    addClass("CharKt")
-                    addClass("StringKt")
+                    addClass("Int")
+                    addClass("Long")
+                    addClass("Char")
+                    addClass("String")
                 }
                 addPackage("io").apply {
                     addClass("ConsoleKt")

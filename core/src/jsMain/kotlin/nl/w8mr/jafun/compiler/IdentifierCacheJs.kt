@@ -87,7 +87,7 @@ actual fun IdentifierCache.findMethodsInClass(
                 )
             )
         }
-        "jafun.lang.IntKt" -> {
+        "jafun.lang.Int" -> {
             listOf(
                 Type.JFMethod(
                     listOf(
