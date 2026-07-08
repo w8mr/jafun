@@ -55,13 +55,12 @@ object StdlibLoader {
         symbolTable.addImport(FQDN("jafun.test"))
 
         for (resource in stdlibResources) {
-            val content = readStdlibResource(resource) ?: continue
+val content = readStdlibResource(resource) ?: continue
+            val resourceFqdn = FQDN(resourceToClassName(resource))
 
             val phase1 = Phase1Parser(symbolMap, symbolTable).parse(content).first ?: continue
-            val parsed = ParserJafun(symbolMap, symbolTable).parse(phase1).first ?: continue
+            val parsed = ParserJafun(symbolMap, symbolTable, moduleFqdn = resourceFqdn).parse(phase1).first ?: continue
             val functions = parsed.filterIsInstance<ExpressionNode.Function>()
-
-            val resourceFqdn = FQDN(resourceToClassName(resource))
 
             for (fn in functions) {
                 val paramType = fn.symbol.parameters.firstOrNull()?.type

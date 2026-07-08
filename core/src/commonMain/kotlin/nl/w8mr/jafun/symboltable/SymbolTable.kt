@@ -50,6 +50,14 @@ class SymbolTable {
 
     fun registerMethod(def: MethodDef) {
         val overloads = methodRegistry.getOrPut(def.name) { mutableMapOf() }
+        val existingKey = overloads.entries.firstOrNull { (_, existing) ->
+            existing.parameters.map { it.type } == def.parameters.map { it.type }
+        }?.key
+        if (existingKey != null) {
+            println("WARNING: registerMethod replacing duplicate ${def.name} (${existingKey.value} -> ${def.id.value})")
+            overloads.remove(existingKey)
+            methodById.remove(existingKey)
+        }
         overloads[def.id] = def
         methodById[def.id] = def
     }

@@ -45,7 +45,7 @@ import nl.w8mr.parsek.times
 import nl.w8mr.parsek.zeroOrMore
 import nl.w8mr.parsek.invoke
 
-data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }, val symbolTable: SymbolTable = SymbolTable()) {
+data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager().apply { reset() }, val symbolTable: SymbolTable = SymbolTable(), val moduleFqdn: FQDN = FQDN("Script")) {
     inline fun <reified R : ExpressionNode.Phase1Token> token() = nl.w8mr.parsek.token<ExpressionNode.Phase1Token, R>(R::class)
 
     val whitespace = token<ExpressionNode.Whitespace>()
@@ -87,14 +87,12 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                                 val methodName = result.value.value
                                 val oldChildren = symbolMapManager.find(parentContext, methodName)
 val stChildren = if (oldChildren.isEmpty()) {
-                                symbolTable.lookupMethods(methodName)?.values
-                                    ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == parentContext }
-                                    ?.groupBy { it.name }
-                                    ?.map { (_, methods) -> methods.first().toJFMethod() }
-                                    ?: emptyList()
-                            } else {
-                                emptyList()
-                            }
+                                    symbolTable.lookupMethods(methodName)?.values
+                                        ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == parentContext }
+                                        ?.map { it.toJFMethod() } ?: emptyList()
+                                } else {
+                                    emptyList()
+                                }
                                 (oldChildren + stChildren).flatMap { child ->
                                     when (current) {
                                         is JFField -> when (child) {
@@ -950,13 +948,12 @@ val stChildren = if (oldChildren.isEmpty()) {
     )
 
     private fun registerFunctionInSymbolTable(method: JFMethod) {
-        val parentFqdn = FQDN("Script")
-        val methodId = parentFqdn + method.name
+        val methodId = moduleFqdn + method.name
         symbolTable.registerMethod(
             MethodDef(
                 id = methodId,
                 name = method.name,
-                parentFqdn = parentFqdn,
+                parentFqdn = moduleFqdn,
                 parameters = method.parameters.map { Parameter(it.name, it.type) },
                 rtn = method.rtn,
                 static = method.static,
@@ -966,7 +963,7 @@ val stChildren = if (oldChildren.isEmpty()) {
                 inline = method.inline,
             )
         )
-        val pkgParts = parentFqdn.packageName.split(".").filter { it.isNotEmpty() }
+        val pkgParts = moduleFqdn.packageName.split(".").filter { it.isNotEmpty() }
         symbolTable.findOrCreatePackage(*pkgParts.toTypedArray()).addFunction(method.name, methodId)
     }
 
