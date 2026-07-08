@@ -12,19 +12,17 @@ data class VariableDef(
 class LocalScope(
     val parent: LocalScope? = null,
     val id: Int = nextId,
+    private val variables: Map<String, VariableDef> = emptyMap(),
 ) {
-    private val variables = mutableMapOf<String, VariableDef>()
-
-    fun add(name: String, variable: VariableDef) {
+    fun add(name: String, variable: VariableDef): LocalScope {
         if (variables.containsKey(name)) {
             throw IllegalStateException("Variable '$name' already defined in this scope")
         }
-        variables[name] = variable
+        return LocalScope(parent, id, variables + (name to variable))
     }
 
-    fun replace(name: String, variable: VariableDef) {
-        variables[name] = variable
-    }
+    fun replace(name: String, variable: VariableDef): LocalScope =
+        LocalScope(parent, id, variables + (name to variable))
 
     fun find(name: String): VariableDef? =
         variables[name] ?: parent?.find(name)

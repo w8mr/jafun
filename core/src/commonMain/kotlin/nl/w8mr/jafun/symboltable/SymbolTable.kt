@@ -161,17 +161,23 @@ class SymbolTable {
     }
 
     fun addVariable(name: String, variable: VariableDef) {
-        currentScope.add(name, variable)
+        currentScope = currentScope.add(name, variable)
     }
 
     fun replaceVariable(name: String, variable: VariableDef) {
-        currentScope.replace(name, variable)
+        currentScope = currentScope.replace(name, variable)
     }
 
     fun lookupVariable(name: String): VariableDef? =
         currentScope.find(name)
 
     val currentScopeId: Int get() = currentScope.id
+
+    fun captureScope(): LocalScope = currentScope
+
+    fun restoreScope(scope: LocalScope) {
+        currentScope = scope
+    }
 
     // --- Runtime fallback via TypeResolver ---
 
