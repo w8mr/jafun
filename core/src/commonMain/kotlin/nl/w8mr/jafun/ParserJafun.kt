@@ -121,10 +121,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 }
 
             val id = identifier.bind()
-            val oldSymbols = symbolMapManager.find(null, id.value)
             val symbolTableMethods = symbolTable.lookupMethods(id.value)?.values?.map { it.toJFMethod() } ?: emptyList()
-            val oldNames = oldSymbols.mapNotNull { (it as? JFMethod)?.let { "${it.parentPath}.${it.name}" } }.toSet()
-            val currents = oldSymbols + symbolTableMethods.filterNot { "${it.parentPath}.${it.name}" in oldNames }
+            val stMethodNames = symbolTableMethods.map { "${it.parentPath}.${it.name}" }.toSet()
+            val oldSymbols = symbolMapManager.find(null, id.value)
+            val currents = symbolTableMethods +
+                oldSymbols.filterNot {
+                    (it as? JFMethod)?.let { "${it.parentPath}.${it.name}" in stMethodNames } ?: false
+                }
             currents.flatMap { handleSubIndentifiers(it) }
         }
 
