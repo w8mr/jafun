@@ -37,8 +37,12 @@ sealed interface ExpressionNode: Printable {
         }
     }
 
-    data class CurlyBlock(val symbolMap: SymbolMap, val tokens: List<Phase1Token>) : Phase1Token {
-        constructor(symbolMap: SymbolMap, vararg tokens: Phase1Token) : this(symbolMap, tokens.toList())
+    data class CurlyBlock(
+        val symbolMap: SymbolMap,
+        val scopeCapture: Any? = null,
+        val tokens: List<Phase1Token>,
+    ) : Phase1Token {
+        constructor(symbolMap: SymbolMap, vararg tokens: Phase1Token) : this(symbolMap, null, tokens.toList())
 
         /**
          * override equals to ignore symbolMap

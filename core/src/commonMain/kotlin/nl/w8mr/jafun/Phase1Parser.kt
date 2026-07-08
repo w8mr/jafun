@@ -79,12 +79,13 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
 
     val betweenParentheses1 = seq(leftParen, ref(::phase1Tokens) map ExpressionNode::Phase1List, rightParen) { l, b, r -> ExpressionNode.Phase1List(l,b,r) }
     val betweenCurly1 = seq(
-        leftCurly.map { symbolMapManager.push(); symbolTable.pushScope(); it }, // push new symbolMap before parsing block
+        leftCurly.map { symbolMapManager.push(); symbolTable.pushScope(); it },
         ref(::phase1Tokens) map ExpressionNode::Phase1List,
         rightCurly) { l, b, r ->
-        val current = symbolMapManager.pop() // pop symbolmap and add it to CurlyBlock
-        symbolTable.popScope() // keep SymbolTable scope in sync
-        ExpressionNode.CurlyBlock(current, listOf(l) + b.flatten() + listOf(r))
+        val current = symbolMapManager.pop()
+        val scopeCapture = symbolTable.captureScope()
+        symbolTable.popScope()
+        ExpressionNode.CurlyBlock(current, scopeCapture, listOf(l) + b.flatten() + listOf(r))
     }
 
     val unicode_digit = char(" is not Unicode digit") { it.category == CharCategory.DECIMAL_DIGIT_NUMBER }
