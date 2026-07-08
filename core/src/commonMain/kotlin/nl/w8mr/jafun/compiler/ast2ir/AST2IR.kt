@@ -52,7 +52,10 @@ private fun createWhenConditionExpression(
     condition: ExpressionNode.Phase2_3Expression,
 ): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
-        val symbol = IdentifierCache.findMethod(subjVar.type, "==", listOf(subjVar.type, condition.type()))
+        val symbols = IdentifierCache.find(subjVar.type, "==")
+        val symbol = symbols.filterIsInstance<Type.JFMethod>().singleOrNull { method ->
+            method.parameters.map { it.type } == listOf(subjVar.type, condition.type())
+        } ?: error("No == method found for ${subjVar.type} with ${condition.type()}")
         ExpressionNode.MethodInvocation(
             methodName = symbol.name,
             parentPath = symbol.parentPath,
@@ -61,7 +64,7 @@ private fun createWhenConditionExpression(
             field = null,
             arguments = listOf(ExpressionNode.Variable(subjVar), condition),
         )
-    } ?: condition // If no subject variable, the condition is used directly
+    } ?: condition
 }
 
 fun compileExpressionNode(
