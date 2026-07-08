@@ -1,4 +1,30 @@
-# SymbolTable — Proposed Design
+# SymbolTable — Current Design
+
+## Status
+
+The SymbolTable is now the primary source for method and type resolution in the compiler. The old `SymbolMap` / `IdentifierCache` / `LocalSymbolMap` system has been partially removed and the remaining parts (`SymbolMapManager`, `IdentifierCache`, `SymbolMap`) are deprecated.
+
+### ✅ Fully removed:
+- `symbolMap` field from `JFVariableSymbol` — replaced with `scopeId: Int`
+- `findClassInPackage` expect/actual declarations
+- `findFirst`, `findFirstOrNull`, `findMethod` from `SymbolMap` interface  
+- `IdentifierCache.replaceType`/`find` from `StdlibLoader` and `ParserJafun`
+- `SymbolMapManagerTests`, `SymbolMapTests`
+
+### ✅ SymbolTable is primary for:
+- Method resolution via `complexIdentifier` (SymbolTable first, old system fallback with name-based dedup)
+- Operator lookup via `methodRhs` (SymbolTable primary, old system fallback)
+- Return type inference via `actualReturnType` / `setInferredReturnType`
+- JVM methods (ConsoleKt, TestKt) — registered by FQDN only via `registerMethodByFqdn`
+- Variable scope IDs via `scopeId` (used by JVMBackend, AST2IR)
+- Scope capture/restore via `captureScope` / `restoreScope` (all 9 `override(symbolMap)` calls wrapped)
+
+### ❌ Still uses old system:
+- `SymbolMapManager` — scope management and variable lookups in parser
+- `IdentifierCache` — root scope for `handleSubIndentifiers` dotted access and AST2IR `==` lookup
+- `LocalSymbolMap` / `SymbolMap` — still implemented by `IdentifierCache` and used by `SymbolMapManager`
+
+---
 
 ## Principles
 

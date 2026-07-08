@@ -83,8 +83,19 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             else -> current
                         }
                         when (val result = (dot and identifier).bindAsResult()) {
-                            is Success -> when (val children = symbolMapManager.find(parentContext, result.value.value)) {
-                                else -> children.flatMap { child ->
+                            is Success -> {
+                                val methodName = result.value.value
+                                val oldChildren = symbolMapManager.find(parentContext, methodName)
+val stChildren = if (oldChildren.isEmpty()) {
+                                symbolTable.lookupMethods(methodName)?.values
+                                    ?.filter { it.parameters.isNotEmpty() && it.parameters[0].type == parentContext }
+                                    ?.groupBy { it.name }
+                                    ?.map { (_, methods) -> methods.first().toJFMethod() }
+                                    ?: emptyList()
+                            } else {
+                                emptyList()
+                            }
+                                (oldChildren + stChildren).flatMap { child ->
                                     when (current) {
                                         is JFField -> when (child) {
                                             is JFMethod -> listOf(JFFieldMethod(current, child))
@@ -563,7 +574,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         val fieldName = (dot and owsnl and identifier).bind().value
         val lhsType = lhsExpression.type()
         val methods = symbolMapManager.find(lhsType, fieldName).filterIsInstance<JFMethod>()
-        val getter = methods.singleOrNull { it.parameters.isEmpty() } ?: fail("No getter for $fieldName")
+        val stMethods = if (methods.isEmpty()) {
+            symbolTable.lookupMethods(fieldName)?.values
+                ?.filter { it.parameters.isEmpty() }
+                ?.map { it.toJFMethod() } ?: emptyList()
+        } else {
+            emptyList()
+        }
+        val getter = (methods + stMethods).singleOrNull { it.parameters.isEmpty() } ?: fail("No getter for $fieldName")
         val fieldIndex = symbolMapManager.find(lhsType).filterIsInstance<Type.JFConstructor>()
             .flatMap { it.parameters }.indexOfFirst { it.name == fieldName }
         ExpressionNode.FieldAccess(

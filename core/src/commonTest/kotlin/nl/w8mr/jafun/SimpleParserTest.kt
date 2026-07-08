@@ -15,6 +15,7 @@ import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.StdlibLoader
 import nl.w8mr.jafun.compiler.IdentifierCache
 import nl.w8mr.jafun.compiler.SymbolMapManager
+import nl.w8mr.jafun.symboltable.SymbolTable
 import nl.w8mr.parsek.ListContext
 import nl.w8mr.parsek.Parser
 import nl.w8mr.parsek.parse
@@ -25,18 +26,19 @@ import kotlin.test.fail
 class SimpleParserTest {
     @Test
     fun `Spaceship`() {
-        val loaded = StdlibLoader.load(SymbolMapManager())
+        val st = SymbolTable()
+        val loaded = StdlibLoader.load(SymbolMapManager(), st)
         val powerFn = loaded.firstOrNull { it.symbol.name == "**" }
         val block = powerFn!!.block
         println("** block size: ${block.size}, types: ${block.map { it::class.simpleName }}")
-        StdlibLoader.load(SymbolMapManager())
+        StdlibLoader.load(SymbolMapManager(), st)
         testSingleParser(
-            ParserJafun().complexIdentifier,
+            ParserJafun(SymbolMapManager().apply { reset() }, st).complexIdentifier,
             "<=>4",
             listOf(
                 JFMethod(
                     listOf(JFVariableSymbol("a", OperandType.SInt32)),
-                    parent = JFClass("Script"),
+                    parent = JFClass("jafun.test.Test"),
                     "<=>",
                     OperandType.SInt32,
                     static = true,
@@ -45,6 +47,7 @@ class SimpleParserTest {
                 ),
             ),
             1,
+            sharedTable = st,
         )
     }
 
@@ -265,8 +268,9 @@ class SimpleParserTest {
 
     @Test
     fun `string interpolation expression`() {
+        val st = SymbolTable()
         testSingleParser(
-            ParserJafun().stringLiteral_term,
+            ParserJafun(SymbolMapManager().apply { reset() }, st).stringLiteral_term,
             "\"abc\${21 + 21}\"",
             ExpressionNode.StringTemplate(listOf(
                 ExpressionNode.StringLiteral("abc"),
@@ -283,6 +287,7 @@ class SimpleParserTest {
                 )
             )),
             5,
+            sharedTable = st,
         )
     }
 
@@ -291,10 +296,11 @@ class SimpleParserTest {
         input: String,
         expected: R,
         afterIndex: Int = 1,
+        sharedTable: SymbolTable = SymbolTable(),
     ) {
+        StdlibLoader.load(SymbolMapManager(), sharedTable)
         val symbolMap = SymbolMapManager().apply { reset() }
-        StdlibLoader.load(SymbolMapManager())
-        val phase1 = Phase1Parser(symbolMap).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
+        val phase1 = Phase1Parser(symbolMap, sharedTable).parse(input.trimMargin()).first ?: fail("Phase1 not successful")
         val source = ListContext(phase1)
         val (parsed, afterContext) = parser.apply(source)
         if (parsed is Parser.Failure) {
