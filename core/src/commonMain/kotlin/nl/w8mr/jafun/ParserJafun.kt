@@ -167,9 +167,15 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
     private val expressions =
         zeroOrMore(owsnl and expressionUntilNewline)
 
-    val curlyBlock = token<ExpressionNode.CurlyBlock>().map {
-        symbolMapManager.override(it.symbolMap) {
-            ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
+    val curlyBlock = token<ExpressionNode.CurlyBlock>().map { block ->
+        val saved = symbolTable.captureScope()
+        (block.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
+        try {
+            symbolMapManager.override(block.symbolMap) {
+                ExpressionNode.ExpressionList(expressions(block.tokens.drop(1).dropLast(1)))
+            }
+        } finally {
+            symbolTable.restoreScope(saved)
         }
     }
 
@@ -327,10 +333,13 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
             val returnType = optional(colon and owsnl and identifier).bind()
             -owsnl
 
-            val (symbol, block) = token<ExpressionNode.CurlyBlock>().map {
-                symbolMapManager.override(it.symbolMap) {
-                    val arguments = parameters.map { (identifier, type) ->
-                        val variableSymbol = symbolMapManager.replaceVariableSymbol(
+            val (symbol, block) = token<ExpressionNode.CurlyBlock>().map { cb ->
+                val savedScope = symbolTable.captureScope()
+                (cb.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
+                try {
+                    symbolMapManager.override(cb.symbolMap) {
+                        val arguments = parameters.map { (identifier, type) ->
+                            val variableSymbol = symbolMapManager.replaceVariableSymbol(
                             identifier.value,
                             type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
                             false,
@@ -362,9 +371,12 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     }
                     registerFunctionInSymbolTable(symbol)
 
-                    val block = ExpressionNode.ExpressionList(expressions(it.tokens.drop(1).dropLast(1)) )
+                    val block = ExpressionNode.ExpressionList(expressions(cb.tokens.drop(1).dropLast(1)))
 
                     symbol to block
+                }
+                } finally {
+                    symbolTable.restoreScope(savedScope)
                 }
             }.bind()
 
@@ -791,8 +803,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 symbolMapManager.replaceType(name, jfm)
                 registerFunctionInSymbolTable(jfm)
 
-                symbolMapManager.override(curlyBlock.symbolMap) {
-                    structurePass(curlyBlock.tokens)
+                val savedScope = symbolTable.captureScope()
+                (curlyBlock.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
+                try {
+                    symbolMapManager.override(curlyBlock.symbolMap) {
+                        structurePass(curlyBlock.tokens)
+                    }
+                } finally {
+                    symbolTable.restoreScope(savedScope)
                 }
 
                 functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, inline = true, scopeCapture = curlyBlock.scopeCapture))
@@ -832,8 +850,14 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 symbolMapManager.replaceType(name, jfm)
                 registerFunctionInSymbolTable(jfm)
 
-                symbolMapManager.override(curlyBlock.symbolMap) {
-                    structurePass(curlyBlock.tokens)
+                val savedScope = symbolTable.captureScope()
+                (curlyBlock.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
+                try {
+                    symbolMapManager.override(curlyBlock.symbolMap) {
+                        structurePass(curlyBlock.tokens)
+                    }
+                } finally {
+                    symbolTable.restoreScope(savedScope)
                 }
 
                 functions.add(FunDescriptor(name, curlyBlock.tokens.drop(1).dropLast(1), curlyBlock.symbolMap, returnType, scopeCapture = curlyBlock.scopeCapture))
