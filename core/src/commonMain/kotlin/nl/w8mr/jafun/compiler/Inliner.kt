@@ -345,7 +345,7 @@ class Inliner(private val inlineFunctions: List<ExpressionNode.Function>) : Comp
         for (sym in symbols) {
             oldToNew[sym] = Type.JFVariableSymbol(
                 name = "${sym.name}_$suffix", type = sym.type,
-                symbolMap = sym.symbolMap, mutable = sym.mutable, initialized = sym.initialized,
+                symbolMap = sym.symbolMap, mutable = sym.mutable, initialized = sym.initialized, scopeId = sym.scopeId,
             )
         }
         fun replace(node: ExpressionNode.Phase2_3Expression): ExpressionNode.Phase2_3Expression = when (node) {

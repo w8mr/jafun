@@ -55,8 +55,7 @@ class JVMBackend {
                             }
 
                             is Type.JFVariableSymbol -> {
-                                val variableName =
-                                    "${instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
+                                val variableName = "${if (instruction.field.scopeId != 0) instruction.field.scopeId else instruction.field.symbolMap.symbolMapId}.${instruction.field.name}"
                                 when (instruction.field.type) {
                                     is OperandType.SInt32 -> iload(variableName)
                                     is OperandType.SInt64 -> lload(variableName)
@@ -399,7 +398,7 @@ class JVMBackend {
 
         private fun ClassBuilder.MethodDSL.DSL.storeVariable(instruction: ExpressionNode.Assignment) {
             val variableName =
-                "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+                "${if (instruction.variableSymbol.scopeId != 0) instruction.variableSymbol.scopeId else instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
             when (instruction.expression.type()) {
                 is OperandType.SInt32 -> istore(variableName)
                 is OperandType.SInt64 -> lstore(variableName)
@@ -450,7 +449,7 @@ class JVMBackend {
         }
 
         fun ClassBuilder.MethodDSL.DSL.loadVariable(instruction: ExpressionNode.Variable) {
-            val variableName = "${instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
+            val variableName = "${if (instruction.variableSymbol.scopeId != 0) instruction.variableSymbol.scopeId else instruction.variableSymbol.symbolMap.symbolMapId}.${instruction.variableSymbol.name}"
             when (instruction.variableSymbol.type) {
                 is OperandType.SInt32 -> iload(variableName)
                 is OperandType.SInt64 -> lload(variableName)

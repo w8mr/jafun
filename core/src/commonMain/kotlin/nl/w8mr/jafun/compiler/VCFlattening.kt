@@ -83,7 +83,7 @@ fun expandVariable(variable: Type.JFVariableSymbol): List<Type.JFVariableSymbol>
         }
         
         val expandedName = if (fieldPath.isEmpty()) variable.name else "${variable.name}_$fieldPath"
-        Type.JFVariableSymbol(expandedName, field.type, symbolMap = variable.symbolMap, mutable = variable.mutable)
+        Type.JFVariableSymbol(expandedName, field.type, symbolMap = variable.symbolMap, mutable = variable.mutable, scopeId = variable.scopeId)
     }
 }
 

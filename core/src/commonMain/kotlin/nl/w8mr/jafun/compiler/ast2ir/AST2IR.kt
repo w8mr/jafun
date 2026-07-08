@@ -141,10 +141,9 @@ fun compileExpressionNode(
         is ExpressionNode.Function -> {
             val symbol = node.symbol
             val paramNames = symbol.parameters.map { it.name }.toSet()
-            val paramRefSymbolMap = node.block.mapNotNull { e -> findParamSymbolMap(e, paramNames) }.firstOrNull()
-            val actualSymbolMapId = paramRefSymbolMap?.symbolMapId
+            val paramRefScopeId = node.block.mapNotNull { e -> findParamSymbolMap(e, paramNames) }.firstOrNull()
             val naiveParameters = symbol.parameters.map { param ->
-                val varName = if (actualSymbolMapId != null) "${actualSymbolMapId}.${param.name}" else null
+                val varName = if (paramRefScopeId != null) "${paramRefScopeId}.${param.name}" else null
                 Parameter(param.type, varName)
             }
             compileMethod(
@@ -198,10 +197,13 @@ fun compileExpressionNode(
 private fun findParamSymbolMap(
     expr: ExpressionNode.Phase2_3Expression,
     paramNames: Set<String>,
-): SymbolMap? {
+): Int? {
     return when (expr) {
         is ExpressionNode.Variable -> {
-            if (expr.variableSymbol.name in paramNames) expr.variableSymbol.symbolMap else null
+            if (expr.variableSymbol.name in paramNames) {
+                if (expr.variableSymbol.scopeId != 0) expr.variableSymbol.scopeId
+                else expr.variableSymbol.symbolMap.symbolMapId
+            } else null
         }
         is ExpressionNode.MethodInvocation -> {
             expr.arguments.firstNotNullOfOrNull { findParamSymbolMap(it, paramNames) }
