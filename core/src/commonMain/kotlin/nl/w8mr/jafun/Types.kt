@@ -94,7 +94,8 @@ interface Type : TypeSymbol {
         val type: OperandType<*>,
         val symbolMap: SymbolMap = IdentifierCache,
         val mutable: Boolean = false,
-        val initialized: Boolean = true
+        val initialized: Boolean = true,
+        val scopeId: Int = 0,
     ) : Type, InvocationTarget, Printable {
         override fun equals(other: Any?): Boolean =
             when (other) {

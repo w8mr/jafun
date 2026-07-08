@@ -339,10 +339,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 try {
                     symbolMapManager.override(cb.symbolMap) {
                         val arguments = parameters.map { (identifier, type) ->
-                            val variableSymbol = symbolMapManager.replaceVariableSymbol(
+                        val variableSymbol = symbolMapManager.replaceVariableSymbol(
                             identifier.value,
                             type.singleOrNull() as? OperandType<*> ?: TODO("Handle complex type"),
                             false,
+                            scopeId = symbolTable.currentScopeId,
                             )
                         symbolTable.replaceVariable(
                             identifier.value,

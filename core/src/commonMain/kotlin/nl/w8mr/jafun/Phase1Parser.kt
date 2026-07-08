@@ -126,7 +126,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val optionalType = (optional(
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
-        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, false, false)
+        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, false, false, scopeId = symbolTable.currentScopeId)
         symbolTable.addVariable(identifier.value, VariableDef(identifier.value, OperandType.Unknown, mutable = false, initialized = false))
         ExpressionNode.Phase1List(`val`, whitespace1, identifier, whitespace2, optionalType/*, equals, whitespace3*/)
     }
@@ -145,7 +145,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
         val optionalType = (optional(
             seq(colon, owsnl, complexIdentifierPhase1) { colon, ws1, identifier -> ExpressionNode.Phase1List(colon, ws1, identifier) }
         ).map { it ?: ExpressionNode.Phase1List() }).bind()
-        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, true, false)
+        symbolMapManager.newVariableSymbol(identifier.value, OperandType.Unknown, true, false, scopeId = symbolTable.currentScopeId)
         symbolTable.addVariable(identifier.value, VariableDef(identifier.value, OperandType.Unknown, mutable = true, initialized = false))
         ExpressionNode.Phase1List(`var`, whitespace1, identifier, whitespace2, optionalType)
     }
@@ -180,7 +180,7 @@ data class Phase1Parser(val symbolMapManager: SymbolMapManager = SymbolMapManage
             val type = ((it.getOrNull(4) as? ExpressionNode.Phase1List ?: error("Type not found"))
                 .tokens.singleOrNull() as? Identifier ?: error("Type not simple") ).value
                 .let { resolveTypeName(it) }
-            arguments += symbolMapManager.newVariableSymbol(identifier.value, type, false)
+            arguments += symbolMapManager.newVariableSymbol(identifier.value, type, false, scopeId = symbolTable.currentScopeId)
             symbolTable.addVariable(identifier.value, VariableDef(identifier.value, type, mutable = false))
             it
         } map ExpressionNode::Phase1List ) sepByAllowEmpty (comma and owsnl) map { ExpressionNode.Phase1List(it.flatMap { it.flatten() + listOf(

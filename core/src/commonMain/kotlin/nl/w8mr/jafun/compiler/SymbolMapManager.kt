@@ -72,12 +72,13 @@ class SymbolMapManager {
         name: String,
         type: OperandType<*>,
         mutable: Boolean,
-        initialized: Boolean = true
+        initialized: Boolean = true,
+        scopeId: Int = 0,
     ): JFVariableSymbol {
         if (currentSymbolMap.contains(null, name)) {
             throw IllegalStateException("Variable $name already defined")
         }
-        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized)
+        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized, scopeId)
         currentSymbolMap.add(null, name, variableSymbol)
         return variableSymbol
     }
@@ -86,9 +87,10 @@ class SymbolMapManager {
         name: String,
         type: OperandType<*>,
         mutable: Boolean,
-        initialized: Boolean = true
+        initialized: Boolean = true,
+        scopeId: Int = 0,
     ): JFVariableSymbol {
-        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized)
+        val variableSymbol = JFVariableSymbol(name, type, currentSymbolMap, mutable, initialized, scopeId)
         currentSymbolMap.replaceType(null, name, variableSymbol)
         return variableSymbol
     }
