@@ -768,7 +768,8 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 i++ // skip "fun"
                 while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
                 if (i >= tokens.size) error("Expected function name")
-                val name = (tokens[i] as ExpressionNode.Identifier).value
+                val nameToken = tokens[i] as ExpressionNode.Identifier
+                val name = nameToken.value
                 i++
 
                 while (i < tokens.size && tokens[i] !is ExpressionNode.LeftParen) i++
@@ -794,12 +795,12 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     name,
                     returnType,
                     static = true,
-                    operator = false,
-                    associativity = PREFIX,
+                    operator = nameToken.operator,
+                    associativity = if (nameToken.operator && parameters.size >= 2) Associativity.INFIXL else PREFIX,
                     inline = true,
                 )
                 symbolMapManager.replaceType(name, jfm)
-                registerFunctionInSymbolTable(jfm)
+                if (!nameToken.operator) registerFunctionInSymbolTable(jfm)
 
                 val savedScope = symbolTable.captureScope()
                 (curlyBlock.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
@@ -816,7 +817,8 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                 i++
                 while (i < tokens.size && tokens[i] !is ExpressionNode.Identifier) i++
                 if (i >= tokens.size) error("Expected function name")
-                val name = (tokens[i] as ExpressionNode.Identifier).value
+                val nameToken = tokens[i] as ExpressionNode.Identifier
+                val name = nameToken.value
                 i++
 
                 while (i < tokens.size && tokens[i] !is ExpressionNode.LeftParen) i++
@@ -842,11 +844,11 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     name,
                     returnType,
                     static = true,
-                    operator = false,
-                    associativity = PREFIX,
+                    operator = nameToken.operator,
+                    associativity = if (nameToken.operator && parameters.size >= 2) Associativity.INFIXL else PREFIX,
                 )
                 symbolMapManager.replaceType(name, jfm)
-                registerFunctionInSymbolTable(jfm)
+                if (!nameToken.operator) registerFunctionInSymbolTable(jfm)
 
                 val savedScope = symbolTable.captureScope()
                 (curlyBlock.scopeCapture as? LocalScope)?.let { symbolTable.restoreScope(it) }
