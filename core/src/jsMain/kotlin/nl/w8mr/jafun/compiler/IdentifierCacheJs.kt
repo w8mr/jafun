@@ -246,9 +246,5 @@ actual fun IdentifierCache.findConstructorsInClass(
 ): List<Type.JFConstructor> = emptyList()
 
 
-actual fun findClassInPackage(
-    name: String,
-    parent: Type.JFPackage
-): List<TypeSymbol> {
-    return emptyList<TypeSymbol>()
-}
+
+

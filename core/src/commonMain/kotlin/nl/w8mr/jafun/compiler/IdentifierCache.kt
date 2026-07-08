@@ -253,5 +253,5 @@ expect fun IdentifierCache.findConstructorsInClass(
 ): List<Type.JFConstructor>
 
 
-expect fun findClassInPackage(name: String, parent: Type.JFPackage): List<TypeSymbol>
+
 
