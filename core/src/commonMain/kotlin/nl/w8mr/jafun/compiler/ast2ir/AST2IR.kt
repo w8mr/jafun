@@ -3,10 +3,19 @@ package nl.w8mr.jafun.compiler.ast2ir
 import nl.w8mr.jafun.compiler.ir2jvm.IRBuilder
 import nl.w8mr.jafun.OperandType
 import nl.w8mr.jafun.Type
+import nl.w8mr.jafun.Type.JFMethod
+import nl.w8mr.jafun.Type.JFVariableSymbol
+import nl.w8mr.jafun.Type.JFClass
 import nl.w8mr.jafun.compiler.Parameter
 import nl.w8mr.jafun.compiler.compileMethod
 import nl.w8mr.jafun.compiler.ExpressionNode
 import nl.w8mr.jafun.compiler.IdentifierCache
+import nl.w8mr.jafun.symboltable.SymbolTable
+import nl.w8mr.jafun.symboltable.LocalScope
+
+private var compileSymbolTable: SymbolTable? = null
+
+fun setCompileSymbolTable(st: SymbolTable) { compileSymbolTable = st }
 
 fun compileAsCodeBlock(
     builder: IRBuilder.CodeBlockDSL,
@@ -51,14 +60,27 @@ private fun createWhenConditionExpression(
 ): ExpressionNode.Phase2_3Expression {
     return variable?.let { subjVar ->
         val symbols = IdentifierCache.find(subjVar.type, "==")
-        val symbol = symbols.filterIsInstance<Type.JFMethod>().singleOrNull { method ->
+        val method = symbols.filterIsInstance<Type.JFMethod>().singleOrNull { method ->
             method.parameters.map { it.type } == listOf(subjVar.type, condition.type())
+        } ?: compileSymbolTable?.let { st ->
+            st.findMethodByFirstParamType("==", subjVar.type)?.let { def ->
+                val paramTypes = def.parameters.map { it.type }
+                if (paramTypes == listOf(subjVar.type, condition.type())) {
+                    JFMethod(
+                        paramTypes.mapIndexed { i, t -> JFVariableSymbol("p$i", t) },
+                        JFClass(def.parentFqdn?.value ?: "java.lang.Object"),
+                        "==",
+                        def.rtn,
+                        static = true,
+                    )
+                } else null
+            }
         } ?: error("No == method found for ${subjVar.type} with ${condition.type()}")
         ExpressionNode.MethodInvocation(
-            methodName = symbol.name,
-            parentPath = symbol.parentPath,
-            parameters = symbol.parameters,
-            rtnLookup = { symbol.rtn },
+            methodName = method.name,
+            parentPath = method.parentPath,
+            parameters = method.parameters,
+            rtnLookup = { method.rtn },
             field = null,
             arguments = listOf(ExpressionNode.Variable(subjVar), condition),
         )

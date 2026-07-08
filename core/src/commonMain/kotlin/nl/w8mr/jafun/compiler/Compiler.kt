@@ -12,6 +12,7 @@ import nl.w8mr.jafun.compiler.Compiler.PluginType.Phase3
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVM
 import nl.w8mr.jafun.compiler.Compiler.PluginType.JVMIR
 import nl.w8mr.jafun.compiler.ast2ir.compileExpressionNode
+import nl.w8mr.jafun.compiler.ast2ir.setCompileSymbolTable
 import nl.w8mr.jafun.compiler.ir2jvm.VCBinder
 import nl.w8mr.jafun.symboltable.SymbolTable
 import nl.w8mr.jafun.symboltable.VariableDef
@@ -89,6 +90,7 @@ class Compiler(private val plugins: MutableMap<PluginType<*, *>, MutableList<Plu
                 }
                 val updatedParsed = Phase2.run(parsed ?: error("Parsed expression is null"))
 
+                setCompileSymbolTable(symbolTable)
                 val vcFieldMap = extractValueClassFields(symbolMap)
                 val classContext = ast2ir(className, updatedParsed, methodName)
                 val updatedContext = Phase3.run(classContext)
