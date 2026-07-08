@@ -929,6 +929,7 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                     rtnCache[fn.descriptor.name] = inferredType
                     changed = true
                     if (inferredType != OperandType.Unknown) {
+                        symbolTable.setInferredReturnType(FQDN("Script.${fn.descriptor.name}"), inferredType)
                         val currentSymbol = symbolMapManager.override(fn.descriptor.symbolMap) {
                             symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
                         }
@@ -936,7 +937,6 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
                             symbolMapManager.override(fn.descriptor.symbolMap) {
                                 symbolMapManager.replaceType(fn.descriptor.name, currentSymbol.copy(rtn = inferredType))
                             }
-                            symbolTable.setInferredReturnType(FQDN("Script.${fn.descriptor.name}"), inferredType)
                         }
                     }
                 }
@@ -956,7 +956,8 @@ data class ParserJafun(val symbolMapManager: SymbolMapManager = SymbolMapManager
         val functionNodes = pending.map { fn ->
             val symbol = symbolMapManager.override(fn.descriptor.symbolMap) {
                 symbolMapManager.findSingleOrNull(fn.descriptor.name) as? JFMethod
-            } ?: error("Symbol for ${fn.descriptor.name} not found")
+            } ?: symbolTable.lookupMethodById(FQDN("Script.${fn.descriptor.name}"))?.toJFMethod()
+                ?: error("Symbol for ${fn.descriptor.name} not found")
             ExpressionNode.Function(symbol, fn.parsedBody ?: emptyList(), inline = fn.descriptor.inline)
         }
         return functionNodes + mainResult
